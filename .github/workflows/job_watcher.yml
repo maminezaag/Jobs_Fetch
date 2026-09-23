@@ -1,0 +1,65 @@
+# =============================================================================
+# .github/workflows/job_watcher.yml
+# =============================================================================
+# Exécute job_watcher.py sur les serveurs GitHub Actions.
+#
+# DÉCLENCHEMENT : ce workflow N'UTILISE PAS le planificateur natif GitHub
+# Actions (la section "schedule: cron:"), volontairement — il est déclenché
+# par un événement "repository_dispatch" envoyé depuis l'EXTÉRIEUR (crontab.org
+# appelle l'API GitHub à intervalle régulier). Voir README.md pour la
+# configuration précise côté crontab.org (URL, en-têtes, token).
+#
+# "workflow_dispatch" est aussi activé en plus, pour pouvoir lancer le
+# workflow manuellement depuis l'onglet "Actions" de GitHub (pratique pour
+# tester sans attendre le prochain déclenchement crontab.org).
+
+name: Job Watcher
+
+on:
+  repository_dispatch:
+    # Le type d'événement envoyé par crontab.org doit correspondre EXACTEMENT
+    # à cette valeur dans le corps JSON de sa requête POST :
+    #   { "event_type": "run-job-watcher" }
+    types: [run-job-watcher]
+  workflow_dispatch: {}  # bouton "Run workflow" manuel dans l'onglet Actions
+
+# Nécessaire pour que le job puisse recommitter seen_jobs.json dans le repo
+permissions:
+  contents: write
+
+jobs:
+  run-job-watcher:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code du repo
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer job_watcher.py
+        env:
+          # Ces trois noms doivent être créés comme "Secrets" du repo
+          # (Settings > Secrets and variables > Actions > New repository secret)
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+        run: python job_watcher.py --config config.yaml
+
+      - name: Sauvegarder l'historique des offres déjà vues (seen_jobs.json)
+        # Sans cette étape, seen_jobs.json créé/modifié pendant le run serait
+        # perdu à la fin de l'exécution (les runners GitHub Actions sont
+        # éphémères) — le prochain run croirait que TOUTES les offres sont
+        # nouvelles. On recommit donc le fichier dans le repo, seulement s'il
+        # a changé.
+        run: |
+          git config user.name "job-watcher-bot"
+          git config user.email "job-watcher-bot@users.noreply.github.com"
+          git add seen_jobs.json
+          git diff --staged --quiet || git commit -m "chore: mise à jour de l'historique des offres vues [skip ci]"
+          git push
