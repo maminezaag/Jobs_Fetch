@@ -37,7 +37,7 @@
 
     "parametres_communs": {
       "_aide": "Paramètres appliqués aux DEUX recherches ci-dessus (locale et remote_national).",
-      "domaine": "IT-Netzwerktechnik, -Administration, -Organisation",
+      "domaine": null,
       "jours": 7,
       "type_offre": 1,
       "interim": true
