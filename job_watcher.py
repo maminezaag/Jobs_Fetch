@@ -592,7 +592,7 @@ def main() -> None:
     session = requests.Session()
 
     raw_offers = search_jobs(cfg, session)
-    new_offers = [o for o in raw_offers if o.get("refnr") not in state["vus"]]
+    new_offers = [o for o in raw_offers if o.get("referenznummer") not in state["vus"]]
     logger.info("Nouvelles offres depuis le dernier passage : %d", len(new_offers))
 
     results: list[JobResult] = []
