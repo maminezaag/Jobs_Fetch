@@ -203,10 +203,23 @@ def _run_search(
             **extra_params,
         }
         params = {k: v for k, v in params.items() if v not in (None, "")}
+        # IMPORTANT : la bibliothèque requests sérialise un booléen Python
+        # True/False en "True"/"False" (majuscule) dans l'URL, ce que l'API
+        # Arbeitsagentur ne reconnaît pas forcément comme un booléen valide.
+        # On force donc "true"/"false" en minuscules, format attendu par
+        # la plupart des API REST (dont celle-ci).
+        params = {
+            k: ("true" if v is True else "false" if v is False else v)
+            for k, v in params.items()
+        }
 
         logger.info("[%s] Recherche %r (page %s)...", source_label, query, page)
         try:
             r = session.get(SEARCH_ENDPOINT, headers=HEADERS, params=params, timeout=REQUEST_TIMEOUT)
+            # Log de l'URL réellement appelée (avec tous les paramètres encodés) —
+            # utile pour copier-coller et tester manuellement (navigateur/curl)
+            # si jamais un résultat inattendu (ex. 0 offre partout) se reproduit.
+            logger.info("[%s] URL appelée : %s", source_label, r.url)
             r.raise_for_status()
         except requests.RequestException as e:
             logger.error("[%s] Échec de la recherche pour %r : %s", source_label, query, e)
@@ -263,6 +276,34 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
             _run_search(session, query, remote_params, common_params, "remote_national", fusion)
 
     logger.info("Total offres uniques trouvées (locale + remote fusionnées) : %d", len(fusion))
+
+    # ------------------------------------------------------------------
+    # FILET DE SÉCURITÉ DIAGNOSTIC : si tout reste à zéro malgré des
+    # recherches a priori larges, on fait un ultime appel minimaliste
+    # (aucun filtre sauf "was") et on affiche la réponse brute dans les
+    # logs. Ça permet de savoir directement, depuis les logs GitHub
+    # Actions, si le problème vient d'un des paramètres qu'on envoie ou
+    # d'autre chose (ex. l'API renvoie vraiment 0 résultat même nue).
+    # ------------------------------------------------------------------
+    if not fusion:
+        logger.warning(
+            "Aucune offre trouvée par AUCUNE des %d recherches — test diagnostic "
+            "avec une requête minimale (was=Linux, sans autre filtre)...",
+            len(recherche.get("locale", {}).get("mots_cles", [])) + len(recherche.get("remote_national", {}).get("mots_cles", [])),
+        )
+        try:
+            r = session.get(
+                SEARCH_ENDPOINT,
+                headers=HEADERS,
+                params={"was": "Linux", "size": 5, "page": 1},
+                timeout=REQUEST_TIMEOUT,
+            )
+            logger.warning("[diagnostic] URL appelée : %s", r.url)
+            logger.warning("[diagnostic] Code HTTP : %s", r.status_code)
+            logger.warning("[diagnostic] Réponse brute (premiers 1000 caractères) : %s", r.text[:1000])
+        except requests.RequestException as e:
+            logger.warning("[diagnostic] La requête minimale a aussi échoué : %s", e)
+
     return list(fusion.values())
 
 
