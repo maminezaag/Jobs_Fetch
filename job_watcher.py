@@ -101,7 +101,6 @@ logger = logging.getLogger("job_watcher")
 @dataclass
 class JobResult:
     refnr: str
-    hash_id: str
     title: str
     employer: str
     ort: str
@@ -226,9 +225,16 @@ def _run_search(
             return
 
         data = r.json()
-        offers = data.get("stellenangebote", []) or []
+        # NOTE (23.09.2026) : la réponse réelle de l'API en production diffère
+        # du schéma openapi.yaml documenté (qui semble périmé). Constaté par
+        # diagnostic direct : la liste des offres est sous la clé
+        # "ergebnisliste" (pas "stellenangebote"), et l'identifiant unique
+        # d'une offre est "referenznummer" (pas "refnr"). Voir la fonction
+        # main() pour le mapping complet des autres champs (titre, employeur,
+        # lieu, date) qui ont eux aussi changé de nom.
+        offers = data.get("ergebnisliste", []) or []
         for o in offers:
-            refnr = o.get("refnr")
+            refnr = o.get("referenznummer")
             if refnr and refnr not in fusion:
                 o["_source"] = source_label
                 fusion[refnr] = o
@@ -322,6 +328,9 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     return list(fusion.values())
 
 
+_description_field_warned = False  # évite de spammer les logs, un seul avertissement suffit
+
+
 def fetch_description(session: requests.Session, refnr: str) -> str:
     """Récupère la description complète de l'offre à partir de son refnr
     (encodé en base64 standard dans le chemin, comme l'exige l'API — voir
@@ -330,8 +339,12 @@ def fetch_description(session: requests.Session, refnr: str) -> str:
     tout le run.
 
     Le nom du champ contenant le texte a changé selon la version de l'API
-    (ancien : "stellenbeschreibung", nouveau : "stellenangebotsBeschreibung")
-    — on essaie les deux pour rester robuste si l'API change encore."""
+    (ancien : "stellenbeschreibung", nouveau documenté : "stellenangebotsBeschreibung")
+    — on essaie les deux. Si aucun des deux n'existe (l'API a peut-être encore
+    changé ce nom, comme elle l'a fait pour la recherche), on log UNE FOIS les
+    vraies clés disponibles pour faciliter un futur diagnostic, sans spammer
+    les logs à chaque offre."""
+    global _description_field_warned
     if not refnr:
         return ""
     encoded_refnr = url_quote(base64.b64encode(refnr.encode("utf-8")).decode("ascii"), safe="")
@@ -343,7 +356,16 @@ def fetch_description(session: requests.Session, refnr: str) -> str:
         )
         r.raise_for_status()
         data = r.json()
-        return data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung") or ""
+        description = data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung")
+        if not description and not _description_field_warned:
+            logger.warning(
+                "Aucun champ de description reconnu dans la réponse jobdetails — "
+                "clés disponibles : %s (le nom du champ a peut-être encore changé "
+                "côté API, à vérifier si ce message revient souvent)",
+                list(data.keys()),
+            )
+            _description_field_warned = True
+        return description or ""
     except requests.RequestException as e:
         logger.warning("Détails indisponibles pour refnr=%s : %s", refnr, e)
         return ""
@@ -549,16 +571,21 @@ def main() -> None:
 
     results: list[JobResult] = []
     for o in new_offers:
-        arbeitsort = o.get("arbeitsort") or {}
+        # Mapping vers les vrais noms de champs de la réponse API en
+        # production (voir la note dans _run_search ci-dessus). "stellenlokationen"
+        # est une LISTE de lieux possibles pour l'offre — on prend le premier,
+        # suffisant pour l'affichage dans l'e-mail.
+        lokalisations = o.get("stellenlokationen") or [{}]
+        adresse = (lokalisations[0] or {}).get("adresse", {}) if lokalisations else {}
         job = JobResult(
-            refnr=o.get("refnr", ""),
-            hash_id=o.get("hashId", ""),
-            title=o.get("beruf", ""),
-            employer=o.get("arbeitgeber", ""),
-            ort=arbeitsort.get("ort", ""),
-            plz=str(arbeitsort.get("plz", "")),
-            region=arbeitsort.get("region", ""),
-            published=o.get("aktuelleVeroeffentlichungsdatum", ""),
+            refnr=o.get("referenznummer", ""),
+            title=o.get("stellenangebotsTitel") or o.get("hauptberuf", ""),
+            employer=o.get("firma", ""),
+            ort=adresse.get("ort", ""),
+            plz=str(adresse.get("plz", "")),
+            region=adresse.get("region", ""),
+            published=o.get("datumErsteVeroeffentlichung")
+                      or (o.get("veroeffentlichungszeitraum") or {}).get("von", ""),
             source=o.get("_source", "?"),
         )
         job.description = fetch_description(session, job.refnr)
