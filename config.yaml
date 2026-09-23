@@ -1,0 +1,58 @@
+# =============================================================================
+# config.yaml — Configuration TECHNIQUE de job_watcher.py
+# =============================================================================
+# Ce fichier ne contient QUE la technique (chemins, e-mail, seuil).
+# Tout le contenu "métier" (mots-clés de recherche, critères d'élimination,
+# compétences pondérées) vit dans criteres.json — voir criteres.fichier
+# ci-dessous. C'est ce fichier-là qu'il faut éditer pour ajouter/retirer un
+# mot-clé ou une compétence, pas celui-ci.
+
+criteres:
+  # Chemin du fichier JSON contenant recherche + élimination + points positifs
+  # (relatif à l'emplacement de ce config.yaml, ou chemin absolu).
+  fichier: "criteres.json"
+
+  # Score minimum (somme des poids des compétences trouvées dans criteres.json)
+  # pour qu'une offre déclenche une notification par e-mail.
+  # Repère avec le barème actuel (5/4/3/2) : 2 compétences de niveau 1
+  # (ex. Linux + Proxmox) = 10 pts. Valeur de départ : 12.
+  # → à ajuster librement selon que tu reçois trop ou pas assez d'offres.
+  seuil_points: 12
+
+email:
+  # Serveur SMTP Gmail (valeurs par défaut correctes pour Gmail, à changer
+  # seulement si tu utilises un autre fournisseur).
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+
+  # Les IDENTIFIANTS (adresse, mot de passe d'application, destinataire) ne
+  # sont PAS mis ici en clair. Ils viennent des variables d'environnement :
+  #   GMAIL_ADDRESS       -> adresse d'expédition (et de connexion SMTP)
+  #   GMAIL_APP_PASSWORD  -> mot de passe d'application Gmail (pas ton mdp normal)
+  #   GMAIL_TO            -> adresse(s) destinataire(s), séparées par des virgules
+  # Voir .env.example pour un test en local, et README.md pour leur
+  # configuration en tant que "Secrets" GitHub Actions.
+
+# -----------------------------------------------------------------------
+# Vérification anti-doublon de candidature (Google Sheet "Meine Bewerbungen")
+# -----------------------------------------------------------------------
+# Le script consulte un onglet public en lecture seule de ton suivi de
+# candidatures. Si l'employeur d'une nouvelle offre apparaît déjà dans les
+# dernières lignes de la colonne "Firma", l'offre est NOTIFIÉE QUAND MÊME
+# mais avec un avertissement "⚠️ eventuell bereits beworben" dans l'e-mail
+# (aucun blocage — c'est toi qui décides quoi en faire).
+candidatures_sheet:
+  actif: true
+  # URL d'export CSV d'un onglet précis par son NOM (robuste si tu réordonnes
+  # les onglets plus tard, pas besoin de connaître le gid numérique).
+  url_csv: "https://docs.google.com/spreadsheets/d/11Js4fElaBicrBF3zBxsJBCIeorawN0u4mkXt04g_DkQ/gviz/tq?tqx=out:csv&sheet=StellenempfehlungenALG"
+  colonne_entreprise: "Firma"
+  nb_dernieres_lignes: 30
+
+etat:
+  # Fichier qui mémorise les offres déjà vues, pour ne jamais notifier deux
+  # fois la même annonce lors des prochains passages (chemin relatif à
+  # l'emplacement de ce config.yaml, ou chemin absolu). Sur GitHub Actions,
+  # ce fichier est recommité dans le repo à la fin de chaque run pour
+  # persister d'une exécution à l'autre (voir le workflow).
+  fichier: "seen_jobs.json"

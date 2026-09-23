@@ -1,0 +1,127 @@
+{
+  "_lisez_moi": [
+    "Ce fichier contient TOUT ce qui définit 'quoi chercher' et 'comment noter' les offres.",
+    "config.yaml ne contient que la technique (e-mail, seuil, chemins de fichiers).",
+    "Chaque section a sa propre clé '_aide' avec les instructions d'ajout/suppression.",
+    "Le JSON standard n'accepte pas les commentaires '//' ou '#', d'où ces clés '_aide' —",
+    "elles sont ignorées par le script (il ne lit que les clés utiles), tu peux les garder",
+    "ou les modifier librement, elles ne cassent rien."
+  ],
+
+  "recherche": {
+    "_aide": "Définit les appels faits à l'API Jobsuche de l'Arbeitsagentur. Deux sous-recherches distinctes, fusionnées et dédoublonnées par le script (une offre trouvée par les deux ne compte qu'une fois).",
+
+    "locale": {
+      "_aide": "Recherche classique par rayon autour d'un lieu. POUR AJOUTER un mot-clé : ajoute une ligne dans 'mots_cles'. POUR EN SUPPRIMER un : retire la ligne. 'rayon_km' = distance en km autour de 'lieu' (plus grand = plus large).",
+      "mots_cles": [
+        "IT-Administration und Betreuung",
+        "Linux Systemadministrator",
+        "IT-Systemadministrator",
+        "Netzwerkadministrator",
+        "DevOps Engineer"
+      ],
+      "lieu": "Oldenburg",
+      "rayon_km": 60
+    },
+
+    "remote_national": {
+      "_aide": "Recherche SANS limite de distance (pas de 'wo'/'umkreis'), filtrée sur le télétravail via arbeitszeit=ho (code officiel API pour Home-/Telearbeit). Capte les offres 100% remote proposées par des employeurs situés n'importe où en Allemagne, qui seraient invisibles avec un simple filtre de rayon. Mets 'actif' à false pour désactiver cette seconde recherche sans supprimer sa config.",
+      "actif": true,
+      "mots_cles": [
+        "Linux Systemadministrator",
+        "IT-Systemadministrator",
+        "DevOps Engineer",
+        "Cloud Engineer"
+      ]
+    },
+
+    "parametres_communs": {
+      "_aide": "Paramètres appliqués aux DEUX recherches ci-dessus (locale et remote_national).",
+      "domaine": "IT-Netzwerktechnik, -Administration, -Organisation",
+      "jours": 7,
+      "type_offre": 1,
+      "interim": true
+    }
+  },
+
+  "elimination": {
+    "_aide": "Toute offre contenant UNE de ces expressions (titre OU description, recherche insensible à la casse) est écartée d'office, quel que soit son score. POUR AJOUTER un critère : ajoute une ligne. POUR EN SUPPRIMER un : retire la ligne. ATTENTION : évite les mots trop courts/courants (ex. juste 'C1') qui risqueraient de matcher par erreur dans un contexte sans rapport — préfère des expressions complètes comme ci-dessous.",
+    "mots": [
+      "mindestens C1",
+      "C1-Niveau",
+      "C1 Niveau",
+      "Sprachniveau C1",
+      "Deutschkenntnisse C1",
+      "Deutsch C1",
+      "Niveau C1",
+      "mindestens C2",
+      "C2-Niveau",
+      "C2 Niveau",
+      "Sprachniveau C2",
+      "Deutschkenntnisse C2",
+      "Deutsch C2",
+      "Niveau C2",
+      "verhandlungssicheres Deutsch",
+      "muttersprachliches Deutsch",
+      "Deutsch auf Muttersprachniveau",
+      "Muttersprache Deutsch"
+    ]
+  },
+
+  "points_positifs": {
+    "_aide": [
+      "Chaque groupe = UNE compétence réelle, avec 'nom', 'poids' (points) et 'mots' (tous ses synonymes/orthographes).",
+      "RÈGLE IMPORTANTE : le poids est accordé UNE SEULE FOIS par groupe, même si plusieurs synonymes du même groupe apparaissent dans le texte (ex. 'RedHat' + 'RHEL' dans la même annonce = 5 pts, pas 10).",
+      "POUR AJOUTER une compétence : copie un bloc {nom, poids, mots} et adapte.",
+      "POUR AJOUTER un synonyme à une compétence existante : ajoute une entrée dans son tableau 'mots' (NE CRÉE PAS un nouveau groupe, sinon la même compétence compterait deux fois).",
+      "POUR SUPPRIMER une compétence : retire tout son bloc {...}.",
+      "Barème actuel à 4 niveaux : Niveau 1 -> 5 pts, Niveau 2 -> 4 pts, Niveau 3 -> 3 pts, Niveau 4 -> 2 pts."
+    ],
+    "groupes": [
+      { "nom": "Linux (RedHat/RHEL)", "niveau": 1, "poids": 5,
+        "mots": ["RedHat", "Red Hat", "RHEL", "Red Hat Enterprise Linux"] },
+      { "nom": "Linux (général)", "niveau": 1, "poids": 5,
+        "mots": ["Linux"] },
+      { "nom": "CheckMK", "niveau": 1, "poids": 5,
+        "mots": ["CheckMK", "Check_MK", "Check MK"] },
+      { "nom": "Bash / Shell Scripting", "niveau": 1, "poids": 5,
+        "mots": ["Bash", "Shell-Skript", "Shellskript", "Shell Scripting"] },
+      { "nom": "Proxmox", "niveau": 1, "poids": 5,
+        "mots": ["Proxmox", "Proxmox VE"] },
+      { "nom": "Puppet", "niveau": 1, "poids": 5,
+        "mots": ["Puppet"] },
+      { "nom": "Ubuntu", "niveau": 1, "poids": 5,
+        "mots": ["Ubuntu"] },
+      { "nom": "Zimbra", "niveau": 1, "poids": 5,
+        "mots": ["Zimbra"] },
+      { "nom": "IT-Support", "niveau": 1, "poids": 5,
+        "mots": ["IT-Support", "IT Support", "Anwendersupport", "1st Level Support", "2nd Level Support"] },
+
+      { "nom": "Virtualisierung (général)", "niveau": 2, "poids": 4,
+        "mots": ["Virtualisierung", "Virtualization"] },
+      { "nom": "VMware vSphere / ESXi", "niveau": 2, "poids": 4,
+        "mots": ["vSphere", "VMware vSphere", "VMware ESXi", "ESXi", "VMware"] },
+      { "nom": "Ansible", "niveau": 2, "poids": 4,
+        "mots": ["Ansible"] },
+
+      { "nom": "Terraform", "niveau": 3, "poids": 3,
+        "mots": ["Terraform"] },
+      { "nom": "Active Directory", "niveau": 3, "poids": 3,
+        "mots": ["Active Directory", "AD-Administration"] },
+      { "nom": "GPO / Gruppenrichtlinien", "niveau": 3, "poids": 3,
+        "mots": ["GPO", "Gruppenrichtlinien", "Group Policy"] },
+      { "nom": "Python", "niveau": 3, "poids": 3,
+        "mots": ["Python-Skript", "Python Scripting", "Python"] },
+      { "nom": "Windows Server", "niveau": 3, "poids": 3,
+        "mots": ["Windows Server"] },
+
+      { "nom": "Networking", "niveau": 4, "poids": 2,
+        "mots": ["Networking", "Netzwerktechnik", "Netzwerkadministration"] },
+      { "nom": "Firewalling", "niveau": 4, "poids": 2,
+        "mots": ["Firewall", "Firewalling"] },
+
+      { "nom": "Homeoffice / Remote / Hybrid", "niveau": "bonus", "poids": 3,
+        "mots": ["Homeoffice", "Home-Office", "Remote", "hybrides Arbeiten", "mobiles Arbeiten", "Telearbeit"] }
+    ]
+  }
+}
