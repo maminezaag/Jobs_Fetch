@@ -107,7 +107,7 @@ class JobResult:
     plz: str
     region: str
     published: str
-    source: str  # "locale" ou "remote_national" — d'où vient cette offre
+    source: str  # "locale", "remote_ho" ou "remote_texte" — d'où vient cette offre
     description: str = ""
     score: int = 0
     matched_positive: list[str] = field(default_factory=list)
@@ -274,14 +274,30 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     for query in locale.get("mots_cles", []):
         _run_search(session, query, locale_params, common_params, "locale", fusion)
 
-    # --- Recherche remote nationale : pas de wo/umkreis, arbeitszeit=ho ---
+    # --- Recherche remote nationale : deux volets complémentaires ---
     remote = recherche.get("remote_national", {})
     if remote.get("actif", False):
-        remote_params = {"arbeitszeit": "ho"}
-        for query in remote.get("mots_cles", []):
-            _run_search(session, query, remote_params, common_params, "remote_national", fusion)
+        # Volet 1 : mots-clés classiques + tag officiel arbeitszeit=ho
+        avec_flag = remote.get("avec_flag_ho", {})
+        for query in avec_flag.get("mots_cles", []):
+            _run_search(session, query, {"arbeitszeit": "ho"}, common_params, "remote_ho", fusion)
 
-    logger.info("Total offres uniques trouvées (locale + remote fusionnées) : %d", len(fusion))
+        # Volet 2 : le mot "remote"/"homeoffice" est DANS le mot-clé recherché,
+        # aucun filtre arbeitszeit — capte les annonces qui ne cochent pas le
+        # tag officiel mais l'annoncent dans leur titre.
+        texte_libre = remote.get("texte_libre", {})
+        for query in texte_libre.get("mots_cles", []):
+            _run_search(session, query, {}, common_params, "remote_texte", fusion)
+
+    # Comptage par source à des fins de diagnostic — pour objectiver combien
+    # d'offres viennent de chaque type de recherche plutôt que de deviner.
+    compte_par_source: dict[str, int] = {}
+    for o in fusion.values():
+        src = o.get("_source", "?")
+        compte_par_source[src] = compte_par_source.get(src, 0) + 1
+    logger.info("Répartition par source : %s", compte_par_source)
+
+    logger.info("Total offres uniques trouvées (toutes sources fusionnées) : %d", len(fusion))
 
     # ------------------------------------------------------------------
     # FILET DE SÉCURITÉ DIAGNOSTIC : si tout reste à zéro malgré des
@@ -292,10 +308,15 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     # d'autre chose (ex. l'API renvoie vraiment 0 résultat même nue).
     # ------------------------------------------------------------------
     if not fusion:
+        nb_locale = len(recherche.get("locale", {}).get("mots_cles", []))
+        nb_remote = (
+            len(remote.get("avec_flag_ho", {}).get("mots_cles", []))
+            + len(remote.get("texte_libre", {}).get("mots_cles", []))
+        )
         logger.warning(
             "Aucune offre trouvée par AUCUNE des %d recherches — test diagnostic "
             "avec une requête minimale (was=Linux, sans autre filtre)...",
-            len(recherche.get("locale", {}).get("mots_cles", [])) + len(recherche.get("remote_national", {}).get("mots_cles", [])),
+            nb_locale + nb_remote,
         )
         try:
             r = session.get(
@@ -450,14 +471,19 @@ def load_recent_companies(cfg: dict[str, Any], session: requests.Session) -> lis
         return []
 
     reader = csv.DictReader(io.StringIO(r.text))
-    if colonne not in (reader.fieldnames or []):
+    # Comparaison tolérante aux espaces superflus dans les en-têtes du Sheet
+    # (ex. "Firma " avec une espace finale) — évite de dépendre d'un nom de
+    # colonne EXACT côté Google Sheet, qui pourrait changer par erreur.
+    entetes = reader.fieldnames or []
+    colonne_reelle = next((h for h in entetes if h.strip() == colonne.strip()), None)
+    if colonne_reelle is None:
         logger.warning(
             "Colonne %r introuvable dans le Google Sheet (colonnes trouvées : %s)",
-            colonne, reader.fieldnames,
+            colonne, entetes,
         )
         return []
 
-    noms = [row[colonne].strip() for row in reader if row.get(colonne, "").strip()]
+    noms = [row[colonne_reelle].strip() for row in reader if row.get(colonne_reelle, "").strip()]
     dernieres = noms[-n:] if n > 0 else noms
     logger.info("Suivi de candidatures : %d entreprise(s) récente(s) chargée(s).", len(dernieres))
     return [_normaliser_nom_entreprise(n) for n in dernieres]
