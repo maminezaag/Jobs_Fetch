@@ -25,19 +25,33 @@
     },
 
     "remote_national": {
-      "_aide": "Recherche SANS limite de distance (pas de 'wo'/'umkreis'), filtrée sur le télétravail via arbeitszeit=ho (code officiel API pour Home-/Telearbeit). Capte les offres 100% remote proposées par des employeurs situés n'importe où en Allemagne, qui seraient invisibles avec un simple filtre de rayon. Mets 'actif' à false pour désactiver cette seconde recherche sans supprimer sa config.",
+      "_aide": "Deux façons complémentaires de capter le télétravail à l'échelle nationale (sans limite de distance). 'avec_flag_ho' utilise le tag officiel arbeitszeit=ho (Home-/Telearbeit) que l'API expose — mais beaucoup d'employeurs oublient de cocher ce champ facultatif en publiant leur offre. 'texte_libre' compense ce trou : elle cherche directement des mots comme 'Homeoffice'/'Remote' dans le texte recherché, SANS dépendre du tag ni d'aucune restriction de lieu — ça capte les annonces qui mentionnent le remote sans l'avoir déclaré formellement. Mets 'actif' à false pour tout désactiver d'un coup.",
       "actif": true,
-      "mots_cles": [
-        "Linux Systemadministrator",
-        "IT-Systemadministrator",
-        "DevOps Engineer",
-        "Cloud Engineer"
-      ]
+
+      "avec_flag_ho": {
+        "_aide": "Mots-clés de métier classiques, combinés au filtre arbeitszeit=ho. POUR AJOUTER : ajoute une ligne dans mots_cles.",
+        "mots_cles": [
+          "Linux Systemadministrator",
+          "IT-Systemadministrator",
+          "DevOps Engineer",
+          "Cloud Engineer"
+        ]
+      },
+
+      "texte_libre": {
+        "_aide": "Le mot 'remote'/'homeoffice' fait ICI PARTIE du mot-clé recherché — pas de filtre arbeitszeit, pas de restriction de lieu. POUR AJOUTER une variante : ajoute une ligne dans mots_cles (combine un métier + un terme remote).",
+        "mots_cles": [
+          "Linux Administrator Homeoffice",
+          "Systemadministrator Remote",
+          "IT Administrator Homeoffice",
+          "DevOps Engineer Remote"
+        ]
+      }
     },
 
     "parametres_communs": {
       "_aide": "Paramètres appliqués aux DEUX recherches ci-dessus (locale et remote_national).",
-      "domaine": null,
+      "domaine": "IT-Netzwerktechnik, -Administration, -Organisation",
       "jours": 7,
       "type_offre": 1,
       "interim": true
