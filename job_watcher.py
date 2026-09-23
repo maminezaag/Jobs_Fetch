@@ -300,9 +300,24 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
             )
             logger.warning("[diagnostic] URL appelée : %s", r.url)
             logger.warning("[diagnostic] Code HTTP : %s", r.status_code)
-            logger.warning("[diagnostic] Réponse brute (premiers 1000 caractères) : %s", r.text[:1000])
+            diag_data = r.json()
+            # On affiche les VRAIES clés du JSON (plus fiable qu'un extrait de
+            # texte tronqué) : la clé de premier niveau contenant la liste des
+            # offres, et les clés du premier élément de cette liste, pour
+            # savoir précisément comment adapter le parsing si l'API a changé
+            # ses noms de champs.
+            logger.warning("[diagnostic] Clés de premier niveau : %s", list(diag_data.keys()))
+            for key, value in diag_data.items():
+                if isinstance(value, list) and value and isinstance(value[0], dict):
+                    logger.warning(
+                        "[diagnostic] '%s' est une liste de %d élément(s) — clés du premier élément : %s",
+                        key, len(value), list(value[0].keys()),
+                    )
+                    logger.warning("[diagnostic] Contenu complet du premier élément : %s", json.dumps(value[0], ensure_ascii=False, indent=2))
         except requests.RequestException as e:
             logger.warning("[diagnostic] La requête minimale a aussi échoué : %s", e)
+        except (ValueError, json.JSONDecodeError) as e:
+            logger.warning("[diagnostic] Réponse reçue mais pas du JSON valide : %s | Contenu brut : %s", e, r.text[:1000])
 
     return list(fusion.values())
 
