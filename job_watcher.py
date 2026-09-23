@@ -34,6 +34,7 @@ GitHub Actions.
 from __future__ import annotations
 
 import argparse
+import base64
 import csv
 import io
 import json
@@ -43,6 +44,7 @@ import re
 import smtplib
 import sys
 import time
+from urllib.parse import quote as url_quote
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
@@ -58,15 +60,27 @@ import yaml
 # --------------------------------------------------------------------------
 
 API_BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
-SEARCH_ENDPOINT = f"{API_BASE}/pc/v4/jobs"
-DETAILS_ENDPOINT = f"{API_BASE}/pc/v4/jobdetails/{{hash_id}}"
+
+# NOTE HISTORIQUE (23.09.2026) : l'API est passée de /pc/v4/jobs à /pc/v6/jobs
+# entre la rédaction de la doc initialement consultée et le premier vrai test
+# du script. L'ancien endpoint /pc/v4/jobs renvoyait 403 "No match found for
+# request for url" — pas un problème d'identifiants, juste une route qui
+# n'existe plus côté passerelle API. Référence à jour :
+# https://github.com/bundesAPI/jobsuche-api (README + openapi.yaml)
+SEARCH_ENDPOINT = f"{API_BASE}/pc/v6/jobs"
+
+# Le endpoint de détail attend le refnr encodé en base64 dans le chemin
+# (PAS le hashId renvoyé par la recherche, qui sert seulement au logo
+# employeur). Exemple documenté : base64("10001-1002716922-S") = "MTAwMDEt...".
+DETAILS_ENDPOINT = f"{API_BASE}/pc/v4/jobdetails/{{encoded_refnr}}"
+
 JOB_URL_TEMPLATE = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{refnr}"
 
-# Client ID publique documentée par le projet open-source bundesAPI/jobsuche-api
-# (https://github.com/bundesAPI/jobsuche-api). Destinée à un usage public en
-# header "X-API-Key" — pas de compte requis, pas de secret personnel ici.
-PUBLIC_API_KEY = "c003a37f-024f-462a-b36d-b001be4cd24a"
-HEADERS = {"X-API-Key": PUBLIC_API_KEY, "User-Agent": "job-watcher/2.0"}
+# Client ID publique documentée par le projet open-source bundesAPI/jobsuche-api.
+# Elle a aussi changé en même temps que l'endpoint : ce n'est plus un GUID,
+# mais cette chaîne littérale, à passer en header "X-API-Key".
+API_CLIENT_ID = "jobboerse-jobsuche"
+HEADERS = {"X-API-Key": API_CLIENT_ID, "User-Agent": "job-watcher/2.1"}
 
 PAGE_SIZE = 100
 REQUEST_TIMEOUT = 30
@@ -252,22 +266,30 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     return list(fusion.values())
 
 
-def fetch_description(session: requests.Session, hash_id: str) -> str:
-    """Récupère la description complète de l'offre. En cas d'échec (offre
-    retirée entre-temps, hashId non résolvable, etc.), retourne une chaîne
-    vide plutôt que de faire échouer tout le run."""
-    if not hash_id:
+def fetch_description(session: requests.Session, refnr: str) -> str:
+    """Récupère la description complète de l'offre à partir de son refnr
+    (encodé en base64 standard dans le chemin, comme l'exige l'API — voir
+    DETAILS_ENDPOINT). En cas d'échec (offre retirée entre-temps, refnr
+    invalide, etc.), retourne une chaîne vide plutôt que de faire échouer
+    tout le run.
+
+    Le nom du champ contenant le texte a changé selon la version de l'API
+    (ancien : "stellenbeschreibung", nouveau : "stellenangebotsBeschreibung")
+    — on essaie les deux pour rester robuste si l'API change encore."""
+    if not refnr:
         return ""
+    encoded_refnr = url_quote(base64.b64encode(refnr.encode("utf-8")).decode("ascii"), safe="")
     try:
         r = session.get(
-            DETAILS_ENDPOINT.format(hash_id=hash_id),
+            DETAILS_ENDPOINT.format(encoded_refnr=encoded_refnr),
             headers=HEADERS,
             timeout=REQUEST_TIMEOUT,
         )
         r.raise_for_status()
-        return r.json().get("stellenbeschreibung", "") or ""
+        data = r.json()
+        return data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung") or ""
     except requests.RequestException as e:
-        logger.warning("Détails indisponibles pour hashId=%s : %s", hash_id, e)
+        logger.warning("Détails indisponibles pour refnr=%s : %s", refnr, e)
         return ""
 
 
@@ -483,7 +505,7 @@ def main() -> None:
             published=o.get("aktuelleVeroeffentlichungsdatum", ""),
             source=o.get("_source", "?"),
         )
-        job.description = fetch_description(session, job.hash_id)
+        job.description = fetch_description(session, job.refnr)
         evaluate(job, cfg)
         results.append(job)
 
