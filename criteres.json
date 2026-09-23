@@ -59,7 +59,7 @@
   },
 
   "elimination": {
-    "_aide": "Toute offre contenant UNE de ces expressions (titre OU description, recherche insensible à la casse) est écartée d'office, quel que soit son score. POUR AJOUTER un critère : ajoute une ligne. POUR EN SUPPRIMER un : retire la ligne. ATTENTION : évite les mots trop courts/courants (ex. juste 'C1') qui risqueraient de matcher par erreur dans un contexte sans rapport — préfère des expressions complètes comme ci-dessous.",
+    "_aide": "Toute offre contenant UNE de ces expressions (titre OU description, recherche insensible à la casse) est écartée d'office, quel que soit son score. POUR AJOUTER un critère : ajoute une ligne. POUR EN SUPPRIMER un : retire la ligne. ATTENTION : évite les mots trop courts/courants (ex. juste 'C1') qui risqueraient de matcher par erreur dans un contexte sans rapport — préfère des expressions complètes comme ci-dessous. ATTENTION SPÉCIFIQUE À L'ALLEMAND : les adjectifs déclinent selon le genre/cas grammatical (ex. 'verhandlungssicheres' vs 'verhandlungssichere' vs 'verhandlungssicherem' vs 'verhandlungssicheren') — une annonce peut utiliser n'importe laquelle de ces formes selon sa construction de phrase. Pour une expression adjectivale, il faut donc lister TOUTES les déclinaisons courantes, pas juste une, sinon des annonces au phrasé différent passent au travers (bug constaté le 23.09.2026 : 'Verhandlungssichere Deutsch- und gute Englischkenntnisse' n'était pas détecté car seule la forme 'verhandlungssicheres' était listée).",
     "mots": [
       "mindestens C1",
       "C1-Niveau",
@@ -76,7 +76,13 @@
       "Deutsch C2",
       "Niveau C2",
       "verhandlungssicheres Deutsch",
+      "verhandlungssichere Deutsch",
+      "verhandlungssicherem Deutsch",
+      "verhandlungssicheren Deutsch",
       "muttersprachliches Deutsch",
+      "muttersprachliche Deutsch",
+      "muttersprachlichem Deutsch",
+      "muttersprachlichen Deutsch",
       "Deutsch auf Muttersprachniveau",
       "Muttersprache Deutsch"
     ]
