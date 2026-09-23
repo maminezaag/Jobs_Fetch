@@ -626,6 +626,10 @@ def main() -> None:
     seuil = int(cfg["criteres"].get("seuil_points", 10))
     qualifies = [j for j in results if not j.eliminated and j.score >= seuil]
     eliminees = [j for j in results if j.eliminated]
+    # Offres analysées mais ni qualifiées ni éliminées — passées sous le seuil.
+    # Les logger permet de juger si le seuil est trop strict (ex. de bonnes
+    # offres remote ratées de peu) plutôt que de les perdre silencieusement.
+    sous_le_seuil = [j for j in results if not j.eliminated and j.score < seuil]
 
     # Vérification anti-doublon uniquement sur les offres qui seront notifiées
     # (inutile de charger le Google Sheet s'il n'y a rien à notifier)
@@ -634,14 +638,19 @@ def main() -> None:
         marquer_doublons(qualifies, entreprises_recentes)
 
     logger.info(
-        "Résumé : %d analysées | %d éliminées | %d qualifiées (seuil=%d pts)",
-        len(results), len(eliminees), len(qualifies), seuil,
+        "Résumé : %d analysées | %d éliminées | %d sous le seuil | %d qualifiées (seuil=%d pts)",
+        len(results), len(eliminees), len(sous_le_seuil), len(qualifies), seuil,
     )
     for j in qualifies:
         flag = " [DOUBLON POSSIBLE]" if j.deja_postule else ""
         logger.info("  ✔ %s — %s (%d pts)%s %s", j.title, j.employer, j.score, flag, j.url)
     for j in eliminees:
         logger.info("  ✘ %s — %s (élim.: %s)", j.title, j.employer, ", ".join(j.matched_elimination))
+    for j in sorted(sous_le_seuil, key=lambda x: x.score, reverse=True):
+        logger.info(
+            "  ○ %s — %s (%d pts, sous le seuil de %d) [%s] %s",
+            j.title, j.employer, j.score, seuil, j.source, j.url,
+        )
 
     if qualifies and not args.dry_run:
         send_email(cfg, qualifies)
