@@ -3,54 +3,48 @@
     "Ce fichier contient TOUT ce qui définit 'quoi chercher' et 'comment noter' les offres.",
     "config.yaml ne contient que la technique (e-mail, seuil, chemins de fichiers).",
     "Chaque section a sa propre clé '_aide' avec les instructions d'ajout/suppression.",
-    "Le JSON standard n'accepte pas les commentaires '//' ou '#', d'où ces clés '_aide' —",
-    "elles sont ignorées par le script (il ne lit que les clés utiles), tu peux les garder",
-    "ou les modifier librement, elles ne cassent rien."
+    "",
+    "ARCHITECTURE DE RECHERCHE (depuis la refonte du 24.09.2026) :",
+    "Une SEULE recherche nationale par mot-clé (pas de restriction 'wo'/'umkreis' au",
+    "niveau de l'API) — on récupère toutes les offres correspondantes en Allemagne,",
+    "puis le script CLASSIFIE chaque offre après coup :",
+    "  - 'locale'    si ses coordonnées GPS (fournies par l'API) sont à moins de",
+    "                rayon_km de lieu_reference",
+    "  - 'remote'    sinon, si le texte de l'annonce mentionne Homeoffice/Remote/etc.",
+    "                (réutilise le groupe de points 'Homeoffice / Remote / Hybrid' —",
+    "                une seule liste de synonymes à maintenir, pas deux)",
+    "  - 'hors_zone' sinon — l'offre est alors ÉCARTÉE (comme une élimination) : ni",
+    "                accessible en trajet, ni télétravaillable, donc inutile à notifier.",
+    "Avantage par rapport à l'ancienne architecture (3 recherches API séparées) :",
+    "aucune offre n'est plus ratée à cause d'un mot-clé cherché au mauvais endroit —",
+    "on voit TOUT ce qui correspond au mot-clé, où que ce soit en Allemagne, et on",
+    "juge sa pertinence géographique/remote sur le contenu réel de l'annonce."
   ],
 
   "recherche": {
-    "_aide": "Définit les appels faits à l'API Jobsuche de l'Arbeitsagentur. Deux sous-recherches distinctes, fusionnées et dédoublonnées par le script (une offre trouvée par les deux ne compte qu'une fois).",
+    "_aide": "Liste UNIQUE de mots-clés, cherchés dans toute l'Allemagne (pas de filtre de lieu au niveau API). POUR AJOUTER un mot-clé : ajoute une ligne dans 'mots_cles'. POUR EN SUPPRIMER un : retire la ligne.",
+    "mots_cles": [
+      "Linux Systemadministrator",
+      "IT-Systemadministrator",
+      "IT-Administration und Betreuung",
+      "Netzwerkadministrator",
+      "DevOps Engineer",
+      "IT Support Engineer",
+      "Linux Support",
+      "IT Administrator",
+      "IT Infrastructure Engineer"
+    ],
 
-    "locale": {
-      "_aide": "Recherche classique par rayon autour d'un lieu. POUR AJOUTER un mot-clé : ajoute une ligne dans 'mots_cles'. POUR EN SUPPRIMER un : retire la ligne. 'rayon_km' = distance en km autour de 'lieu' (plus grand = plus large).",
-      "mots_cles": [
-        "IT-Administration und Betreuung",
-        "Linux Systemadministrator",
-        "IT-Systemadministrator",
-        "Netzwerkadministrator",
-        "DevOps Engineer"
-      ],
-      "lieu": "Oldenburg",
-      "rayon_km": 60
+    "lieu_reference": {
+      "_aide": "Point de référence pour le calcul de distance (classification 'locale' vs le reste). Coordonnées approximatives du centre-ville. À changer si tu déménages.",
+      "nom": "Oldenburg",
+      "latitude": 53.1435,
+      "longitude": 8.2146
     },
-
-    "remote_national": {
-      "_aide": "Deux façons complémentaires de capter le télétravail à l'échelle nationale (sans limite de distance). 'avec_flag_ho' utilise le tag officiel arbeitszeit=ho (Home-/Telearbeit) que l'API expose — mais beaucoup d'employeurs oublient de cocher ce champ facultatif en publiant leur offre. 'texte_libre' compense ce trou : elle cherche directement des mots comme 'Homeoffice'/'Remote' dans le texte recherché, SANS dépendre du tag ni d'aucune restriction de lieu — ça capte les annonces qui mentionnent le remote sans l'avoir déclaré formellement. Mets 'actif' à false pour tout désactiver d'un coup.",
-      "actif": true,
-
-      "avec_flag_ho": {
-        "_aide": "Mots-clés de métier classiques, combinés au filtre arbeitszeit=ho. POUR AJOUTER : ajoute une ligne dans mots_cles.",
-        "mots_cles": [
-          "Linux Systemadministrator",
-          "IT-Systemadministrator",
-          "DevOps Engineer",
-          "Cloud Engineer"
-        ]
-      },
-
-      "texte_libre": {
-        "_aide": "Le mot 'remote'/'homeoffice' fait ICI PARTIE du mot-clé recherché — pas de filtre arbeitszeit, pas de restriction de lieu. POUR AJOUTER une variante : ajoute une ligne dans mots_cles (combine un métier + un terme remote).",
-        "mots_cles": [
-          "Linux Administrator Homeoffice",
-          "Systemadministrator Remote",
-          "IT Administrator Homeoffice",
-          "DevOps Engineer Remote"
-        ]
-      }
-    },
+    "rayon_km": 60,
 
     "parametres_communs": {
-      "_aide": "Paramètres appliqués aux DEUX recherches ci-dessus (locale et remote_national).",
+      "_aide": "Paramètres envoyés à l'API pour chaque recherche.",
       "domaine": "IT-Netzwerktechnik, -Administration, -Organisation",
       "jours": 7,
       "type_offre": 1,
@@ -59,8 +53,23 @@
   },
 
   "elimination": {
-    "_aide": "Toute offre contenant UNE de ces expressions (titre OU description, recherche insensible à la casse) est écartée d'office, quel que soit son score. POUR AJOUTER un critère : ajoute une ligne. POUR EN SUPPRIMER un : retire la ligne. ATTENTION : évite les mots trop courts/courants (ex. juste 'C1') qui risqueraient de matcher par erreur dans un contexte sans rapport — préfère des expressions complètes comme ci-dessous. ATTENTION SPÉCIFIQUE À L'ALLEMAND : les adjectifs déclinent selon le genre/cas grammatical (ex. 'verhandlungssicheres' vs 'verhandlungssichere' vs 'verhandlungssicherem' vs 'verhandlungssicheren') — une annonce peut utiliser n'importe laquelle de ces formes selon sa construction de phrase. Pour une expression adjectivale, il faut donc lister TOUTES les déclinaisons courantes, pas juste une, sinon des annonces au phrasé différent passent au travers (bug constaté le 23.09.2026 : 'Verhandlungssichere Deutsch- und gute Englischkenntnisse' n'était pas détecté car seule la forme 'verhandlungssicheres' était listée).",
-    "mots": [
+    "_aide": [
+      "Trois listes distinctes, pour permettre la règle B2 (voir plus bas) :",
+      "'mots_stricts' : exigences FERMES (C1/C2 explicite, niveau natif) — éliminent",
+      "  TOUJOURS l'offre, même si elle mentionne aussi B2 quelque part.",
+      "'mots_souples' : formulations VAGUES ('verhandlungssicher', 'muttersprachlich')",
+      "  qui en pratique demandent souvent un C1/C2 mais sans le dire explicitement —",
+      "  ces critères sont NEUTRALISÉS si l'annonce mentionne explicitement B2 comme",
+      "  niveau attendu ('b2_marqueurs' ci-dessous), car une annonce qui accepte B2",
+      "  quelque part se contredit elle-même si elle exige aussi du 'verhandlungssicher'",
+      "  ailleurs — dans le doute, on te la montre plutôt que de la rater.",
+      "'b2_marqueurs' : expressions qui indiquent que B2 est explicitement accepté.",
+      "POUR AJOUTER un critère : ajoute une ligne dans la liste appropriée.",
+      "POUR EN SUPPRIMER un : retire la ligne. Attention aux mots trop courts qui",
+      "risqueraient de matcher par erreur (ex. 'B2' seul matcherait aussi 'Bundesstraße",
+      "B2' — d'où l'usage d'expressions complètes comme 'B2-Niveau' plutôt que 'B2' nu)."
+    ],
+    "mots_stricts": [
       "mindestens C1",
       "C1-Niveau",
       "C1 Niveau",
@@ -75,73 +84,75 @@
       "Deutschkenntnisse C2",
       "Deutsch C2",
       "Niveau C2",
-      "verhandlungssicheres Deutsch",
-      "verhandlungssichere Deutsch",
-      "verhandlungssicherem Deutsch",
-      "verhandlungssicheren Deutsch",
       "muttersprachliches Deutsch",
       "muttersprachliche Deutsch",
       "muttersprachlichem Deutsch",
       "muttersprachlichen Deutsch",
       "Deutsch auf Muttersprachniveau",
       "Muttersprache Deutsch"
+    ],
+    "mots_souples": [
+      "verhandlungssicheres Deutsch",
+      "verhandlungssichere Deutsch",
+      "verhandlungssicherem Deutsch",
+      "verhandlungssicheren Deutsch"
+    ],
+    "b2_marqueurs": [
+      "B2-Niveau",
+      "B2 Niveau",
+      "Niveau B2",
+      "Sprachniveau B2",
+      "Deutschkenntnisse B2",
+      "Deutsch B2",
+      "mindestens B2",
+      "ab B2"
     ]
   },
 
   "points_positifs": {
     "_aide": [
-      "Chaque groupe = UNE compétence réelle, avec 'nom', 'poids' (points) et 'mots' (tous ses synonymes/orthographes).",
-      "RÈGLE IMPORTANTE : le poids est accordé UNE SEULE FOIS par groupe, même si plusieurs synonymes du même groupe apparaissent dans le texte (ex. 'RedHat' + 'RHEL' dans la même annonce = 5 pts, pas 10).",
-      "POUR AJOUTER une compétence : copie un bloc {nom, poids, mots} et adapte.",
-      "POUR AJOUTER un synonyme à une compétence existante : ajoute une entrée dans son tableau 'mots' (NE CRÉE PAS un nouveau groupe, sinon la même compétence compterait deux fois).",
-      "POUR SUPPRIMER une compétence : retire tout son bloc {...}.",
-      "Barème actuel à 4 niveaux : Niveau 1 -> 5 pts, Niveau 2 -> 4 pts, Niveau 3 -> 3 pts, Niveau 4 -> 2 pts."
+      "Chaque groupe = UNE compétence réelle, avec 'nom', 'poids' et 'mots' (synonymes).",
+      "Le poids est accordé UNE SEULE FOIS par groupe, même si plusieurs synonymes",
+      "apparaissent (ex. 'RedHat' + 'RHEL' = 5 pts, pas 10).",
+      "POUR AJOUTER une compétence : copie un bloc {nom, poids, mots}.",
+      "POUR AJOUTER un synonyme : ajoute une entrée dans 'mots' du groupe existant.",
+      "POUR SUPPRIMER : retire tout le bloc.",
+      "Barème calibré le 24.09.2026 selon le niveau réel du candidat (CV) : les",
+      "compétences maîtrisées en profondeur pèsent plus que celles juste découvertes."
     ],
     "groupes": [
-      { "nom": "Linux (RedHat/RHEL)", "niveau": 1, "poids": 5,
-        "mots": ["RedHat", "Red Hat", "RHEL", "Red Hat Enterprise Linux"] },
-      { "nom": "Linux (général)", "niveau": 1, "poids": 5,
-        "mots": ["Linux"] },
-      { "nom": "CheckMK", "niveau": 1, "poids": 5,
-        "mots": ["CheckMK", "Check_MK", "Check MK"] },
-      { "nom": "Bash / Shell Scripting", "niveau": 1, "poids": 5,
-        "mots": ["Bash", "Shell-Skript", "Shellskript", "Shell Scripting"] },
-      { "nom": "Proxmox", "niveau": 1, "poids": 5,
-        "mots": ["Proxmox", "Proxmox VE"] },
-      { "nom": "Puppet", "niveau": 1, "poids": 5,
-        "mots": ["Puppet"] },
-      { "nom": "Ubuntu", "niveau": 1, "poids": 5,
-        "mots": ["Ubuntu"] },
-      { "nom": "Zimbra", "niveau": 1, "poids": 5,
-        "mots": ["Zimbra"] },
-      { "nom": "IT-Support", "niveau": 1, "poids": 5,
-        "mots": ["IT-Support", "IT Support", "Anwendersupport", "1st Level Support", "2nd Level Support"] },
+      { "nom": "Linux (RedHat/RHEL)", "poids": 5, "mots": ["RedHat", "Red Hat", "RHEL", "Red Hat Enterprise Linux"] },
+      { "nom": "Linux (général)", "poids": 5, "mots": ["Linux"] },
+      { "nom": "CheckMK / Nagios", "poids": 5, "mots": ["CheckMK", "Check_MK", "Check MK", "Nagios"] },
+      { "nom": "Bash / Shell Scripting", "poids": 5, "mots": ["Bash", "Shell-Skript", "Shellskript", "Shell Scripting"] },
+      { "nom": "Proxmox", "poids": 5, "mots": ["Proxmox", "Proxmox VE"] },
+      { "nom": "Puppet", "poids": 5, "mots": ["Puppet"] },
+      { "nom": "Ubuntu", "poids": 5, "mots": ["Ubuntu"] },
+      { "nom": "Zimbra", "poids": 5, "mots": ["Zimbra"] },
+      { "nom": "IT-Support", "poids": 5, "mots": ["IT-Support", "IT Support", "Anwendersupport", "1st Level Support", "2nd Level Support"] },
 
-      { "nom": "Virtualisierung (général)", "niveau": 2, "poids": 4,
-        "mots": ["Virtualisierung", "Virtualization"] },
-      { "nom": "VMware vSphere / ESXi", "niveau": 2, "poids": 4,
-        "mots": ["vSphere", "VMware vSphere", "VMware ESXi", "ESXi", "VMware"] },
-      { "nom": "Ansible", "niveau": 2, "poids": 4,
-        "mots": ["Ansible"] },
+      { "nom": "VMware vSphere / ESXi", "poids": 4, "mots": ["vSphere", "VMware vSphere", "VMware ESXi", "ESXi", "VMware"] },
+      { "nom": "Ansible", "poids": 4, "mots": ["Ansible"] },
+      { "nom": "Active Directory / GPO", "poids": 4, "mots": ["Active Directory", "AD-Administration", "GPO", "Gruppenrichtlinien", "Group Policy"] },
+      { "nom": "Veeam", "poids": 4, "mots": ["Veeam"] },
+      { "nom": "Kaspersky Security Center", "poids": 4, "mots": ["Kaspersky", "Kaspersky Security Center", "Kaspersky Endpoint Security"] },
 
-      { "nom": "Terraform", "niveau": 3, "poids": 3,
-        "mots": ["Terraform"] },
-      { "nom": "Active Directory", "niveau": 3, "poids": 3,
-        "mots": ["Active Directory", "AD-Administration"] },
-      { "nom": "GPO / Gruppenrichtlinien", "niveau": 3, "poids": 3,
-        "mots": ["GPO", "Gruppenrichtlinien", "Group Policy"] },
-      { "nom": "Python", "niveau": 3, "poids": 3,
-        "mots": ["Python-Skript", "Python Scripting", "Python"] },
-      { "nom": "Windows Server", "niveau": 3, "poids": 3,
-        "mots": ["Windows Server"] },
+      { "nom": "Terraform", "poids": 3, "mots": ["Terraform"] },
+      { "nom": "Git", "poids": 3, "mots": ["Git", "GitHub", "GitLab"] },
+      { "nom": "Datenbanken", "poids": 3, "mots": ["Oracle", "MySQL", "MariaDB", "PostgreSQL"] },
+      { "nom": "Prometheus / Grafana", "poids": 3, "mots": ["Prometheus", "Grafana"] },
+      { "nom": "Windows Server", "poids": 3, "mots": ["Windows Server"] },
+      { "nom": "Python", "poids": 3, "mots": ["Python-Skript", "Python Scripting", "Python"] },
+      { "nom": "Docker", "poids": 3, "mots": ["Docker"] },
+      { "nom": "Zertifizierungen (RHCSA/AZ-104/LPIC)", "poids": 3, "mots": ["RHCSA", "Red Hat Certified System Administrator", "AZ-104", "Azure Administrator Associate", "Azure Administrator", "LPIC-1", "LPIC-2", "LPIC1", "LPIC2", "Linux Professional Institute"] },
 
-      { "nom": "Networking", "niveau": 4, "poids": 2,
-        "mots": ["Networking", "Netzwerktechnik", "Netzwerkadministration"] },
-      { "nom": "Firewalling", "niveau": 4, "poids": 2,
-        "mots": ["Firewall", "Firewalling"] },
+      { "nom": "Networking", "poids": 2, "mots": ["Networking", "Netzwerktechnik", "Netzwerkadministration"] },
+      { "nom": "Firewalling", "poids": 2, "mots": ["Firewall", "Firewalling"] },
+      { "nom": "Storage (NetApp/3PAR)", "poids": 2, "mots": ["NetApp", "NetApp FAS", "HP 3PAR", "3PAR"] },
 
-      { "nom": "Homeoffice / Remote / Hybrid", "niveau": "bonus", "poids": 3,
-        "mots": ["Homeoffice", "Home-Office", "Remote", "hybrides Arbeiten", "mobiles Arbeiten", "Telearbeit"] }
+      { "nom": "Kubernetes", "poids": 1, "mots": ["Kubernetes", "k3s"] },
+
+      { "nom": "Homeoffice / Remote / Hybrid", "poids": 3, "mots": ["Homeoffice", "Home-Office", "Remote", "hybrides Arbeiten", "mobiles Arbeiten", "Telearbeit"] }
     ]
   }
 }
