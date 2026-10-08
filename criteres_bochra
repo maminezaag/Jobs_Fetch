@@ -1,0 +1,383 @@
+	{
+  "_LISEZ_MOI": [
+    "FICHIER DES CRITERES METIER de job_watcher_bochra.py (profil Bochra : Teilzeit ou Praktikum en chimie / laboratoire, 20 km autour d'Oldenburg).",
+    "Les parametres TECHNIQUES (API, rayon, seuils, e-mail) sont dans config_bochra.yaml.",
+    "",
+    "COMMENT EDITER (directement dans l'editeur GitHub en ligne) :",
+    "- Chaque liste 'termes' contient des mots ou expressions en MINUSCULES. Majuscules/minuscules n'ont pas d'importance dans les annonces.",
+    "- Un terme ordinaire (ex. \"laborhelfer\") est cherche au DEBUT d'un mot : il trouve aussi les formes declinees (\"laborhelfer\", \"laborhelferin\", \"laborhelfern\"...).",
+    "- Un terme qui commence par re: est une expression reguliere (avance). Dans ce fichier JSON, chaque antislash doit etre DOUBLE (\\\\b, \\\\s, \\\\d).",
+    "- COMMENT AJOUTER : ajouter une virgule apres le dernier element de la liste, puis le nouveau terme entre guillemets.",
+    "- COMMENT SUPPRIMER : supprimer la ligne du terme (et verifier qu'il n'y a pas de virgule apres le DERNIER element de la liste).",
+    "- Les cles qui commencent par _ (comme celle-ci) sont des commentaires ignores par le script.",
+    "- Dans 'points', chaque GROUPE ne compte qu'UNE fois, meme si plusieurs synonymes sont trouves."
+  ],
+
+  "recherche": {
+    "_aide": "Chaque entree = un mot-cle envoye a l'API (parametre 'was'). 'angebotsarten' : 1 = emploi, 34 = Praktikum/Trainee. Les offres d'Ausbildung (type 4) ne sont volontairement jamais demandees. COMMENT AJOUTER : copier une ligne et changer 'was'. COMMENT SUPPRIMER : supprimer la ligne.",
+    "mots_cles": [
+      { "was": "Laborhelfer", "angebotsarten": [1] },
+      { "was": "Laborhelfer Chemie", "angebotsarten": [1] },
+      { "was": "Laborassistent", "angebotsarten": [1] },
+      { "was": "Laborassistent Chemie", "angebotsarten": [1] },
+      { "was": "Labormitarbeiter Chemie", "angebotsarten": [1] },
+      { "was": "Chemielaborant", "angebotsarten": [1] },
+      { "was": "Chemisch-technischer Assistent", "angebotsarten": [1] },
+      { "was": "CTA Labor", "angebotsarten": [1] },
+      { "was": "Laborant", "angebotsarten": [1] },
+      { "was": "Analytik Labor", "angebotsarten": [1] },
+      { "was": "Qualitätskontrolle Labor", "angebotsarten": [1] },
+      { "was": "Probenvorbereitung", "angebotsarten": [1] },
+      { "was": "Praktikum Chemie", "angebotsarten": [34, 1] },
+      { "was": "Praktikum Labor", "angebotsarten": [34, 1] },
+      { "was": "Praktikum Chemielaborant", "angebotsarten": [34, 1] },
+      { "was": "Praktikum Analytik", "angebotsarten": [34, 1] },
+      { "was": "Praktikum Qualitätskontrolle", "angebotsarten": [34, 1] }
+    ]
+  },
+
+  "domaine_requis": {
+    "_aide": "Garde-fou de pertinence : le TITRE ou le METIER principal de l'offre doit contenir au moins un de ces termes, sinon l'offre est ecartee (evite les stages en marketing, etc.).",
+    "termes": [
+      "chemi",
+      "labor",
+      "analytik",
+      "cta",
+      "biologisch-technische",
+      "biologisch technische",
+      "probenahme",
+      "probenvorbereitung",
+      "probenaufbereitung",
+      "pharma",
+      "biotech",
+      "umweltanalytik",
+      "werkstoffprüf",
+      "materialprüf"
+    ]
+  },
+
+  "types_offre": {
+    "_aide": "Seules les offres de type 'praktikum' ou 'teilzeit' sont gardees. Une offre ni l'un ni l'autre (Vollzeit pur) est ecartee. Une offre est 'praktikum' si elle vient de la recherche angebotsart 34 OU si son TITRE contient un terme de 'praktikum_titre'.",
+    "praktikum_titre": [
+      "praktikum",
+      "praktikant"
+    ],
+    "teilzeit": [
+      "teilzeit",
+      "minijob",
+      "midijob",
+      "geringfügig",
+      "halbtags",
+      "re:\\btz\\b",
+      "stundenweise"
+    ]
+  },
+
+  "elimination": {
+    "_aide": "Une offre qui correspond a l'un de ces criteres est ECARTEE (sauf mention contraire). Les formulations niees (\"keine ... erforderlich\", \"ohne ...\", \"... nicht erforderlich\") ne declenchent PAS l'elimination.",
+
+    "ausbildung_titre": {
+      "_aide": "Offres d'Ausbildung (formation en alternance) : ecartees d'apres le TITRE. 'abgeschlossene Ausbildung' (diplome deja obtenu) n'est PAS une Ausbildung a faire.",
+      "termes": [
+        "azubi",
+        "auszubildende",
+        "ausbildungsplatz",
+        "ausbildungsstelle",
+        "ausbildungsstart",
+        "ausbildungsbeginn",
+        "ausbildungsjahr",
+        "duales studium",
+        "dualen studium",
+        "duale ausbildung",
+        "dualer student",
+        "re:(?<!abgeschlossene )(?<!abgeschlossener )(?<!abgeschlossenen )\\bausbildung\\b"
+      ]
+    },
+
+    "statut_etudiant_ou_eleve": {
+      "_aide": "Decision : on ECARTE toute offre qui mentionne un statut etudiant/eleve, meme 'souhaite', car Bochra n'est inscrite nulle part. Couvre aussi Werkstudent, memoires de fin d'etudes, stages scolaires.",
+      "termes": [
+        "immatrikul",
+        "studienbescheinigung",
+        "studiennachweis",
+        "pflichtpraktikum",
+        "praktikumsvereinbarung",
+        "praktikumsvertrag",
+        "praxissemester",
+        "praxisphase",
+        "praktisches studiensemester",
+        "semesterferien",
+        "werkstudent",
+        "studentische hilfskraft",
+        "studentische aushilfe",
+        "wissenschaftliche hilfskraft",
+        "bachelorarbeit",
+        "masterarbeit",
+        "abschlussarbeit",
+        "während des studiums",
+        "studienbegleitend",
+        "re:im\\s+rahmen\\s+(?:ihres|deines|eines|des|ihrer)\\s+(?:studiums|studiengangs|ausbildung)",
+        "re:eingeschrieben\\w*\\s+(?:\\w+\\s+){0,3}(?:hochschule|universität|studiengang|student)",
+        "re:für\\s+studierende",
+        "schülerpraktikum",
+        "berufsorientierungspraktikum",
+        "orientierungspraktikum",
+        "berufsfelderkundung",
+        "schnupperpraktikum"
+      ]
+    },
+
+    "experience": {
+      "_aide": "Experience professionnelle exigee. 'types' = types d'offre auxquels l'elimination s'applique (pour un Praktikum la mention est seulement signalee dans l'e-mail). 'ignorer_si_contexte' : si l'un de ces mots se trouve juste a cote, l'exigence est consideree comme facultative.",
+      "types": ["teilzeit"],
+      "ignorer_si_contexte": [
+        "wünschen",
+        "von vorteil",
+        "vorteilhaft",
+        "gern",
+        "idealerweise",
+        "erwünscht",
+        "bevorzugt",
+        "wäre schön",
+        "optional",
+        "ein plus",
+        "nice to have"
+      ],
+      "termes": [
+        "re:(?:mehrjährig|langjährig)\\w*\\s+(?:\\w+\\s+){0,2}?(?:berufs|praxis)?erfahrung",
+        "re:\\b(?:mindestens|mind\\.?|min\\.?|über|ab)\\s+\\d+\\s*(?:-\\s*\\d+\\s*)?jahr\\w*\\s+(?:\\w+\\s+){0,3}?(?:berufs|praxis)?erfahrung",
+        "re:\\b\\d+\\s*(?:-|bis)\\s*\\d+\\s*jahr\\w*\\s+(?:\\w+\\s+){0,3}?(?:berufs|praxis)?erfahrung",
+        "re:\\b\\d+\\+?\\s*jahr\\w*\\s+(?:\\w+\\s+){0,3}?(?:berufs|praxis)?erfahrung",
+        "re:\\b(?:berufs|praxis|labor)?erfahrung\\s+(?:\\w+\\s+){0,3}?(?:ist\\s+)?(?:zwingend\\s+)?(?:erforderlich|notwendig|vorausgesetzt|nachweisbar)",
+        "einschlägige berufserfahrung",
+        "einschlägige erfahrung"
+      ]
+    },
+
+    "langue_stricte": {
+      "_aide": "Niveau d'allemand trop eleve (C1/C2, langue maternelle). TOUJOURS ecarte, meme si B2 est mentionne ailleurs. Les motifs C1/C2 exigent un contexte de langue (evite de confondre avec 'C1-C4' en chimie).",
+      "termes": [
+        "re:deutsch\\w*[^.]{0,60}\\bc[12]\\b",
+        "re:\\bc[12]\\b[^.]{0,40}(?:deutsch|sprachkenntnis|niveau|sprachniveau)",
+        "re:(?:sprach)?niveau\\s*(?:\\w+\\s+)?c[12]\\b",
+        "re:(?:mindestens|mind\\.?|min\\.?)\\s+c[12]\\b",
+        "re:german[^.]{0,40}\\bc[12]\\b",
+        "re:\\bc[12]\\b[^.]{0,40}german",
+        "muttersprach",
+        "native speaker",
+        "perfekte deutsch",
+        "perfektes deutsch",
+        "deutsch perfekt",
+        "einwandfreie deutsch",
+        "einwandfreies deutsch"
+      ]
+    },
+
+    "langue_souple": {
+      "_aide": "Formulations VAGUES sur l'allemand. Ecartees, SAUF si l'offre mentionne B1/B2 comme niveau accepte (voir b2_accepte). Les declinaisons (verhandlungssicheres/-e/-em/-en) sont couvertes automatiquement.",
+      "termes": [
+        "verhandlungssicher",
+        "re:flie(?:ß|ss)end\\w*\\s+(?:in\\s+)?deutsch",
+        "re:deutsch\\w*\\s+(?:\\w+\\s+){0,2}flie(?:ß|ss)end",
+        "sehr gute deutschkenntnisse",
+        "sehr gutes deutsch",
+        "sehr gute kenntnisse der deutschen sprache",
+        "ausgezeichnete deutschkenntnisse",
+        "exzellente deutschkenntnisse",
+        "hervorragende deutschkenntnisse"
+      ]
+    },
+
+    "b2_accepte": {
+      "_aide": "Detecte une mention de B1/B2 pour l'allemand (neutralise les formulations vagues ci-dessus et donne des points). Exige un contexte de langue (evite la vitamine B2).",
+      "termes": [
+        "re:deutsch\\w*[^.]{0,60}\\bb[12]\\b",
+        "re:\\bb[12]\\b[^.]{0,40}(?:deutsch|sprachkenntnis|niveau|sprachniveau)",
+        "re:(?:sprach)?niveau\\s*(?:\\w+\\s+)?b[12]\\b",
+        "re:german[^.]{0,40}\\bb[12]\\b"
+      ]
+    }
+  },
+
+  "alertes": [
+    {
+      "nom": "Mentionne une 'abgeschlossene Ausbildung' (Bochra a un Bachelor : a verifier dans l'annonce)",
+      "termes": [
+        "re:abgeschlossen\\w*\\s+(?:\\w+\\s+){0,3}(?:berufs)?ausbildung"
+      ]
+    }
+  ],
+
+  "points": [
+    {
+      "nom": "Debutant accepte",
+      "points": 5,
+      "scope": "all",
+      "termes": [
+        "quereinsteiger",
+        "berufseinsteiger",
+        "berufsanfänger",
+        "berufsstarter",
+        "berufsstart",
+        "wiedereinsteiger",
+        "wiedereinstieg",
+        "absolvent",
+        "hochschulabsolvent",
+        "anlernen",
+        "angelernt",
+        "ohne vorkenntnisse",
+        "keine vorkenntnisse",
+        "re:keine\\s+(?:\\w+\\s+){0,2}berufserfahrung",
+        "re:ohne\\s+(?:\\w+\\s+){0,2}berufserfahrung"
+      ]
+    },
+    {
+      "nom": "Titre cible (Laborhelfer / Assistent / CTA / Laborant)",
+      "points": 5,
+      "scope": "title",
+      "termes": [
+        "laborhelfer",
+        "laborhilfe",
+        "laborassistent",
+        "laborkraft",
+        "labormitarbeiter",
+        "labormitarbeit",
+        "laborant",
+        "chemielaborant",
+        "chemisch-technische",
+        "chemisch technische",
+        "biologisch-technische",
+        "biologisch technische",
+        "re:\\bcta\\b",
+        "technischer assistent",
+        "technische assistent",
+        "probenvorbereiter",
+        "analytiker"
+      ]
+    },
+    {
+      "nom": "Praktikum en chimie / labo (titre)",
+      "points": 5,
+      "scope": "title",
+      "types": ["praktikum"],
+      "termes": [
+        "chemi",
+        "labor",
+        "analytik",
+        "qualitätskontrolle"
+      ]
+    },
+    {
+      "nom": "Analytique / methodes de laboratoire",
+      "points": 4,
+      "scope": "all",
+      "termes": [
+        "analytik",
+        "analytische",
+        "probenvorbereitung",
+        "probenaufbereitung",
+        "probenahme",
+        "qualitätskontrolle",
+        "qualitätssicherung",
+        "titration",
+        "hplc",
+        "re:\\bgc\\b",
+        "chromatographie",
+        "spektroskopie",
+        "photometri",
+        "re:\\bicp\\b",
+        "laborarbeit",
+        "labormethoden",
+        "pipettier",
+        "ansetzen von"
+      ]
+    },
+    {
+      "nom": "Bachelor / Studium chimie accepte",
+      "points": 3,
+      "scope": "all",
+      "termes": [
+        "bachelor",
+        "chemiestudium",
+        "hochschulabschluss",
+        "abgeschlossenes studium",
+        "re:studium\\s+(?:der\\s+)?chemie",
+        "re:naturwissenschaftliche\\w*\\s+(?:\\w+\\s+){0,2}(?:studium|hochschul)",
+        "re:chemische\\w*\\s+(?:\\w+\\s+){0,2}(?:studium|hochschul)"
+      ]
+    },
+    {
+      "nom": "Documentation / GLP / GMP",
+      "points": 3,
+      "scope": "all",
+      "termes": [
+        "re:\\bgmp\\b",
+        "re:\\bglp\\b",
+        "dokumentation",
+        "laborjournal",
+        "re:\\bsop\\b",
+        "iso 17025"
+      ]
+    },
+    {
+      "nom": "Allemand B1/B2 mentionne (suffisant)",
+      "points": 3,
+      "scope": "all",
+      "utilise_detecteur_b2": true,
+      "termes": []
+    },
+    {
+      "nom": "Einarbeitung / formation interne",
+      "points": 3,
+      "scope": "all",
+      "termes": [
+        "einarbeitung",
+        "einarbeiten",
+        "eingearbeitet",
+        "schulung",
+        "weiterbildung"
+      ]
+    },
+    {
+      "nom": "Perspective d'embauche (Praktikum)",
+      "points": 3,
+      "scope": "all",
+      "types": ["praktikum"],
+      "termes": [
+        "übernahme",
+        "perspektive",
+        "festanstellung",
+        "einstieg",
+        "weiterbeschäftigung",
+        "langfristig",
+        "dauerhaft"
+      ]
+    },
+    {
+      "nom": "Langues (anglais / francais / arabe)",
+      "points": 2,
+      "scope": "all",
+      "termes": [
+        "englisch",
+        "französisch",
+        "arabisch",
+        "english",
+        "french"
+      ]
+    },
+    {
+      "nom": "Outils (LIMS / SAP / Office / securite)",
+      "points": 2,
+      "scope": "all",
+      "termes": [
+        "lims",
+        "re:\\bsap\\b",
+        "ms office",
+        "microsoft office",
+        "gefahrstoff",
+        "sicherheitsdatenblatt",
+        "arbeitssicherheit"
+      ]
+    }
+  ]
+}
