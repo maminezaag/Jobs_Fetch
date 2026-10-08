@@ -41,7 +41,7 @@
       "latitude": 53.1435,
       "longitude": 8.2146
     },
-    "rayon_km": 60,
+    "rayon_km": 70,
 
     "parametres_communs": {
       "_aide": "Paramètres envoyés à l'API pour chaque recherche.",
