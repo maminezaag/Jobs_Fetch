@@ -1,13 +1,16 @@
 # =============================================================================
 # .github/workflows/job_watcher.yml
 # =============================================================================
-# Exécute job_watcher.py sur les serveurs GitHub Actions.
+# Exécute job_watcher.py (recherche IT) PUIS job_watcher_bochra.py (recherche
+# chimie / labo pour Bochra) sur les serveurs GitHub Actions, dans UN SEUL job.
 #
 # DÉCLENCHEMENT : ce workflow N'UTILISE PAS le planificateur natif GitHub
 # Actions (la section "schedule: cron:"), volontairement — il est déclenché
 # par un événement "repository_dispatch" envoyé depuis l'EXTÉRIEUR (crontab.org
 # appelle l'API GitHub à intervalle régulier). Voir README.md pour la
 # configuration précise côté crontab.org (URL, en-têtes, token).
+# Un seul déclencheur suffit pour les deux scripts : rien à changer côté
+# crontab.org.
 #
 # "workflow_dispatch" est aussi activé en plus, pour pouvoir lancer le
 # workflow manuellement depuis l'onglet "Actions" de GitHub (pratique pour
@@ -23,7 +26,8 @@ on:
     types: [run-job-watcher]
   workflow_dispatch: {}  # bouton "Run workflow" manuel dans l'onglet Actions
 
-# Nécessaire pour que le job puisse recommitter seen_jobs.json dans le repo
+# Nécessaire pour que le job puisse recommitter seen_jobs.json et
+# seen_jobs_bochra.json dans le repo
 permissions:
   contents: write
 
@@ -51,15 +55,32 @@ jobs:
           GMAIL_TO: ${{ secrets.GMAIL_TO }}
         run: python job_watcher.py --config config.yaml
 
-      - name: Sauvegarder l'historique des offres déjà vues (seen_jobs.json)
-        # Sans cette étape, seen_jobs.json créé/modifié pendant le run serait
-        # perdu à la fin de l'exécution (les runners GitHub Actions sont
-        # éphémères) — le prochain run croirait que TOUTES les offres sont
-        # nouvelles. On recommit donc le fichier dans le repo, seulement s'il
-        # a changé.
+      - name: Lancer job_watcher_bochra.py
+        # "!cancelled()" : cette étape se lance MÊME SI l'étape précédente a
+        # échoué, pour qu'une panne d'un script ne bloque jamais l'autre.
+        # Même secrets Gmail que ci-dessus ; aucun secret Google Sheet n'est
+        # nécessaire pour ce script (état local uniquement).
+        if: ${{ !cancelled() }}
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+        run: python job_watcher_bochra.py --config config_bochra.yaml
+
+      - name: Sauvegarder l'historique des offres déjà vues (seen_jobs*.json)
+        # Sans cette étape, les fichiers seen_jobs*.json créés/modifiés pendant
+        # le run seraient perdus à la fin de l'exécution (les runners GitHub
+        # Actions sont éphémères) — le prochain run croirait que TOUTES les
+        # offres sont nouvelles. On recommit donc les fichiers dans le repo,
+        # seulement s'ils ont changé.
+        # Le motif 'seen_jobs*.json' prend à la fois seen_jobs.json (IT) et
+        # seen_jobs_bochra.json. Un SEUL commit est fait, après les deux
+        # scripts : pas de conflit entre eux.
+        # "!cancelled()" : on sauvegarde même si un des deux scripts a échoué.
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "job-watcher-bot"
           git config user.email "job-watcher-bot@users.noreply.github.com"
-          git add seen_jobs.json
+          git add 'seen_jobs*.json'
           git diff --staged --quiet || git commit -m "chore: mise à jour de l'historique des offres vues [skip ci]"
           git push
