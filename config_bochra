@@ -1,0 +1,61 @@
+# =============================================================================
+# config_bochra.yaml — réglages TECHNIQUES de job_watcher_bochra.py
+# =============================================================================
+# Les critères MÉTIER (mots-clés, éliminations, points) sont dans
+# criteres_bochra.json — c'est ce fichier-là qu'on édite le plus souvent.
+# Les identifiants Gmail NE sont PAS ici : ils viennent des secrets GitHub
+# (GMAIL_ADDRESS, GMAIL_APP_PASSWORD, GMAIL_TO), les mêmes que job_watcher.py.
+
+api:
+  base_url: "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
+  search_path: "/pc/v6/jobs"
+  # Chemins essayés dans l'ordre pour lire le texte complet d'une annonce.
+  # {b64} = référence de l'offre encodée en base64. Le premier qui répond est
+  # mémorisé pour la suite du run. Le endpoint de détail n'est pas
+  # officiellement documenté : si aucun ne répond, le script le dit clairement
+  # dans les logs (voir README_bochra.md).
+  details_paths:
+    - "/pc/v6/jobdetails/{b64}"
+    - "/pc/v4/jobdetails/{b64}"
+  api_key: "jobboerse-jobsuche"
+  page_size: 100            # résultats par page (max accepté par l'API : 100)
+  max_pages: 3              # pages lues au maximum par mot-clé
+  delai_entre_requetes_s: 0.4
+  timeout_s: 30
+  essais_par_requete: 3
+
+recherche:
+  jours: 7                  # fenêtre : offres publiées ces N derniers jours
+  # Pré-filtre côté API (économise des appels) : code postal de Bochra + 25 km.
+  # Le vrai filtre à 20 km est refait ensuite avec les coordonnées GPS.
+  # Mettre wo: "" pour chercher dans toute l'Allemagne.
+  wo: "26129"
+  umkreis_api_km: 25
+  rayon_max_km: 20          # rayon réellement appliqué (à vol d'oiseau)
+  point_reference:
+    nom: "Oldenburg (centre-ville)"
+    lat: 53.1435
+    lon: 8.2146
+  # Si une offre n'a pas de coordonnées GPS mais que l'API l'a renvoyée dans
+  # le périmètre demandé, on la garde (true) ou on l'écarte (false).
+  garder_si_pas_de_coordonnees: true
+
+scoring:
+  # Points minimum pour être notifié, selon le type d'offre.
+  seuil_points:
+    teilzeit: 8
+    praktikum: 6
+
+email:
+  sujet_prefixe: "[Bochra]"   # pour distinguer ces e-mails de ceux du job IT ("" pour aucun)
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 465
+  max_offres_par_email: 50
+
+fichiers:
+  criteres: "criteres_bochra.json"
+  etat: "seen_jobs_bochra.json"   # historique des offres vues (propre à Bochra)
+
+etat:
+  conservation_jours: 120   # les offres vues sont oubliées après N jours
+  max_echecs_details: 3     # après N échecs de lecture du détail, l'offre est abandonnée
