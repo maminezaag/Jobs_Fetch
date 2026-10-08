@@ -29,9 +29,9 @@ recherche:
   # Pré-filtre côté API (économise des appels) : code postal de Bochra + 25 km.
   # Le vrai filtre à 20 km est refait ensuite avec les coordonnées GPS.
   # Mettre wo: "" pour chercher dans toute l'Allemagne.
-  wo: ""
+  wo: "26129"
   umkreis_api_km: 25
-  rayon_max_km: 600          # rayon réellement appliqué (à vol d'oiseau)
+  rayon_max_km: 100          # rayon réellement appliqué (à vol d'oiseau)
   point_reference:
     nom: "Oldenburg (centre-ville)"
     lat: 53.1435
