@@ -14,7 +14,7 @@ CE SCRIPT EST INDÉPENDANT DE job_watcher.py (autres fichiers, autre workflow, a
 DÉROULEMENT
     1. Recherche (API Arbeitsagentur) pour chaque mot-clé de config.json, toute l'Allemagne, 90 jours.
     2. Téléchargement du texte complet de chaque offre.
-    3. Dédoublonnage (même entreprise + même titre + même texte = une seule offre).
+    3. Filtre de dates (1re publication dans la fenêtre) puis dédoublonnage (même entreprise + même titre + même texte = une seule offre).
     4. Classification : niveau de langue (sprache.json), zone (GPS), thèmes (themes.json).
     5. Écriture dans le Google Sheet (6 onglets) - TOUT À LA FIN, une fois les données complètes.
 
@@ -359,6 +359,9 @@ def agreger(offres, sprache, expressions, themes):
             "ambigu": sum(1 for o in avec if o["ambigu"]),
             "aucune": sum(1 for o in avec if not o["cats"]),
             "par_cat": {c: sum(1 for o in avec if c in o["cats"]) for c in cats},
+            # catégorie dominante (la 1re de sprache.json présente) : chaque offre compte une seule fois
+            "top": {c: sum(1 for o in avec if next((x for x in cats if x in o["cats"]), None) == c)
+                    for c in cats},
             "par_expr": {e["name"]: sum(1 for o in avec if any(h["name"] == e["name"] for h in o["hits"]))
                          for e in expressions},
             "par_theme": {t["name"]: sum(1 for o in avec if t["name"] in o["themes"]) for t in themes},
@@ -397,7 +400,7 @@ def cellule(v):
     return v
 
 
-def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdhui, doublons):
+def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdhui, doublons, hors_fenetre=0):
     cats = sprache["kategorien"]
     ref = cfg["lieu_reference"]["nom"]
     L, D = agg["local"], agg["de"]
@@ -434,9 +437,33 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     r.append(["Aucune mention de niveau (%)", pct(L["aucune"], L["avec_texte"]),
               pct(D["aucune"], D["avec_texte"])])
     r.append([])
-    r.append([f"Doublons retirés : {doublons}. Les % sont calculés sur les offres avec texte exploitable. "
+    r.append([f"Doublons retirés : {doublons}. Offres écartées car publiées pour la première fois il y a plus de "
+              f"{cfg['jours']} jours : {hors_fenetre}. Les % sont calculés sur les offres avec texte exploitable. "
               "Une offre compte une seule fois dans 'C1 ou équivalent', même avec plusieurs mentions."])
-    tab["Résumé"] = {"values": r, "header_rows": [0, 4]}
+
+    # -- données des graphiques (tableaux visibles sous le résumé ; les graphiques les lisent)
+    cles_cats = list(cats.keys())
+    c1_cats = [c for c in cles_cats if cats[c]["zaehlt_als_c1"]]
+    r.append([])
+    r.append(["DONNÉES DES GRAPHIQUES (ne pas modifier)"])
+    h1 = len(r)
+    r.append(["Niveau exigé (% des offres avec texte)"] + [cats[c]["label"] for c in cles_cats] + ["Aucune mention"])
+    for lib, X in ((lib_local, L), ("Allemagne", D)):
+        r.append([lib] + [pct(X["top"][c], X["avec_texte"]) for c in cles_cats] + [pct(X["aucune"], X["avec_texte"])])
+    h2 = len(r) + 1
+    r.append([])
+    r.append(["Comparaison (% des offres avec texte)", f"{cats[c1_cats[0]]['label']} (%)", "C1 ou équivalent (%)"])
+    for lib, X in ((lib_local, L), ("Allemagne", D)):
+        r.append([lib, pct(X["par_cat"][c1_cats[0]], X["avec_texte"]), pct(X["c1"], X["avec_texte"])])
+    charts_r = [
+        {"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
+         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": list(range(1, len(cles_cats) + 2)),
+         "anchor_row": 3, "anchor_col": 7, "y_title": "% des offres"},
+        {"type": "COLUMN", "stacked": False, "titre": "C1 explicite vs C1 ou équivalent (% des offres)",
+         "header_row": h2, "last_row": h2 + 2, "domain_col": 0, "series_cols": [1, 2],
+         "anchor_row": 24, "anchor_col": 7, "y_title": "% des offres"},
+    ]
+    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1, h2], "charts": charts_r, "col_widths": {0: 430}}
 
     # ---- Offres C1
     en_tete = ["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien",
@@ -467,7 +494,11 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     rows.append([])
     rows.append(["Une offre peut apparaître sous plusieurs expressions ; les lignes ne s'additionnent donc pas. "
                  "Les % sont calculés sur les offres avec texte."])
-    tab["Expressions"] = {"values": rows, "header_rows": [0]}
+    tab["Expressions"] = {"values": rows, "header_rows": [0], "col_widths": {0: 240, 1: 200},
+                          "charts": [{"type": "BAR", "stacked": False,
+                                      "titre": "Offres par expression (% des offres avec texte)",
+                                      "header_row": 0, "last_row": len(expressions), "domain_col": 0,
+                                      "series_cols": [3, 5], "anchor_row": 12, "anchor_col": 0}]}
 
     # ---- Tendances
     semaines = liste_semaines(agg)
@@ -495,8 +526,16 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
         blocs[cle] = {"header_row": debut, "first": debut + 1, "last": debut + len(semaines),
                       "titre": f"Offres par semaine - {lib}"}
         t.append([])
+    charts_t = []
+    for bloc in blocs.values():
+        if bloc["last"] >= bloc["first"]:
+            charts_t.append({"type": "LINE", "stacked": False, "titre": bloc["titre"],
+                             "header_row": bloc["header_row"], "last_row": bloc["last"], "domain_col": 0,
+                             "series_cols": list(range(1, ncols)), "anchor_row": bloc["header_row"],
+                             "anchor_col": ncols + 1, "x_title": "Semaine de publication",
+                             "y_title": "Nombre d'offres"})
     tab["Tendances"] = {"values": t, "header_rows": [0, 3] + [b["header_row"] for b in blocs.values()],
-                        "blocs": blocs, "ncols": ncols}
+                        "charts": charts_t, "col_widths": {0: 260}, "extra_cols": ncols + 16}
 
     # ---- Données
     rows = [["Référence", "Zone", "Distance (km)", "Entreprise", "Titre", "Lieu", "Date", "Lien",
@@ -613,56 +652,66 @@ def _ecrire_historique(sh, hist):
         ws.append_rows(nouveaux + [ligne], value_input_option="USER_ENTERED")
 
 
-def _graphiques(sh, ws, bloc, ncols, ancre_col, ancre_ligne):
-    """Courbes natives Google Sheets pour un tableau hebdomadaire."""
-    if bloc["last"] < bloc["first"]:
-        return None
-    sid = ws.id
-
-    def plage(col, debut, fin):
-        return {"sourceRange": {"sources": [{"sheetId": sid, "startRowIndex": debut, "endRowIndex": fin,
+def _requete_graphique(sid, d):
+    """Requête Sheets 'addChart' à partir d'un descripteur de graphique (voir construire_tableaux)."""
+    def plage(col):
+        return {"sourceRange": {"sources": [{"sheetId": sid, "startRowIndex": d["header_row"],
+                                             "endRowIndex": d["last_row"] + 1,
                                              "startColumnIndex": col, "endColumnIndex": col + 1}]}}
-    series = [{"series": plage(c, bloc["header_row"], bloc["last"] + 1), "targetAxis": "LEFT_AXIS"}
-              for c in range(1, ncols)]
+    horizontal = d["type"] == "BAR"
+    axe_valeurs = "BOTTOM_AXIS" if horizontal else "LEFT_AXIS"
+    basic = {"chartType": d["type"], "legendPosition": "BOTTOM_LEGEND", "headerCount": 1,
+             "domains": [{"domain": plage(d["domain_col"])}],
+             "series": [{"series": plage(c), "targetAxis": axe_valeurs} for c in d["series_cols"]]}
+    if d.get("stacked"):
+        basic["stackedType"] = "STACKED"
+    axes = []
+    if d.get("x_title") and not horizontal:
+        axes.append({"position": "BOTTOM_AXIS", "title": d["x_title"]})
+    if d.get("y_title") and not horizontal:
+        axes.append({"position": "LEFT_AXIS", "title": d["y_title"]})
+    if axes:
+        basic["axis"] = axes
     return {"addChart": {"chart": {
-        "spec": {"title": bloc["titre"],
-                 "basicChart": {"chartType": "LINE", "legendPosition": "BOTTOM_LEGEND", "headerCount": 1,
-                                "axis": [{"position": "BOTTOM_AXIS", "title": "Semaine de publication"},
-                                         {"position": "LEFT_AXIS", "title": "Nombre d'offres"}],
-                                "domains": [{"domain": plage(0, bloc["header_row"], bloc["last"] + 1)}],
-                                "series": series}},
-        "position": {"overlayPosition": {"anchorCell": {"sheetId": sid, "rowIndex": ancre_ligne,
-                                                        "columnIndex": ancre_col},
-                                         "widthPixels": 720, "heightPixels": 320}}}}}
+        "spec": {"title": d["titre"], "basicChart": basic},
+        "position": {"overlayPosition": {"anchorCell": {"sheetId": sid, "rowIndex": d["anchor_row"],
+                                                        "columnIndex": d["anchor_col"]},
+                                         "widthPixels": d.get("largeur", 640),
+                                         "heightPixels": d.get("hauteur", 340)}}}}}
 
 
 def ecrire_sheet(tab):
     sh = ouvrir_sheet()
     log.info("Sheet ouvert : %s", sh.title)
     ordre = ["Résumé", "Offres C1", "Expressions", "Tendances", "Données"]
+    feuilles = {}
     for nom in ordre:
         info = tab[nom]
-        cols_min = (info["ncols"] + 16) if nom == "Tendances" else 26
-        ws = _ecrire_onglet(sh, nom, info["values"], info["header_rows"], cols_min)
+        feuilles[nom] = _ecrire_onglet(sh, nom, info["values"], info["header_rows"],
+                                       info.get("extra_cols", 26))
         log.info("Onglet '%s' écrit (%d lignes)", nom, len(info["values"]))
-        if nom == "Tendances":
-            # supprimer les anciens graphiques puis recréer
-            meta = sh.fetch_sheet_metadata()
-            reqs = []
-            for s in meta.get("sheets", []):
-                if s["properties"]["sheetId"] == ws.id:
-                    reqs += [{"deleteEmbeddedObject": {"objectId": c["chartId"]}} for c in s.get("charts", [])]
-            ancre = info["ncols"] + 1
-            for bloc in info["blocs"].values():
-                g = _graphiques(sh, ws, bloc, info["ncols"], ancre, bloc["header_row"])
-                if g:
-                    reqs.append(g)
-            if reqs:
-                try:
-                    sh.batch_update({"requests": reqs})
-                    log.info("Graphiques de tendance créés")
-                except Exception as e:  # noqa: BLE001
-                    log.warning("Graphiques non créés (tableaux écrits quand même) : %s", e)
+
+    # Graphiques et largeurs de colonnes : on supprime les anciens graphiques puis on recrée tout.
+    # Non critique : si cette étape échoue, les tableaux sont déjà écrits.
+    try:
+        ids = {ws.id: nom for nom, ws in feuilles.items()}
+        reqs = []
+        for s in sh.fetch_sheet_metadata().get("sheets", []):
+            if s["properties"]["sheetId"] in ids:
+                reqs += [{"deleteEmbeddedObject": {"objectId": c["chartId"]}} for c in s.get("charts", [])]
+        for nom, ws in feuilles.items():
+            for col, px in tab[nom].get("col_widths", {}).items():
+                reqs.append({"updateDimensionProperties": {
+                    "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": col, "endIndex": col + 1},
+                    "properties": {"pixelSize": px}, "fields": "pixelSize"}})
+            for d in tab[nom].get("charts", []):
+                reqs.append(_requete_graphique(ws.id, d))
+        if reqs:
+            sh.batch_update({"requests": reqs})
+            log.info("Graphiques créés : %d", sum(len(tab[n].get("charts", [])) for n in feuilles))
+    except Exception as e:  # noqa: BLE001
+        log.warning("Graphiques non créés (tableaux écrits quand même) : %s", e)
+
     _ecrire_historique(sh, tab["_historique"])
     log.info("Onglet 'Historique' mis à jour")
     # ordre des onglets + suppression de l'onglet vide par défaut
@@ -680,7 +729,7 @@ def ecrire_sheet(tab):
 # --------------------------------------------------------------------------- principal
 
 def collecter(cfg, session=None):
-    """Étapes 1 à 3 : recherche, textes, dédoublonnage. Retourne (offres, nb_doublons)."""
+    """Étapes 1 à 3 : recherche, filtre de dates, textes, dédoublonnage. Retourne (offres, doublons, hors_fenetre)."""
     session = session or requests.Session()
     brut = {}
     for mot in cfg["mots_cles"]:
@@ -699,7 +748,15 @@ def collecter(cfg, session=None):
     if not brut:
         raise StatJobsError("Aucune offre trouvée : recherche suspecte (API ou paramètres). Sheet non modifié.")
 
-    offres = list(brut.values())
+    # L'API filtre sur la DERNIÈRE publication : une annonce republiée récemment peut avoir une date de
+    # PREMIÈRE publication très ancienne. On écarte ici celles qui dépassent la fenêtre demandée.
+    limite = (date.today() - timedelta(days=int(cfg["jours"]))).isoformat()
+    offres = [o for o in brut.values() if not o["datum"] or o["datum"] >= limite]
+    hors_fenetre = len(brut) - len(offres)
+    log.info("Fenêtre %d jours (depuis le %s) : %d offres écartées car publiées pour la 1re fois plus tôt",
+             int(cfg["jours"]), limite, hors_fenetre)
+    if not offres:
+        raise StatJobsError("Aucune offre dans la fenêtre de dates. Sheet non modifié.")
     log.info("Téléchargement de %d textes d'offres...", len(offres))
     pause = cfg.get("pause_s", 0.15)
 
@@ -720,7 +777,8 @@ def collecter(cfg, session=None):
         raise StatJobsError(
             f"{erreurs}/{len(offres)} textes illisibles (erreurs techniques) : au-delà du seuil de "
             f"{cfg.get('max_ohne_text_anteil', 0.05):.0%}. Relancer plus tard. Sheet non modifié.")
-    return dedoublonner(offres)
+    uniques, doublons = dedoublonner(offres)
+    return uniques, doublons, hors_fenetre
 
 
 def main(argv=None):
@@ -735,14 +793,14 @@ def main(argv=None):
     compiler_expressions(sprache)   # valide les regex AVANT de lancer 10 minutes de téléchargement
     compiler_themes(themes_cfg)
 
-    offres, doublons = collecter(cfg)
+    offres, doublons, hors_fenetre = collecter(cfg)
     expressions, themes = classifier(offres, cfg, sprache, themes_cfg)
     sans_gps = sum(1 for o in offres if o["dist"] is None)
     if sans_gps:
         log.info("%d offres sans coordonnées GPS : comptées dans 'Allemagne' uniquement", sans_gps)
     agg = agreger(offres, sprache, expressions, themes)
     tab = construire_tableaux(offres, agg, sprache, expressions, themes, cfg,
-                              date.today().isoformat(), doublons)
+                              date.today().isoformat(), doublons, hors_fenetre)
     sauvegarder_local(offres, tab, agg)
 
     L, D = agg["local"], agg["de"]
