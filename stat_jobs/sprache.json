@@ -1,0 +1,37 @@
+{
+  "_hilfe": [
+    "Expressions de niveau d'allemand cherchées dans le TITRE et le TEXTE de chaque annonce.",
+    "Trois catégories (ne pas renommer les clés) :",
+    "  c1_explizit       -> C1 explicite, compte comme 'C1 ou équivalent'",
+    "  aequivalent_stark -> équivalent fort, compte comme 'C1 ou équivalent' (chiffre séparé)",
+    "  mehrdeutig        -> niveau ambigu, affiché à part, NE compte PAS comme C1",
+    "Chaque expression a un 'name' (affiché dans le Sheet) et une liste de 'muster' (expressions régulières,",
+    "insensibles à la casse). Les formes allemandes déclinées sont couvertes par \\w* (ex. verhandlungssicher\\w*",
+    "attrape verhandlungssicher, verhandlungssichere, verhandlungssicheres, verhandlungssicherem...).",
+    "POUR AJOUTER une expression : copie un bloc {name, kategorie, muster} et adapte.",
+    "POUR EN RETIRER une : supprime tout son bloc {...}.",
+    "Exemple de test possible : ajouter {\"name\": \"gute Deutschkenntnisse\", \"kategorie\": \"mehrdeutig\", \"muster\": [\"\\\\bgute\\\\w*\\\\s+deutsch\\\\w*\"]}",
+    "pour voir combien d'annonces l'utilisent.",
+    "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
+  ],
+
+  "kategorien": {
+    "c1_explizit": { "label": "C1 explicite", "zaehlt_als_c1": true },
+    "aequivalent_stark": { "label": "Équivalent fort", "zaehlt_als_c1": true },
+    "mehrdeutig": { "label": "Niveau ambigu (non compté)", "zaehlt_als_c1": false }
+  },
+
+  "ausdruecke": [
+    { "name": "C1", "kategorie": "c1_explizit", "muster": ["\\bC1\\b"],
+      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
+    { "name": "C2", "kategorie": "c1_explizit", "muster": ["\\bC2\\b"],
+      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
+    { "name": "muttersprachlich", "kategorie": "c1_explizit", "muster": ["muttersprach\\w*"] },
+
+    { "name": "verhandlungssicher", "kategorie": "aequivalent_stark", "muster": ["verhandlungssicher\\w*"] },
+    { "name": "fließend", "kategorie": "aequivalent_stark", "muster": ["flie(?:ß|ss)end\\w*"] },
+    { "name": "perfektes Deutsch", "kategorie": "aequivalent_stark", "muster": ["perfekt\\w*\\s+deutsch\\w*"] },
+
+    { "name": "sehr gute Deutschkenntnisse", "kategorie": "mehrdeutig", "muster": ["sehr\\s+gute\\w*\\s+deutsch\\w*"] }
+  ]
+}
