@@ -13,10 +13,11 @@
     "  Familles (groupes de themes.json) : part des offres qui citent AU MOINS UN terme de la famille.",
     "",
     "TYPES DE RÈGLES",
-    "  orientation : compare les familles -> la famille qui monte le plus vs celle qui baisse le plus",
+    "  orientation : 'cible' groupes (familles de termes) ou profils (types de poste) : celui qui monte le plus",
+    "                vs celui qui baisse le plus",
     "  leader      : le terme le plus demandé",
     "  apparition  : terme presque absent avant (p1 < seuil_absent) qui dépasse seuil_apparition maintenant",
-    "  terme       : conditions 'si' sur 'recente' / 'precedente' ; 'cible' = termes | groupes",
+    "  terme       : conditions 'si' sur 'recente' / 'precedente' ; 'cible' = termes | groupes | profils",
     "  Un même terme ne reçoit qu'UNE phrase : la règle de plus haute 'priorite' qui s'applique.",
     "",
     "MOTS À PLACER DANS LES PHRASES (entre accolades)",
@@ -47,7 +48,10 @@
   },
 
   "regles": [
-    { "nom": "orientation_marche", "type": "orientation", "priorite": 100,
+    { "nom": "orientation_postes", "type": "orientation", "cible": "profils", "priorite": 101,
+      "phrase": "Les postes {hausse} gagnent du terrain ({h1} % → {h0} % des offres) au détriment des postes {baisse} ({b1} % → {b0} %)." },
+
+    { "nom": "orientation_marche", "type": "orientation", "cible": "groupes", "priorite": 100,
       "phrase": "Le marché s'oriente vers {hausse} ({h1} % → {h0} % des offres) tandis que {baisse} recule ({b1} % → {b0} %)." },
 
     { "nom": "leader", "type": "leader", "priorite": 90,
@@ -71,6 +75,14 @@
     { "nom": "famille_baisse_continue", "type": "terme", "cible": "groupes", "priorite": 72,
       "si": { "precedente": "baisse", "recente": "baisse" },
       "phrase": "La famille {terme} perd du terrain de façon continue ({p2} % → {p1} % → {p0} %)." },
+
+    { "nom": "profil_hausse", "type": "terme", "cible": "profils", "priorite": 71,
+      "si": { "recente": "hausse" },
+      "phrase": "Les offres de type {terme} augmentent ({p1} % → {p0} % des offres)." },
+
+    { "nom": "profil_baisse", "type": "terme", "cible": "profils", "priorite": 71,
+      "si": { "recente": "baisse" },
+      "phrase": "Les offres de type {terme} diminuent ({p1} % → {p0} % des offres)." },
 
     { "nom": "hausse_continue", "type": "terme", "cible": "termes", "priorite": 70,
       "si": { "precedente": "hausse", "recente": "hausse" },
