@@ -210,19 +210,51 @@ def telecharger_texte(session, refnr, pause):
 
 # --------------------------------------------------------------------------- 3. doublons
 
-def dedoublonner(offres):
-    """Même entreprise + même titre + même texte = une seule offre (ex. FERCHAU republie)."""
-    vues, uniques, doublons = set(), [], 0
+def _shingles(texte, n=5):
+    mots = norm(texte).split()
+    return {" ".join(mots[i:i + n]) for i in range(max(1, len(mots) - n + 1))}
+
+
+def dedoublonner(offres, cfg=None):
+    """
+    Une même annonce ne compte qu'une fois :
+      - même entreprise + même titre + texte identique, OU
+      - même entreprise (agences confondues, ex. 'FERCHAU GmbH Niederlassung Kiel' = 'FERCHAU GmbH')
+        + même titre + texte presque identique (>= seuil de similarité ; seuls le nom d'agence / le lieu changent).
+    On garde l'exemplaire le plus proche du lieu de référence (Oldenburg), pour ne pas vider la zone locale.
+    """
+    seuil = float((cfg or {}).get("doublon_aehnlichkeit", 0.85))
+    ref = (cfg or {}).get("lieu_reference")
+
+    def distance(o):
+        try:
+            return haversine_km(ref["latitude"], ref["longitude"], float(o["lat"]), float(o["lon"]))
+        except (TypeError, ValueError, KeyError):
+            return float("inf")
+
+    if ref:
+        offres = sorted(offres, key=distance)
+    groupes, uniques, doublons, vues_sans_texte = {}, [], 0, set()
     for o in offres:
-        if o["statut"] == "ok":
-            cle = (norm(o["firma"]), norm(o["titel"]),
-                   hashlib.sha1(norm(o["text"])[:3000].encode()).hexdigest())
-        else:
-            cle = ("ref", o["refnr"])   # sans texte, on ne peut comparer que le numéro
-        if cle in vues:
+        if o["statut"] != "ok":
+            if o["refnr"] in vues_sans_texte:
+                doublons += 1
+                continue
+            vues_sans_texte.add(o["refnr"])
+            uniques.append(o)
+            continue
+        cle = (firme_normalisee(o["firma"]), norm(o["titel"]))
+        sh = _shingles(o["text"])
+        doublon = False
+        for autre in groupes.get(cle, []):
+            inter = len(sh & autre)
+            if inter and inter / len(sh | autre) >= seuil:
+                doublon = True
+                break
+        if doublon:
             doublons += 1
             continue
-        vues.add(cle)
+        groupes.setdefault(cle, []).append(sh)
         uniques.append(o)
     log.info("Dédoublonnage : %d doublons retirés, %d offres uniques", doublons, len(uniques))
     return uniques, doublons
@@ -439,71 +471,35 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     lib_local = f"{ref} + {int(cfg['rayon_km'])} km"
     tab = {}
 
-    # ---- Résumé
+    # ---- Résumé (volontairement simple : C1 ou plus contre le reste)
     lib_moins = "Moins que C1 ou non précisé"
-    r = [["STATISTIQUE : offres IT exigeant un allemand C1 ou plus"],
-         [f"Mise à jour : {aujourdhui} | Fenêtre : {cfg['jours']} derniers jours | "
-          f"Mots-clés : {', '.join(cfg['mots_cles'])}"],
-         ["Note : instantané des offres encore en ligne à cette date (pas une évolution réelle). "
-          "'Allemagne' inclut aussi la zone locale."],
+    moins_L, moins_D = L["avec_texte"] - L["c1"], D["avec_texte"] - D["c1"]
+    r = [["Offres IT de mon domaine exigeant un allemand C1 ou plus"],
+         [f"Offres actuellement en ligne sur la Jobbörse de l'Agentur für Arbeit - mise à jour : {aujourdhui}"],
          [],
-         ["Indicateur", lib_local, "Allemagne"]]
-
-    def ligne(lib, k):
-        r.append([lib, L[k], D[k]])
-
-    moins = {k: X["avec_texte"] - X["c1"] for k, X in (("L", L), ("D", D))}
-    ligne("Offres analysées (après dédoublonnage)", "total")
-    ligne("dont avec texte exploitable", "avec_texte")
-    ligne("dont sans texte (offre vide / introuvable)", "vides")
-    ligne("dont texte illisible (erreur technique)", "erreurs")
-    r.append([])
-    r.append(["C1 OU PLUS (nombre d'offres)", L["c1"], D["c1"]])
-    r.append(["C1 OU PLUS (% des offres avec texte)", pct(L["c1"], L["avec_texte"]), pct(D["c1"], D["avec_texte"])])
-    r.append([f"{lib_moins} (nombre d'offres)", moins["L"], moins["D"]])
-    r.append([f"{lib_moins} (%)", pct(moins["L"], L["avec_texte"]), pct(moins["D"], D["avec_texte"])])
-    r.append([])
-    r.append(["C1 ÉCRIT EXPLICITEMENT (C1 / C2 dans le texte) - nombre", L["explizit"], D["explizit"]])
-    r.append(["C1 ÉCRIT EXPLICITEMENT - %", pct(L["explizit"], L["avec_texte"]), pct(D["explizit"], D["avec_texte"])])
-    r.append([])
-    r.append(["Entreprises distinctes derrière les offres C1 ou plus", L["distinct"], D["distinct"]])
-    r.append(["Entreprise la plus représentée", L["top_nom"], D["top_nom"]])
-    r.append(["... nombre de ses offres C1 ou plus", L["top_n"], D["top_n"]])
-    r.append(["... part des offres C1 ou plus (%)", pct(L["top_n"], L["c1"]), pct(D["top_n"], D["c1"])])
-    r.append(["C1 OU PLUS sans cette entreprise (% des autres offres)", pct(L["c1_sans_top"], L["avec_sans_top"]),
-              pct(D["c1_sans_top"], D["avec_sans_top"])])
-    r.append([])
-    r.append([f"Doublons retirés : {doublons}. Offres écartées car publiées pour la première fois il y a plus de "
-              f"{cfg['jours']} jours : {hors_fenetre}. Les % sont calculés sur les offres avec texte exploitable. "
-              "Une offre compte une seule fois dans 'C1 ou plus', même avec plusieurs mentions (voir l'onglet Expressions)."])
-
-    # -- données des graphiques (tableau visible sous le résumé ; les graphiques le lisent)
-    r.append([])
-    r.append(["DONNÉES DES GRAPHIQUES (ne pas modifier)"])
+         ["", lib_local, "Allemagne"],
+         ["Offres analysées", L["avec_texte"], D["avec_texte"]],
+         ["C1 ou plus (nombre d'offres)", L["c1"], D["c1"]],
+         ["C1 ou plus (%)", pct(L["c1"], L["avec_texte"]), pct(D["c1"], D["avec_texte"])],
+         [f"{lib_moins} (nombre d'offres)", moins_L, moins_D],
+         [f"{lib_moins} (%)", pct(moins_L, L["avec_texte"]), pct(moins_D, D["avec_texte"])],
+         [],
+         [],
+         ["Données du graphique"]]
     h1 = len(r)
-    r.append(["Niveau d'allemand exigé (% des offres avec texte)", "C1 ou plus", lib_moins])
-    for lib, X, m in ((lib_local, L, moins["L"]), ("Allemagne", D, moins["D"])):
-        r.append([lib, pct(X["c1"], X["avec_texte"]), pct(m, X["avec_texte"])])
-    r.append([])
-    h2 = len(r)
-    r.append(["Comparaison (% des offres avec texte)", "C1 écrit explicitement", "C1 ou plus",
-              "C1 ou plus sans l'entreprise principale"])
-    for lib, X in ((lib_local, L), ("Allemagne", D)):
-        r.append([lib, pct(X["explizit"], X["avec_texte"]), pct(X["c1"], X["avec_texte"]),
-                  pct(X["c1_sans_top"], X["avec_sans_top"])])
+    r.append(["Niveau d'allemand exigé (%)", "C1 ou plus", lib_moins])
+    r.append([lib_local, pct(L["c1"], L["avec_texte"]), pct(moins_L, L["avec_texte"])])
+    r.append(["Allemagne", pct(D["c1"], D["avec_texte"]), pct(moins_D, D["avec_texte"])])
     charts_r = [
         {"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
          "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
-         "anchor_row": 3, "anchor_col": 7, "y_title": "% des offres"},
-        {"type": "COLUMN", "stacked": False, "titre": "C1 explicite / C1 ou plus / sans l'entreprise principale (%)",
-         "header_row": h2, "last_row": h2 + 2, "domain_col": 0, "series_cols": [1, 2, 3],
-         "anchor_row": 22, "anchor_col": 7, "y_title": "% des offres"},
+         "anchor_row": 2, "anchor_col": 4, "y_title": "% des offres"},
     ]
-    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1, h2], "charts": charts_r, "col_widths": {0: 430}}
+    tab["Résumé"] = {"values": r, "header_rows": [0, 3, h1], "charts": charts_r, "col_widths": {0: 330, 1: 150, 2: 120}}
 
     # ---- Offres C1 ("C1 ou plus")
-    en_tete = ["Zone", "Entreprise", "Offres C1 ou plus de cette entreprise (Allemagne)", "Titre", "Lieu",
-               "Date de publication", "Lien", "C1 écrit explicitement", "Expression(s) déclenchante(s)", "Phrase"]
+    en_tete = ["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien",
+               "Expression(s) déclenchante(s)", "Phrase"]
     c1 = [o for o in offres if o["c1"]]
     # local d'abord ; dans chaque zone, les plus récentes en premier
     loc = sorted([o for o in c1 if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True)
@@ -513,8 +509,7 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
         hits = o["hits"]
         rows.append([cellule(x) for x in [
             lib_local if o["zone"] == "local" else "Reste de l'Allemagne",
-            o["firma"], D["firmes"].get(o["firma_norm"], 0), o["titel"], f"{o['plz']} {o['ort']}".strip(),
-            o["datum"], o["link"], "oui" if o["explizit"] else "non",
+            o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
             " / ".join(h["name"] for h in hits),
             hits[0]["phrase"] if hits else ""]])
     tab["Offres C1"] = {"values": rows, "header_rows": [0]}
@@ -585,11 +580,10 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
 
     # ---- ligne d'historique
     ent = ["Date", "Offres Allemagne", f"Offres {lib_local}", "C1 ou plus Allemagne", "% C1 ou plus Allemagne",
-           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}", "C1 explicite Allemagne",
-           "Entreprises distinctes C1 Allemagne", "Sans texte / illisible"]
+           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}"]
     ent += [f"{th['name']} (DE)" for th in themes] + [f"{th['name']} (local)" for th in themes]
-    ligne_h = [aujourdhui, D["total"], L["total"], D["c1"], pct(D["c1"], D["avec_texte"]),
-               L["c1"], pct(L["c1"], L["avec_texte"]), D["explizit"], D["distinct"], D["vides"] + D["erreurs"]]
+    ligne_h = [aujourdhui, D["avec_texte"], L["avec_texte"], D["c1"], pct(D["c1"], D["avec_texte"]),
+               L["c1"], pct(L["c1"], L["avec_texte"])]
     ligne_h += [D["par_theme"][th["name"]] for th in themes] + [L["par_theme"][th["name"]] for th in themes]
     tab["_historique"] = {"header": ent, "row": ligne_h}
     return tab
@@ -755,7 +749,7 @@ def ecrire_sheet(tab):
         sh.reorder_worksheets([sh.worksheet(n) for n in noms] +
                               [w for w in sh.worksheets() if w.title not in noms])
         for w in sh.worksheets():
-            if w.title in ("Sheet1", "Feuille 1", "Feuille1", "Tabelle1") and not any(w.get_all_values()):
+            if w.title in ("Sheet1", "Feuille 1", "Feuille1", "Tabelle1", "Tabellenblatt1") and not any(w.get_all_values()):
                 sh.del_worksheet(w)
     except Exception as e:  # noqa: BLE001
         log.warning("Réordonnancement des onglets ignoré : %s", e)
@@ -812,7 +806,7 @@ def collecter(cfg, session=None):
         raise StatJobsError(
             f"{erreurs}/{len(offres)} textes illisibles (erreurs techniques) : au-delà du seuil de "
             f"{cfg.get('max_ohne_text_anteil', 0.05):.0%}. Relancer plus tard. Sheet non modifié.")
-    uniques, doublons = dedoublonner(offres)
+    uniques, doublons = dedoublonner(offres, cfg)
     return uniques, doublons, hors_fenetre
 
 
@@ -839,11 +833,10 @@ def main(argv=None):
     sauvegarder_local(offres, tab, agg)
 
     L, D = agg["local"], agg["de"]
-    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%), %d C1 explicite, %d entreprises distinctes "
-             "(principale : %s, %d offres)", D["total"], D["c1"], pct(D["c1"], D["avec_texte"]), D["explizit"],
-             D["distinct"], D["top_nom"], D["top_n"])
+    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%)",
+             D["avec_texte"], D["c1"], pct(D["c1"], D["avec_texte"]))
     log.info("RÉSULTAT %s +%s km : %d offres, %d C1 ou plus (%.1f %%)",
-             cfg["lieu_reference"]["nom"], cfg["rayon_km"], L["total"], L["c1"], pct(L["c1"], L["avec_texte"]))
+             cfg["lieu_reference"]["nom"], cfg["rayon_km"], L["avec_texte"], L["c1"], pct(L["c1"], L["avec_texte"]))
 
     if args.sans_sheet:
         log.info("--sans-sheet : écriture Google Sheets ignorée")
