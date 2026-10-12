@@ -5,7 +5,9 @@
     "mots_cles      : MES postes (liste 'domaine') -> Résumé, Offres C1 et Tendances. Ajoute / supprime une ligne.",
     "mots_cles_marche : postes VOISINS (liste 'marché') -> uniquement l'onglet Tendances (expertises et profils).",
     "berufsfeld_marche: filtre domaine pour la liste 'marché' ; null = aucun filtre (ces postes sont classés ailleurs).",
-    "profils_datei  : règles qui déduisent le type de poste du titre (graphique 'Profils demandés').",
+    "profils_datei  : règles qui déduisent le type de poste du titre (onglet 'Profils').",
+    "titres_exclus  : métiers hors domaine. Une offre dont le TITRE contient une de ces regex est retirée PARTOUT",
+    "                 (Résumé, Offres C1, Tendances, Profils). Elle reste dans l'archive : retirer un mot la fait revenir.",
     "berufsfeld     : filtre domaine de l'API. Mets null (sans guillemets) pour le désactiver (plus d'offres, plus de bruit).",
     "periode_jours  : période glissante des statistiques (offres publiées ces N derniers jours, encore en ligne ou retirées).",
     "recherche_jours: paramètre de l'API (100 maximum) ; laisser 100.",
@@ -35,6 +37,20 @@
     "VDI Engineer"
   ],
   "berufsfeld_marche": null,
+
+  "titres_exclus": [
+    "tester", "\\btest\\b", "test ?engineer",
+    "security", "sicherheit", "cyber", "hacker", "penetration",
+    "entwickler", "developer", "software ?engineer", "programmierer",
+    "\\bsap\\b", "\\berp\\b",
+    "\\bcad\\b",
+    "\\bki\\b",
+    "architekt", "architect",
+    "projektleit", "projektmanag", "projektsteuer", "project ?manager",
+    "consultant", "berater",
+    "safety",
+    "servicenow"
+  ],
 
   "berufsfeld": "IT-Netzwerktechnik, -Administration, -Organisation",
   "angebotsart": 1,
