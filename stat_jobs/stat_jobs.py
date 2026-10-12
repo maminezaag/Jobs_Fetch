@@ -1,43 +1,44 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-stat_jobs.py - Statistique du marché : combien d'offres IT exigent un allemand C1 ou plus ?
+stat_jobs.py - Statistiques sur les offres IT de mon domaine (Jobbörse de l'Agentur für Arbeit)
 
-BUT
-    Argumenter auprès du conseiller (Agentur für Arbeit) pour financer un cours d'allemand C1 :
-    sur les ~90 derniers jours, combien d'offres de mon domaine (administrateur système, Linux,
-    IT-Support...) demandent du C1 ou plus, autour d'Oldenburg (+60 km) et dans toute
-    l'Allemagne ?
+DEUX QUESTIONS
+    1. Niveau d'allemand : combien d'offres exigent C1 ou plus ? (Oldenburg + rayon, et toute l'Allemagne)
+    2. Expertise technique : quelles technologies sont demandées, et comment ça évolue (Kubernetes, Ansible,
+       Azure, VMware, Proxmox...) ?
 
-CE SCRIPT EST INDÉPENDANT DE job_watcher.py (autres fichiers, autre workflow, autres secrets).
+POURQUOI UNE ARCHIVE
+    L'API ne renvoie que les offres ENCORE EN LIGNE : une offre retirée disparaît pour toujours.
+    Le script tourne donc chaque nuit et garde chaque offre vue dans stat_jobs/archive/ (fichiers JSONL,
+    un par mois, texte complet compris). Une offre retirée de la Jobbörse reste dans l'archive ET dans les
+    statistiques. Comme le texte est gardé, un terme ajouté plus tard dans themes.json s'applique aussi aux
+    anciennes offres (tout est reclassé à chaque exécution).
 
-DÉROULEMENT
-    1. Recherche (API Arbeitsagentur) pour chaque mot-clé de config.json, toute l'Allemagne, 90 jours.
-    2. Téléchargement du texte complet de chaque offre.
-    3. Filtre de dates (1re publication dans la fenêtre) puis dédoublonnage (même entreprise + même titre + même texte = une seule offre).
-    4. Classification : niveau de langue (sprache.json), zone (GPS), thèmes (themes.json).
-    5. Écriture dans le Google Sheet (6 onglets) - TOUT À LA FIN, une fois les données complètes.
+DÉROULEMENT D'UNE EXÉCUTION
+    1. Recherche API (mots-clés de config.json, toute l'Allemagne).
+    2. Offres nouvelles -> téléchargement du texte -> ajout à l'archive.
+       Offres déjà connues -> seule la date de "dernière vue" est mise à jour (pas de re-téléchargement).
+    3. Statistiques calculées sur l'archive, période glissante de 'periode_jours' (90 par défaut),
+       doublons retirés en arrière-plan (même annonce publiée par plusieurs agences d'une entreprise).
+    4. Google Sheet ENTIÈREMENT vidé (tous les onglets, tous les graphiques) puis reconstruit :
+       Résumé / Offres C1 / Tendances.
 
-RÈGLES DE SÉCURITÉ (re-exécution)
-    - Si une recherche échoue après 3 essais  -> le script s'arrête, le Sheet n'est PAS touché.
-    - Si trop de textes sont illisibles (erreurs réseau > 5 %) -> idem.
-    - Si l'écriture dans le Sheet échoue -> les résultats restent dans stat_jobs/out/ (artefact GitHub).
-    - Les onglets Résumé / Offres C1 / Expressions / Tendances / Données sont RECRÉÉS à chaque
-      exécution (même résultat si on relance le même jour). L'onglet Historique n'est JAMAIS
-      effacé : une ligne par jour (la ligne du jour est remplacée en cas de relance).
+SÉCURITÉ
+    - Recherche en échec après 3 essais -> arrêt, ni l'archive ni le Sheet ne sont modifiés.
+    - Texte d'une nouvelle offre illisible (panne) -> l'offre n'est pas archivée, elle sera retentée la nuit suivante.
+    - L'archive est écrite AVANT le Sheet : si le Sheet échoue, les nouvelles offres sont quand même gardées
+      (le workflow les commite dans le dépôt) et le Sheet sera reconstruit à la prochaine exécution.
 
-SECRETS GITHUB UTILISÉS (jamais dans un fichier du dépôt)
-    GCP_SA_KEY           contenu JSON de la clé du compte de service Google
-    STAT_JOBS_SHEET_ID   identifiant du Google Sheet
+SECRETS GITHUB : GCP_SA_KEY (clé JSON du compte de service Google), STAT_JOBS_SHEET_ID (identifiant du Sheet)
 
-UTILISATION LOCALE (test sans écrire dans le Sheet) :
-    python stat_jobs.py --sans-sheet
+UTILISATION LOCALE (test, sans écrire dans le Sheet) :  python stat_jobs.py --sans-sheet
 """
 
 import argparse
 import base64
 import csv
-import hashlib
+import glob
 import json
 import logging
 import math
@@ -58,16 +59,17 @@ OUT_DIR = os.path.join(BASE_DIR, "out")
 
 API_SEARCH = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs"
 API_DETAIL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails/{}"
-API_HEADERS = {"X-API-Key": "jobboerse-jobsuche", "User-Agent": "stat_jobs/1.0"}
+API_HEADERS = {"X-API-Key": "jobboerse-jobsuche", "User-Agent": "stat_jobs/2.0"}
 LIEN_OFFRE = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{}"
 
 PAGE_SIZE = 100
 MAX_PAGES = 60          # garde-fou : 6000 offres par mot-clé maximum
 ESSAIS = 3
 TEXTE_MIN = 80          # en dessous : on considère que l'offre n'a pas de vrai texte
+GRIS_CLAIR = {"red": 0.85, "green": 0.85, "blue": 0.85}
 
 
-# --------------------------------------------------------------------------- utilitaires
+# =========================================================================== utilitaires
 
 class StatJobsError(Exception):
     """Erreur bloquante : on s'arrête AVANT d'écrire dans le Sheet."""
@@ -118,7 +120,34 @@ def norm(s):
     return re.sub(r"[^a-z0-9äöüß]+", " ", (s or "").lower()).strip()
 
 
-# --------------------------------------------------------------------------- 1. recherche
+def pct(n, d):
+    return round(100.0 * n / d, 1) if d else 0.0
+
+
+def lundi(iso):
+    try:
+        d = datetime.strptime(iso, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+    return d - timedelta(days=d.weekday())
+
+
+def cellule(v):
+    """Neutralise les textes qui seraient pris pour une formule par Google Sheets."""
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@"):
+        return "'" + v
+    return v
+
+
+def ecrire_atomique(chemin, contenu):
+    """Écrit dans un fichier temporaire puis renomme : jamais de fichier à moitié écrit."""
+    tmp = chemin + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(contenu)
+    os.replace(tmp, chemin)
+
+
+# =========================================================================== 1. API
 
 def lancer_recherche(session, cfg, mot_cle):
     """Toutes les pages d'un mot-clé (toute l'Allemagne). Retourne la liste brute d'offres."""
@@ -128,7 +157,7 @@ def lancer_recherche(session, cfg, mot_cle):
             "was": mot_cle,
             "size": PAGE_SIZE,
             "page": page,
-            "veroeffentlichtseit": min(int(cfg["jours"]), 100),
+            "veroeffentlichtseit": min(int(cfg.get("recherche_jours", 100)), 100),
             "angebotsart": cfg.get("angebotsart", 1),
             # IMPORTANT : booléen en minuscules ("true"), sinon l'API renvoie 0 résultat
             "zeitarbeit": str(bool(cfg.get("zeitarbeit", True))).lower(),
@@ -146,8 +175,7 @@ def lancer_recherche(session, cfg, mot_cle):
         liste = data.get("ergebnisliste") or data.get("stellenangebote") or []
         total = data.get("maxErgebnisse")
         resultats.extend(liste)
-        log.info("Recherche '%s' page %d : %d offres (total annoncé : %s)",
-                 mot_cle, page, len(liste), total)
+        log.info("Recherche '%s' page %d : %d offres (total annoncé : %s)", mot_cle, page, len(liste), total)
         if len(liste) < PAGE_SIZE:
             break
         if total and len(resultats) >= int(total):
@@ -162,9 +190,8 @@ def mapper_offre(o):
     lokas = o.get("stellenlokationen") or [{}]
     loc0 = lokas[0] or {}
     adr = loc0.get("adresse", {}) or {}
-    refnr = o.get("referenznummer") or o.get("refnr") or ""
     return {
-        "refnr": refnr,
+        "refnr": o.get("referenznummer") or o.get("refnr") or "",
         "titel": o.get("stellenangebotsTitel") or o.get("hauptberuf", "") or "",
         "firma": o.get("firma", "") or "",
         "ort": adr.get("ort", "") or "",
@@ -173,16 +200,13 @@ def mapper_offre(o):
         "lat": loc0.get("breite"),
         "lon": loc0.get("laenge"),
         "datum": (o.get("datumErsteVeroeffentlichung") or "")[:10],
-        "link": LIEN_OFFRE.format(urllib.parse.quote(refnr)) if refnr else "",
     }
 
 
-# --------------------------------------------------------------------------- 2. textes
-
 def telecharger_texte(session, refnr, pause):
     """
-    Retourne (texte, statut). statut : 'ok' | 'leer' (offre sans texte / 404, pas une panne)
-    | 'fehler' (panne réseau/serveur après 3 essais - compte dans le seuil d'échec).
+    Retourne (texte, statut). statut : 'ok' | 'leer' (offre sans texte / 404 : définitif)
+    | 'fehler' (panne réseau/serveur après 3 essais : on retentera la nuit suivante).
     """
     time.sleep(pause)
     url = API_DETAIL.format(urllib.parse.quote(base64.b64encode(refnr.encode()).decode()))
@@ -201,66 +225,164 @@ def telecharger_texte(session, refnr, pause):
         return "", "fehler"
     if data is None:
         return "", "leer"
-    brut = data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung") or ""
-    texte = nettoyer_html(brut)
-    if len(texte) < TEXTE_MIN:
-        return texte, "leer"
-    return texte, "ok"
+    texte = nettoyer_html(data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung") or "")
+    return (texte, "leer") if len(texte) < TEXTE_MIN else (texte, "ok")
 
 
-# --------------------------------------------------------------------------- 3. doublons
+# =========================================================================== 2. archive
+
+def dossier_archive(cfg):
+    return os.path.join(BASE_DIR, cfg.get("archive_dossier", "archive"))
+
+
+def charger_archive(cfg):
+    """
+    Lit toutes les offres archivées : archive/AAAA-MM.jsonl (une offre par ligne)
+    + archive/derniere_vue.json ({référence: date de dernière vue}).
+    """
+    dossier = dossier_archive(cfg)
+    archive = {}
+    for chemin in sorted(glob.glob(os.path.join(dossier, "*.jsonl"))):
+        with open(chemin, encoding="utf-8") as f:
+            for n, ligne in enumerate(f, 1):
+                ligne = ligne.strip()
+                if not ligne:
+                    continue
+                try:
+                    o = json.loads(ligne)
+                except ValueError:
+                    raise StatJobsError(f"Archive corrompue : {os.path.basename(chemin)} ligne {n}")
+                archive[o["refnr"]] = o
+    vues = {}
+    chemin_vues = os.path.join(dossier, "derniere_vue.json")
+    if os.path.exists(chemin_vues):
+        with open(chemin_vues, encoding="utf-8") as f:
+            vues = json.load(f)
+    for ref, d in vues.items():
+        if ref in archive:
+            archive[ref]["derniere_vue"] = d
+    log.info("Archive : %d offres déjà connues", len(archive))
+    return archive
+
+
+def enregistrer_archive(cfg, nouvelles, archive, aujourdhui):
+    """Ajoute les nouvelles offres au fichier du mois et met à jour derniere_vue.json."""
+    dossier = dossier_archive(cfg)
+    os.makedirs(dossier, exist_ok=True)
+    if nouvelles:
+        chemin = os.path.join(dossier, f"{aujourdhui[:7]}.jsonl")
+        existant = ""
+        if os.path.exists(chemin):
+            with open(chemin, encoding="utf-8") as f:
+                existant = f.read()
+            if existant and not existant.endswith("\n"):
+                existant += "\n"
+        champs = ("refnr", "titel", "firma", "ort", "plz", "region", "lat", "lon", "datum",
+                  "premiere_vue", "statut", "text")
+        lignes = "".join(json.dumps({k: o.get(k) for k in champs}, ensure_ascii=False) + "\n" for o in nouvelles)
+        ecrire_atomique(chemin, existant + lignes)
+    vues = {ref: o.get("derniere_vue") or o.get("premiere_vue") for ref, o in sorted(archive.items())}
+    ecrire_atomique(os.path.join(dossier, "derniere_vue.json"), json.dumps(vues, ensure_ascii=False, indent=0))
+    log.info("Archive enregistrée : %d nouvelles offres, %d au total", len(nouvelles), len(archive))
+
+
+def mettre_a_jour_archive(cfg, session, aujourdhui):
+    """Étapes 1-2 : recherche, téléchargement des seules nouvelles offres, archivage. Retourne l'archive."""
+    archive = charger_archive(cfg)
+
+    en_ligne = {}
+    for mot in cfg["mots_cles"]:
+        try:
+            liste = lancer_recherche(session, cfg, mot)
+        except (requests.RequestException, ValueError) as e:
+            raise StatJobsError(f"Recherche '{mot}' échouée après {ESSAIS} essais ({e}). Rien n'est modifié.")
+        for o in liste:
+            m = mapper_offre(o)
+            if m["refnr"]:
+                en_ligne.setdefault(m["refnr"], m)
+        log.info("Mot-clé '%s' : %d offres (total unique en ligne : %d)", mot, len(liste), len(en_ligne))
+    if not en_ligne:
+        raise StatJobsError("Aucune offre trouvée : recherche suspecte (API ou paramètres). Rien n'est modifié.")
+
+    for ref in en_ligne:
+        if ref in archive:
+            archive[ref]["derniere_vue"] = aujourdhui
+    a_telecharger = [m for ref, m in en_ligne.items() if ref not in archive]
+    log.info("Offres en ligne : %d, dont %d nouvelles à télécharger", len(en_ligne), len(a_telecharger))
+
+    pause = cfg.get("pause_s", 0.15)
+
+    def tache(m):
+        m["text"], m["statut"] = telecharger_texte(session, m["refnr"], pause)
+        return m
+
+    nouvelles = []
+    with ThreadPoolExecutor(max_workers=int(cfg.get("parallele_anfragen", 3))) as pool:
+        for i, m in enumerate(pool.map(tache, a_telecharger), 1):
+            if i % 200 == 0:
+                log.info("  textes : %d/%d", i, len(a_telecharger))
+            if m["statut"] == "fehler":
+                continue                        # pas archivée : retentée la nuit suivante
+            m["premiere_vue"] = m["derniere_vue"] = aujourdhui
+            archive[m["refnr"]] = m
+            nouvelles.append(m)
+
+    erreurs = len(a_telecharger) - len(nouvelles)
+    if erreurs:
+        log.warning("%d textes illisibles (panne) : ces offres seront retentées à la prochaine exécution", erreurs)
+    if a_telecharger and erreurs > 10 and erreurs / len(a_telecharger) > 0.5:
+        raise StatJobsError(f"{erreurs}/{len(a_telecharger)} textes illisibles : API en panne ? Rien n'est modifié.")
+
+    enregistrer_archive(cfg, nouvelles, archive, aujourdhui)
+    return archive, len(nouvelles)
+
+
+# =========================================================================== 3. doublons
 
 def _shingles(texte, n=5):
     mots = norm(texte).split()
     return {" ".join(mots[i:i + n]) for i in range(max(1, len(mots) - n + 1))}
 
 
-def dedoublonner(offres, cfg=None):
-    """
-    Une même annonce ne compte qu'une fois :
-      - même entreprise + même titre + texte identique, OU
-      - même entreprise (agences confondues, ex. 'FERCHAU GmbH Niederlassung Kiel' = 'FERCHAU GmbH')
-        + même titre + texte presque identique (>= seuil de similarité ; seuls le nom d'agence / le lieu changent).
-    On garde l'exemplaire le plus proche du lieu de référence (Oldenburg), pour ne pas vider la zone locale.
-    """
-    seuil = float((cfg or {}).get("doublon_aehnlichkeit", 0.85))
-    ref = (cfg or {}).get("lieu_reference")
+_FORMES_JURIDIQUES = r"\b(gmbh|ag|se|kg|kgaa|mbh|co|ohg|ug|e\.?\s?v|haftungsbeschränkt|germany|deutschland)\b"
 
-    def distance(o):
-        try:
-            return haversine_km(ref["latitude"], ref["longitude"], float(o["lat"]), float(o["lon"]))
-        except (TypeError, ValueError, KeyError):
-            return float("inf")
 
-    if ref:
-        offres = sorted(offres, key=distance)
-    groupes, uniques, doublons, vues_sans_texte = {}, [], 0, set()
+def firme_normalisee(nom):
+    """'FERCHAU GmbH Niederlassung Bremen' et 'Ferchau GmbH' -> 'ferchau'."""
+    n = (nom or "").lower()
+    n = re.split(r"\b(niederlassung|standort|filiale|zweigniederlassung|vertriebsstützpunkt|region)\b|[,(/|]", n)[0]
+    n = re.sub(_FORMES_JURIDIQUES, " ", n)
+    n = re.sub(r"[^a-z0-9äöüß]+", " ", n).strip()
+    return n or (nom or "").strip().lower() or "(inconnue)"
+
+
+def dedoublonner(offres, cfg):
+    """
+    Même entreprise (agences confondues) + même titre + texte presque identique = une seule offre.
+    On garde l'exemplaire le plus proche du lieu de référence, pour ne pas vider la zone locale.
+    Traitement en arrière-plan : rien n'est affiché dans les statistiques.
+    """
+    seuil = float(cfg.get("doublon_aehnlichkeit", 0.85))
+    offres = sorted(offres, key=lambda o: o["dist"] if o["dist"] is not None else float("inf"))
+    groupes, uniques, doublons, refs_vues = {}, [], 0, set()
     for o in offres:
         if o["statut"] != "ok":
-            if o["refnr"] in vues_sans_texte:
-                doublons += 1
-                continue
-            vues_sans_texte.add(o["refnr"])
-            uniques.append(o)
+            if o["refnr"] not in refs_vues:
+                refs_vues.add(o["refnr"])
+                uniques.append(o)
             continue
         cle = (firme_normalisee(o["firma"]), norm(o["titel"]))
         sh = _shingles(o["text"])
-        doublon = False
-        for autre in groupes.get(cle, []):
-            inter = len(sh & autre)
-            if inter and inter / len(sh | autre) >= seuil:
-                doublon = True
-                break
-        if doublon:
+        if any(len(sh & autre) / len(sh | autre) >= seuil for autre in groupes.get(cle, []) if sh & autre):
             doublons += 1
             continue
         groupes.setdefault(cle, []).append(sh)
         uniques.append(o)
     log.info("Dédoublonnage : %d doublons retirés, %d offres uniques", doublons, len(uniques))
-    return uniques, doublons
+    return uniques
 
 
-# --------------------------------------------------------------------------- 4. classification
+# =========================================================================== 4. classification
 
 def compiler_expressions(sprache):
     cats = sprache["kategorien"]
@@ -275,339 +397,184 @@ def compiler_expressions(sprache):
                 "ausschluss": [re.compile(m, re.IGNORECASE) for m in e.get("ausschluss", [])],
                 "vor": int(e.get("ausschluss_vor", 40)),
                 "nach": int(e.get("ausschluss_nach", 40)),
-                "explizit": bool(e.get("explizit", False)),
             })
         except re.error as err:
             raise StatJobsError(f"sprache.json : regex invalide dans '{e['name']}' : {err}")
     return ex
 
 
-def extrait(texte, debut, fin, marge=70):
-    a, b = max(0, debut - marge), min(len(texte), fin + marge)
-    s = re.sub(r"\s+", " ", texte[a:b]).strip()
-    return ("…" if a > 0 else "") + s + ("…" if b < len(texte) else "")
-
-
 def classer_langue(titre, texte, expressions):
-    """Retourne la liste des mentions trouvées : [{name, kategorie, phrase}], une par expression."""
+    """Retourne la liste des expressions de niveau trouvées (une entrée par expression)."""
     corpus = f"{titre}. {texte}"
     trouvees = []
     for e in expressions:
         for motif in e["muster"]:
             hit = None
             for m in motif.finditer(corpus):
-                # 'ausschluss' : ignore la mention si le contexte proche l'infirme (ex. "Führerschein C1")
-                # zone 'après' coupée au prochain point de liste : on ne lit pas l'exigence suivante
+                # 'ausschluss' : mention ignorée si le contexte proche l'infirme (ex. "Führerschein C1", "(mind. B2)")
+                # la zone 'après' est coupée au prochain point de liste
                 apres = re.split(r"\*|•|\s-\s", corpus[m.end():m.end() + e["nach"]], maxsplit=1)[0]
-                contexte = corpus[max(0, m.start() - e["vor"]):m.start()] + corpus[m.start():m.end()] + apres
+                contexte = corpus[max(0, m.start() - e["vor"]):m.end()] + apres
                 if any(x.search(contexte) for x in e["ausschluss"]):
                     continue
                 hit = m
                 break
             if hit:
-                trouvees.append({"name": e["name"], "kategorie": e["kategorie"], "explizit": e["explizit"],
-                                 "phrase": extrait(corpus, hit.start(), hit.end())})
+                trouvees.append({"name": e["name"], "kategorie": e["kategorie"]})
                 break
     return trouvees
 
 
 def compiler_themes(cfg_themes):
+    """themes.json : chaque terme = {name, muster: [regex...]} (au moins une regex doit être trouvée)."""
     out = []
     try:
         for t in cfg_themes["themes"]:
-            out.append({
-                "name": t["name"],
-                "alle_von": [[re.compile(r, re.I) for r in g] for g in t.get("alle_von", [])],
-                "keines_von": [re.compile(r, re.I) for r in t.get("keines_von", [])],
-                "titel": [re.compile(r, re.I) for r in t.get("titel_enthaelt_eins_von", [])],
-            })
+            out.append({"name": t["name"], "muster": [re.compile(r, re.I) for r in t["muster"]]})
     except (re.error, KeyError) as e:
         raise StatJobsError(f"themes.json invalide : {e}")
     return out
 
 
-def classer_themes(titre, texte, themes):
-    corpus = f"{titre} {texte}"
-    res = []
-    for t in themes:
-        if not all(any(r.search(corpus) for r in g) for g in t["alle_von"]):
-            continue
-        if any(r.search(corpus) for r in t["keines_von"]):
-            continue
-        if t["titel"] and not any(r.search(titre) for r in t["titel"]):
-            continue
-        res.append(t["name"])
-    return res
-
-
-_FORMES_JURIDIQUES = r"\b(gmbh|ag|se|kg|kgaa|mbh|co|ohg|ug|e\.?\s?v|haftungsbeschränkt|germany|deutschland)\b"
-
-
-def firme_normalisee(nom):
-    """'FERCHAU GmbH Niederlassung Bremen' et 'Ferchau GmbH' -> 'ferchau' (pour compter les entreprises distinctes)."""
-    n = (nom or "").lower()
-    n = re.split(r"\b(niederlassung|standort|filiale|zweigniederlassung|region)\b|[,(/|]", n)[0]
-    n = re.sub(_FORMES_JURIDIQUES, " ", n)
-    n = re.sub(r"[^a-z0-9äöüß]+", " ", n).strip()
-    return n or (nom or "").strip().lower() or "(inconnue)"
-
-
-def classifier(offres, cfg, sprache, themes_cfg):
-    expressions = compiler_expressions(sprache)
-    themes = compiler_themes(themes_cfg)
+def classifier(offres, cfg, sprache, expressions, themes):
     cats = sprache["kategorien"]
     ref = cfg["lieu_reference"]
     rayon = float(cfg["rayon_km"])
     for o in offres:
-        # zone
-        if o["lat"] is not None and o["lon"] is not None:
-            try:
-                o["dist"] = round(haversine_km(ref["latitude"], ref["longitude"],
-                                               float(o["lat"]), float(o["lon"])), 1)
-            except (TypeError, ValueError):
-                o["dist"] = None
-        else:
+        try:
+            o["dist"] = round(haversine_km(ref["latitude"], ref["longitude"], float(o["lat"]), float(o["lon"])), 1)
+        except (TypeError, ValueError):
             o["dist"] = None
         o["zone"] = "local" if (o["dist"] is not None and o["dist"] <= rayon) else "reste"
-        # langue (seulement si on a un texte ; le titre seul est trop pauvre)
-        o["hits"] = classer_langue(o["titel"], o["text"], expressions) if o["statut"] == "ok" else []
-        o["cats"] = sorted({h["kategorie"] for h in o["hits"]})
-        o["c1"] = any(cats[c]["zaehlt_als_c1"] for c in o["cats"])
-        o["explizit"] = any(h["explizit"] for h in o["hits"])
-        o["firma_norm"] = firme_normalisee(o["firma"])
-        o["themes"] = classer_themes(o["titel"], o["text"], themes) if o["statut"] == "ok" else []
-    return expressions, themes
+        ok = o.get("statut") == "ok"
+        o["hits"] = classer_langue(o["titel"], o["text"], expressions) if ok else []
+        o["c1"] = any(cats[h["kategorie"]]["zaehlt_als_c1"] for h in o["hits"])
+        corpus = f"{o['titel']} {o['text']}"
+        o["themes"] = [t["name"] for t in themes if any(r.search(corpus) for r in t["muster"])] if ok else []
 
 
-# --------------------------------------------------------------------------- 5. agrégats
-
-def pct(n, d):
-    return round(100.0 * n / d, 1) if d else 0.0
-
-
-def lundi(iso):
-    try:
-        d = datetime.strptime(iso, "%Y-%m-%d").date()
-    except ValueError:
-        return None
-    return d - timedelta(days=d.weekday())
+def offres_de_la_periode(archive, cfg, aujourdhui):
+    """Offres de l'archive publiées pour la 1re fois dans la période glissante (en ligne ou déjà retirées)."""
+    jours = int(cfg.get("periode_jours", 90))
+    debut = (datetime.strptime(aujourdhui, "%Y-%m-%d").date() - timedelta(days=jours)).isoformat()
+    res = []
+    for o in archive.values():
+        d = o.get("datum") or o.get("premiere_vue") or ""
+        if d >= debut:
+            res.append(dict(o, datum=d))
+    return res, debut
 
 
-def agreger(offres, sprache, expressions, themes):
-    """Calcule tous les chiffres pour les deux périmètres : 'local' (Oldenburg+rayon) et 'de' (Allemagne)."""
-    cats = sprache["kategorien"]
-    perimetres = {"local": [o for o in offres if o["zone"] == "local"], "de": list(offres)}
-    agg = {}
-    for cle, lst in perimetres.items():
-        avec = [o for o in lst if o["statut"] == "ok"]
-        a = {
-            "total": len(lst),
-            "avec_texte": len(avec),
-            "vides": sum(1 for o in lst if o["statut"] == "leer"),
-            "erreurs": sum(1 for o in lst if o["statut"] == "fehler"),
-            "c1": sum(1 for o in avec if o["c1"]),
-            "explizit": sum(1 for o in avec if o["explizit"]),
-            "par_cat": {c: sum(1 for o in avec if c in o["cats"]) for c in cats},
-            # catégorie dominante (la 1re de sprache.json présente) : chaque offre compte une seule fois
-            "top": {c: sum(1 for o in avec if next((x for x in cats if x in o["cats"]), None) == c)
-                    for c in cats},
-            "par_expr": {e["name"]: sum(1 for o in avec if any(h["name"] == e["name"] for h in o["hits"]))
-                         for e in expressions},
-            "par_theme": {t["name"]: sum(1 for o in avec if t["name"] in o["themes"]) for t in themes},
-        }
-        # semaines de publication
-        sem_tot, sem_theme = {}, {t["name"]: {} for t in themes}
-        for o in lst:
-            w = lundi(o["datum"])
-            if not w:
-                continue
-            sem_tot[w] = sem_tot.get(w, 0) + 1
-            for tn in o["themes"]:
-                sem_theme[tn][w] = sem_theme[tn].get(w, 0) + 1
-        a["sem_tot"], a["sem_theme"] = sem_tot, sem_theme
-        # entreprises derrière les offres "C1 ou plus"
-        firmes, noms = {}, {}
-        for o in avec:
-            if o["c1"]:
-                firmes[o["firma_norm"]] = firmes.get(o["firma_norm"], 0) + 1
-                noms.setdefault(o["firma_norm"], o["firma"])
-        a["firmes"] = firmes
-        a["distinct"] = len(firmes)
-        if firmes:
-            top = max(firmes, key=firmes.get)
-            a["top_nom"], a["top_n"] = noms[top], firmes[top]
-            a["avec_sans_top"] = sum(1 for o in avec if o["firma_norm"] != top)
-            a["c1_sans_top"] = sum(1 for o in avec if o["c1"] and o["firma_norm"] != top)
-        else:
-            a["top_nom"], a["top_n"], a["avec_sans_top"], a["c1_sans_top"] = "-", 0, len(avec), 0
-        agg[cle] = a
-    return agg
+# =========================================================================== 5. tableaux du Sheet
 
-
-def liste_semaines(agg):
-    ws = set(agg["de"]["sem_tot"].keys())
-    if not ws:
-        return []
-    w, fin, res = min(ws), max(ws), []
-    while w <= fin:
-        res.append(w)
-        w += timedelta(days=7)
-    return res
-
-
-# --------------------------------------------------------------------------- 6. tableaux pour le Sheet
-
-def cellule(v):
-    """Neutralise les textes qui seraient pris pour une formule par Google Sheets."""
-    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@"):
-        return "'" + v
-    return v
-
-
-def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdhui, doublons, hors_fenetre=0):
-    cats = sprache["kategorien"]
-    ref = cfg["lieu_reference"]["nom"]
-    L, D = agg["local"], agg["de"]
-    lib_local = f"{ref} + {int(cfg['rayon_km'])} km"
-    tab = {}
-
-    # ---- Résumé (volontairement simple : C1 ou plus contre le reste)
+def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive):
+    """offres = offres de la période, classées et dédoublonnées, avec un texte exploitable."""
+    lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
     lib_moins = "Moins que C1 ou non précisé"
-    moins_L, moins_D = L["avec_texte"] - L["c1"], D["avec_texte"] - D["c1"]
+    loc = [o for o in offres if o["zone"] == "local"]
+    nL, nD = len(loc), len(offres)
+    c1L, c1D = sum(o["c1"] for o in loc), sum(o["c1"] for o in offres)
+    tab = {}
+    note_archive = ("" if debut_archive <= debut else
+                    f" Archive démarrée le {debut_archive} : les offres retirées avant cette date ne sont pas comptées.")
+
+    # ---------------------------------------------------------------- Résumé
     r = [["Offres IT de mon domaine exigeant un allemand C1 ou plus"],
-         [f"Offres actuellement en ligne sur la Jobbörse de l'Agentur für Arbeit - mise à jour : {aujourdhui}"],
+         [f"Offres publiées du {debut} au {aujourdhui} (encore en ligne ou déjà retirées). "
+          f"Mise à jour : {aujourdhui}.{note_archive}"],
          [],
          ["", lib_local, "Allemagne"],
-         ["Offres analysées", L["avec_texte"], D["avec_texte"]],
-         ["C1 ou plus (nombre d'offres)", L["c1"], D["c1"]],
-         ["C1 ou plus (%)", pct(L["c1"], L["avec_texte"]), pct(D["c1"], D["avec_texte"])],
-         [f"{lib_moins} (nombre d'offres)", moins_L, moins_D],
-         [f"{lib_moins} (%)", pct(moins_L, L["avec_texte"]), pct(moins_D, D["avec_texte"])],
-         [],
-         [],
-         ["Données du graphique"]]
+         ["Offres analysées", nL, nD],
+         ["C1 ou plus (nombre d'offres)", c1L, c1D],
+         ["C1 ou plus (%)", pct(c1L, nL), pct(c1D, nD)],
+         [f"{lib_moins} (nombre d'offres)", nL - c1L, nD - c1D],
+         [f"{lib_moins} (%)", pct(nL - c1L, nL), pct(nD - c1D, nD)],
+         [], []]
     h1 = len(r)
-    r.append(["Niveau d'allemand exigé (%)", "C1 ou plus", lib_moins])
-    r.append([lib_local, pct(L["c1"], L["avec_texte"]), pct(moins_L, L["avec_texte"])])
-    r.append(["Allemagne", pct(D["c1"], D["avec_texte"]), pct(moins_D, D["avec_texte"])])
-    charts_r = [
-        {"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
-         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
-         "anchor_row": 2, "anchor_col": 4, "y_title": "% des offres"},
-    ]
-    tab["Résumé"] = {"values": r, "header_rows": [0, 3, h1], "charts": charts_r, "col_widths": {0: 330, 1: 150, 2: 120}}
+    r.append(["Données du graphique", "C1 ou plus", lib_moins])
+    r.append([lib_local, pct(c1L, nL), pct(nL - c1L, nL)])
+    r.append(["Allemagne", pct(c1D, nD), pct(nD - c1D, nD)])
+    tab["Résumé"] = {
+        "values": r, "gras": [0, 3], "gris": (h1, h1 + 2), "col_widths": {0: 330, 1: 150, 2: 120},
+        "charts": [{"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
+                    "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
+                    "anchor_row": 2, "anchor_col": 4, "y_title": "% des offres"}]}
 
-    # ---- Offres C1 ("C1 ou plus")
-    en_tete = ["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien",
-               "Expression(s) déclenchante(s)", "Phrase"]
+    # ---------------------------------------------------------------- Offres C1
+    rows = [["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien", "Expression(s)"]]
     c1 = [o for o in offres if o["c1"]]
-    # local d'abord ; dans chaque zone, les plus récentes en premier
-    loc = sorted([o for o in c1 if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True)
-    rest = sorted([o for o in c1 if o["zone"] != "local"], key=lambda o: o["datum"], reverse=True)
-    rows = [en_tete]
-    for o in loc + rest:
-        hits = o["hits"]
+    ordre = (sorted([o for o in c1 if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True) +
+             sorted([o for o in c1 if o["zone"] != "local"], key=lambda o: o["datum"], reverse=True))
+    for o in ordre:
+        lieu = f"{o.get('plz') or ''} {o.get('ort') or ''}".strip() or o.get("region") or "non indiqué"
         rows.append([cellule(x) for x in [
             lib_local if o["zone"] == "local" else "Reste de l'Allemagne",
-            o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
-            " / ".join(h["name"] for h in hits),
-            hits[0]["phrase"] if hits else ""]])
-    tab["Offres C1"] = {"values": rows, "header_rows": [0]}
+            o["firma"], o["titel"], lieu, o["datum"],
+            LIEN_OFFRE.format(urllib.parse.quote(o["refnr"])),
+            " / ".join(h["name"] for h in o["hits"])]])
+    tab["Offres C1"] = {"values": rows, "gras": [0], "freeze": 1,
+                        "col_widths": {0: 170, 1: 260, 2: 330, 3: 200, 4: 130, 5: 120, 6: 200}}
 
-    # ---- Expressions
-    rows = [["Expression", f"Offres {lib_local}", f"% {lib_local}", "Offres Allemagne", "% Allemagne"]]
-    for e in expressions:
-        n = e["name"]
-        rows.append([cellule(n), L["par_expr"][n], pct(L["par_expr"][n], L["avec_texte"]),
-                     D["par_expr"][n], pct(D["par_expr"][n], D["avec_texte"])])
-    rows.append([])
-    rows.append(["Une offre peut apparaître sous plusieurs expressions ; les lignes ne s'additionnent donc pas. "
-                 "Les % sont calculés sur les offres avec texte. Toutes ces expressions comptent comme 'C1 ou plus'."])
-    tab["Expressions"] = {"values": rows, "header_rows": [0], "col_widths": {0: 240},
-                          "charts": [{"type": "BAR", "stacked": False,
-                                      "titre": "Offres par expression (% des offres avec texte)",
-                                      "header_row": 0, "last_row": len(expressions), "domain_col": 0,
-                                      "series_cols": [2, 4], "anchor_row": 12, "anchor_col": 0}]}
-
-    # ---- Tendances
-    semaines = liste_semaines(agg)
-    t = [["TENDANCES PAR THÈME (indépendantes du niveau de langue ; thèmes modifiables dans themes.json)"],
-         ["Instantané des offres encore en ligne, classées par semaine de première publication."],
+    # ---------------------------------------------------------------- Tendances
+    t = [["Expertise technique demandée (part des offres qui mentionnent chaque terme)"],
+         [f"Offres publiées du {debut} au {aujourdhui}. Termes modifiables dans themes.json.{note_archive}"],
          [],
-         ["Thème", f"Offres {lib_local}", f"% {lib_local}", "Offres Allemagne", "% Allemagne"],
-         ["Toutes les offres", L["avec_texte"], 100.0 if L["avec_texte"] else 0.0,
-          D["avec_texte"], 100.0 if D["avec_texte"] else 0.0]]
+         ["Terme", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"]]
+    h_classement = len(t) - 1
+    lignes = []
     for th in themes:
         n = th["name"]
-        t.append([n, L["par_theme"][n], pct(L["par_theme"][n], L["avec_texte"]),
-                  D["par_theme"][n], pct(D["par_theme"][n], D["avec_texte"])])
+        a, b = sum(n in o["themes"] for o in loc), sum(n in o["themes"] for o in offres)
+        lignes.append([n, pct(a, nL), pct(b, nD), a, b])
+    lignes.sort(key=lambda x: x[2], reverse=True)
+    t += lignes
+    fin_classement = len(t) - 1
     t.append([])
-    blocs = {}
-    ncols = 2 + len(themes)
-    for cle, lib in (("de", "ALLEMAGNE"), ("local", lib_local.upper())):
-        a = agg[cle]
-        t.append([f"Offres par semaine de publication - {lib}"])
-        debut = len(t)
-        t.append(["Semaine (lundi)", "Toutes les offres"] + [th["name"] for th in themes])
-        for w in semaines:
-            t.append([w.isoformat(), a["sem_tot"].get(w, 0)] +
-                     [a["sem_theme"][th["name"]].get(w, 0) for th in themes])
-        blocs[cle] = {"header_row": debut, "first": debut + 1, "last": debut + len(semaines),
-                      "titre": f"Offres par semaine - {lib}"}
-        t.append([])
-    charts_t = []
-    for bloc in blocs.values():
-        if bloc["last"] >= bloc["first"]:
-            charts_t.append({"type": "LINE", "stacked": False, "titre": bloc["titre"],
-                             "header_row": bloc["header_row"], "last_row": bloc["last"], "domain_col": 0,
-                             "series_cols": list(range(1, ncols)), "anchor_row": bloc["header_row"],
-                             "anchor_col": ncols + 1, "x_title": "Semaine de publication",
-                             "y_title": "Nombre d'offres"})
-    tab["Tendances"] = {"values": t, "header_rows": [0, 3] + [b["header_row"] for b in blocs.values()],
-                        "charts": charts_t, "col_widths": {0: 260}, "extra_cols": ncols + 16}
-
-    # ---- Données
-    rows = [["Référence", "Zone", "Distance (km)", "Entreprise", "Titre", "Lieu", "Date", "Lien",
-             "Statut du texte", "C1 ou plus", "Expressions", "Thèmes"]]
-    for o in sorted(offres, key=lambda x: x["datum"], reverse=True):
-        rows.append([cellule(x) for x in [
-            o["refnr"], "local" if o["zone"] == "local" else "reste", o["dist"] if o["dist"] is not None else "",
-            o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
-            {"ok": "ok", "leer": "vide", "fehler": "erreur"}[o["statut"]],
-            "oui" if o["c1"] else "non",
-            " / ".join(h["name"] for h in o["hits"]), " / ".join(o["themes"])]])
-    tab["Données"] = {"values": rows, "header_rows": [0]}
-
-    # ---- ligne d'historique
-    ent = ["Date", "Offres Allemagne", f"Offres {lib_local}", "C1 ou plus Allemagne", "% C1 ou plus Allemagne",
-           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}"]
-    ent += [f"{th['name']} (DE)" for th in themes] + [f"{th['name']} (local)" for th in themes]
-    ligne_h = [aujourdhui, D["avec_texte"], L["avec_texte"], D["c1"], pct(D["c1"], D["avec_texte"]),
-               L["c1"], pct(L["c1"], L["avec_texte"])]
-    ligne_h += [D["par_theme"][th["name"]] for th in themes] + [L["par_theme"][th["name"]] for th in themes]
-    tab["_historique"] = {"header": ent, "row": ligne_h}
+    t.append(["Évolution par semaine de publication - Allemagne (% des offres de la semaine)"])
+    h_sem = len(t)
+    t.append(["Semaine (lundi)"] + [th["name"] for th in themes])
+    semaines = {}
+    for o in offres:
+        w = lundi(o["datum"])
+        if w:
+            semaines.setdefault(w, []).append(o)
+    debut_arch = lundi(debut_archive)
+    for w in sorted(semaines):
+        lst = semaines[w]
+        etiquette = w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
+        t.append([etiquette] + [pct(sum(th["name"] in o["themes"] for o in lst), len(lst)) for th in themes])
+    fin_sem = len(t) - 1
+    t.append([])
+    t.append(["* semaine antérieure au démarrage de l'archive : incomplète (seules les offres encore en ligne "
+              "à ce moment-là sont comptées)."])
+    ncols = 1 + len(themes)
+    charts = [{"type": "BAR", "stacked": False, "titre": "Termes techniques demandés (% des offres)",
+               "header_row": h_classement, "last_row": fin_classement, "domain_col": 0, "series_cols": [1, 2],
+               "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420}]
+    if fin_sem > h_sem:
+        charts.append({"type": "LINE", "stacked": False,
+                       "titre": "Évolution des termes techniques - Allemagne (% des offres de la semaine)",
+                       "header_row": h_sem, "last_row": fin_sem, "domain_col": 0,
+                       "series_cols": list(range(1, ncols)), "anchor_row": 24, "anchor_col": ncols + 1,
+                       "x_title": "Semaine de publication", "y_title": "% des offres", "largeur": 900,
+                       "hauteur": 420})
+    tab["Tendances"] = {"values": t, "gras": [0, h_classement, h_sem], "col_widths": {0: 200},
+                        "extra_cols": ncols + 14, "charts": charts}
     return tab
 
 
-# --------------------------------------------------------------------------- 7. sauvegarde locale
+# =========================================================================== 6. sauvegarde locale
 
-def sauvegarder_local(offres, tab, agg):
-    """Copie locale (artefact GitHub) : sert de secours si l'écriture dans le Sheet échoue."""
+def sauvegarder_local(tab):
+    """Copie CSV des onglets (artefact GitHub) : secours si l'écriture dans le Sheet échoue."""
     os.makedirs(OUT_DIR, exist_ok=True)
-    legers = [{k: v for k, v in o.items() if k != "text"} for o in offres]
-    with open(os.path.join(OUT_DIR, "resultat.json"), "w", encoding="utf-8") as f:
-        json.dump({"offres": legers, "tableaux": {k: v.get("values", v) for k, v in tab.items()
-                                                  if k != "_historique"}},
-                  f, ensure_ascii=False, indent=1, default=str)
     for nom, contenu in tab.items():
-        if nom.startswith("_"):
-            continue
         with open(os.path.join(OUT_DIR, f"{nom}.csv"), "w", encoding="utf-8", newline="") as f:
             csv.writer(f).writerows(contenu["values"])
-    log.info("Copie locale écrite dans %s", OUT_DIR)
+    log.info("Copie CSV écrite dans %s", OUT_DIR)
 
 
-# --------------------------------------------------------------------------- 8. Google Sheets
+# =========================================================================== 7. Google Sheets
 
 def ouvrir_sheet():
     import gspread
@@ -623,75 +590,20 @@ def ouvrir_sheet():
     creds = Credentials.from_service_account_info(
         info, scopes=["https://www.googleapis.com/auth/spreadsheets",
                       "https://www.googleapis.com/auth/drive"])
-    gc = gspread.authorize(creds)
-    return gc.open_by_key(sheet_id)
-
-
-def _onglet(sh, nom, lignes=100, cols=26):
-    import gspread
-    try:
-        return sh.worksheet(nom)
-    except gspread.WorksheetNotFound:
-        return sh.add_worksheet(title=nom, rows=lignes, cols=cols)
-
-
-def _ecrire_onglet(sh, nom, valeurs, lignes_entete, cols_min=26):
-    ws = _onglet(sh, nom)
-    ws.clear()
-    largeur = max([len(r) for r in valeurs] + [1])
-    ws.resize(rows=max(len(valeurs) + 5, 10), cols=max(largeur, cols_min))
-    ws.update(values=valeurs, range_name="A1", value_input_option="USER_ENTERED")
-    try:  # mise en forme : non critique
-        for i in lignes_entete:
-            ws.format(f"{i + 1}:{i + 1}", {"textFormat": {"bold": True}})
-        if lignes_entete and lignes_entete[-1] == 0 or lignes_entete == [0]:
-            ws.freeze(rows=1)
-    except Exception as e:  # noqa: BLE001
-        log.warning("Mise en forme de '%s' ignorée : %s", nom, e)
-    return ws
-
-
-def _ecrire_historique(sh, hist):
-    ws = _onglet(sh, "Historique", 200, max(30, len(hist["header"]) + 2))
-    existant = ws.get_all_values()
-    ent, ligne = hist["header"], hist["row"]
-    if not existant:
-        ws.update(values=[ent, ligne], range_name="A1", value_input_option="USER_ENTERED")
-        try:
-            ws.format("1:1", {"textFormat": {"bold": True}})
-            ws.freeze(rows=1)
-        except Exception:  # noqa: BLE001
-            pass
-        return
-    # dernière ligne d'en-tête connue ; si elle diffère (thèmes modifiés), on ajoute un nouvel en-tête
-    dernier_ent = next((r for r in reversed(existant) if r and r[0] == "Date"), None)
-    nouveaux = []
-    if dernier_ent is None or [c for c in dernier_ent if c != ""] != ent:
-        nouveaux.append(ent)
-    # même jour : on remplace la ligne du jour (relance)
-    idx_jour = None
-    for i, r in enumerate(existant):
-        if r and r[0] == ligne[0]:
-            idx_jour = i + 1
-    if idx_jour and not nouveaux:
-        ws.update(values=[ligne], range_name=f"A{idx_jour}", value_input_option="USER_ENTERED")
-    else:
-        if idx_jour:      # en-têtes changés le même jour : on supprime l'ancienne ligne du jour
-            ws.delete_rows(idx_jour)
-        ws.append_rows(nouveaux + [ligne], value_input_option="USER_ENTERED")
+    return gspread.authorize(creds).open_by_key(sheet_id)
 
 
 def _requete_graphique(sid, d):
-    """Requête Sheets 'addChart' à partir d'un descripteur de graphique (voir construire_tableaux)."""
+    """Requête Sheets 'addChart' à partir d'un descripteur de graphique."""
     def plage(col):
         return {"sourceRange": {"sources": [{"sheetId": sid, "startRowIndex": d["header_row"],
                                              "endRowIndex": d["last_row"] + 1,
                                              "startColumnIndex": col, "endColumnIndex": col + 1}]}}
     horizontal = d["type"] == "BAR"
-    axe_valeurs = "BOTTOM_AXIS" if horizontal else "LEFT_AXIS"
     basic = {"chartType": d["type"], "legendPosition": "BOTTOM_LEGEND", "headerCount": 1,
              "domains": [{"domain": plage(d["domain_col"])}],
-             "series": [{"series": plage(c), "targetAxis": axe_valeurs} for c in d["series_cols"]]}
+             "series": [{"series": plage(c), "targetAxis": "BOTTOM_AXIS" if horizontal else "LEFT_AXIS"}
+                        for c in d["series_cols"]]}
     if d.get("stacked"):
         basic["stackedType"] = "STACKED"
     axes = []
@@ -710,133 +622,87 @@ def _requete_graphique(sid, d):
 
 
 def ecrire_sheet(tab):
+    """VIDE ENTIÈREMENT le Sheet (tous les onglets et graphiques), puis recrée Résumé / Offres C1 / Tendances."""
     sh = ouvrir_sheet()
     log.info("Sheet ouvert : %s", sh.title)
-    ordre = ["Résumé", "Offres C1", "Expressions", "Tendances", "Données"]
-    feuilles = {}
-    for nom in ordre:
-        info = tab[nom]
-        feuilles[nom] = _ecrire_onglet(sh, nom, info["values"], info["header_rows"],
-                                       info.get("extra_cols", 26))
-        log.info("Onglet '%s' écrit (%d lignes)", nom, len(info["values"]))
 
-    # Graphiques et largeurs de colonnes : on supprime les anciens graphiques puis on recrée tout.
-    # Non critique : si cette étape échoue, les tableaux sont déjà écrits.
+    # 1. vidage total : un onglet temporaire (un Sheet doit toujours en avoir un), puis suppression de tous les autres
+    anciens = sh.worksheets()
+    tmp = sh.add_worksheet(title=f"_vidage_{int(time.time())}", rows=1, cols=1)
+    for w in anciens:
+        sh.del_worksheet(w)
+    log.info("Sheet vidé : %d onglets supprimés", len(anciens))
+
+    # 2. création et remplissage des onglets
+    feuilles = {}
+    for nom, info in tab.items():
+        valeurs = info["values"]
+        largeur = max([len(x) for x in valeurs] + [1])
+        ws = sh.add_worksheet(title=nom, rows=max(len(valeurs) + 5, 20), cols=max(largeur, info.get("extra_cols", 12)))
+        ws.update(values=valeurs, range_name="A1", value_input_option="USER_ENTERED")
+        feuilles[nom] = ws
+        log.info("Onglet '%s' écrit (%d lignes)", nom, len(valeurs))
+    sh.del_worksheet(tmp)
+
+    # 3. mise en forme + graphiques (non critique : les tableaux sont déjà écrits)
     try:
-        ids = {ws.id: nom for nom, ws in feuilles.items()}
         reqs = []
-        for s in sh.fetch_sheet_metadata().get("sheets", []):
-            if s["properties"]["sheetId"] in ids:
-                reqs += [{"deleteEmbeddedObject": {"objectId": c["chartId"]}} for c in s.get("charts", [])]
         for nom, ws in feuilles.items():
-            for col, px in tab[nom].get("col_widths", {}).items():
+            info = tab[nom]
+            for i in info.get("gras", []):
+                reqs.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": i, "endRowIndex": i + 1},
+                                            "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
+                                            "fields": "userEnteredFormat.textFormat.bold"}})
+            if info.get("gris"):
+                a, b = info["gris"]
+                reqs.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": a, "endRowIndex": b + 1},
+                                            "cell": {"userEnteredFormat": {"textFormat": {"foregroundColor": GRIS_CLAIR}}},
+                                            "fields": "userEnteredFormat.textFormat.foregroundColor"}})
+            if info.get("freeze"):
+                reqs.append({"updateSheetProperties": {
+                    "properties": {"sheetId": ws.id, "gridProperties": {"frozenRowCount": info["freeze"]}},
+                    "fields": "gridProperties.frozenRowCount"}})
+            for col, px in info.get("col_widths", {}).items():
                 reqs.append({"updateDimensionProperties": {
                     "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": col, "endIndex": col + 1},
                     "properties": {"pixelSize": px}, "fields": "pixelSize"}})
-            for d in tab[nom].get("charts", []):
+            for d in info.get("charts", []):
                 reqs.append(_requete_graphique(ws.id, d))
         if reqs:
             sh.batch_update({"requests": reqs})
-            log.info("Graphiques créés : %d", sum(len(tab[n].get("charts", [])) for n in feuilles))
+            log.info("Mise en forme et graphiques appliqués")
     except Exception as e:  # noqa: BLE001
-        log.warning("Graphiques non créés (tableaux écrits quand même) : %s", e)
-
-    _ecrire_historique(sh, tab["_historique"])
-    log.info("Onglet 'Historique' mis à jour")
-    # ordre des onglets + suppression de l'onglet vide par défaut
-    try:
-        noms = ordre + ["Historique"]
-        sh.reorder_worksheets([sh.worksheet(n) for n in noms] +
-                              [w for w in sh.worksheets() if w.title not in noms])
-        for w in sh.worksheets():
-            if w.title in ("Sheet1", "Feuille 1", "Feuille1", "Tabelle1", "Tabellenblatt1") and not any(w.get_all_values()):
-                sh.del_worksheet(w)
-    except Exception as e:  # noqa: BLE001
-        log.warning("Réordonnancement des onglets ignoré : %s", e)
+        log.warning("Mise en forme / graphiques non appliqués (tableaux écrits quand même) : %s", e)
 
 
-# --------------------------------------------------------------------------- principal
+# =========================================================================== principal
 
-def collecter(cfg, session=None):
-    """Étapes 1 à 3 : recherche, filtre de dates, textes, dédoublonnage. Retourne (offres, doublons, hors_fenetre)."""
-    session = session or requests.Session()
-    brut = {}
-    for mot in cfg["mots_cles"]:
-        try:
-            liste = lancer_recherche(session, cfg, mot)
-        except (requests.RequestException, ValueError) as e:
-            raise StatJobsError(f"Recherche '{mot}' échouée après {ESSAIS} essais ({e}). Sheet non modifié.")
-        nouveaux = 0
-        for o in liste:
-            m = mapper_offre(o)
-            if m["refnr"] and m["refnr"] not in brut:
-                brut[m["refnr"]] = m
-                nouveaux += 1
-        log.info("Mot-clé '%s' : %d offres, dont %d nouvelles (total unique : %d)",
-                 mot, len(liste), nouveaux, len(brut))
-    if not brut:
-        raise StatJobsError("Aucune offre trouvée : recherche suspecte (API ou paramètres). Sheet non modifié.")
-
-    # L'API filtre sur la DERNIÈRE publication : une annonce republiée récemment peut avoir une date de
-    # PREMIÈRE publication très ancienne. On écarte ici celles qui dépassent la fenêtre demandée.
-    limite = (date.today() - timedelta(days=int(cfg["jours"]))).isoformat()
-    offres = [o for o in brut.values() if not o["datum"] or o["datum"] >= limite]
-    hors_fenetre = len(brut) - len(offres)
-    log.info("Fenêtre %d jours (depuis le %s) : %d offres écartées car publiées pour la 1re fois plus tôt",
-             int(cfg["jours"]), limite, hors_fenetre)
-    if not offres:
-        raise StatJobsError("Aucune offre dans la fenêtre de dates. Sheet non modifié.")
-    log.info("Téléchargement de %d textes d'offres...", len(offres))
-    pause = cfg.get("pause_s", 0.15)
-
-    def tache(o):
-        o["text"], o["statut"] = telecharger_texte(session, o["refnr"], pause)
-        return o
-
-    with ThreadPoolExecutor(max_workers=int(cfg.get("parallele_anfragen", 3))) as pool:
-        for i, _ in enumerate(pool.map(tache, offres), 1):
-            if i % 200 == 0:
-                log.info("  textes : %d/%d", i, len(offres))
-
-    erreurs = sum(1 for o in offres if o["statut"] == "fehler")
-    vides = sum(1 for o in offres if o["statut"] == "leer")
-    log.info("Textes : %d ok, %d vides/introuvables, %d erreurs techniques",
-             len(offres) - erreurs - vides, vides, erreurs)
-    if erreurs / len(offres) > float(cfg.get("max_ohne_text_anteil", 0.05)):
-        raise StatJobsError(
-            f"{erreurs}/{len(offres)} textes illisibles (erreurs techniques) : au-delà du seuil de "
-            f"{cfg.get('max_ohne_text_anteil', 0.05):.0%}. Relancer plus tard. Sheet non modifié.")
-    uniques, doublons = dedoublonner(offres, cfg)
-    return uniques, doublons, hors_fenetre
-
-
-def main(argv=None):
-    ap = argparse.ArgumentParser(description="Statistique des offres IT exigeant un allemand C1.")
+def main(argv=None, session=None):
+    ap = argparse.ArgumentParser(description="Statistiques des offres IT (niveau d'allemand, expertise technique).")
     ap.add_argument("--sans-sheet", action="store_true", help="ne pas écrire dans Google Sheets (test)")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
     cfg = charger_json("config.json")
     sprache = charger_json(cfg["sprache_datei"])
-    themes_cfg = charger_json(cfg["themes_datei"])
-    compiler_expressions(sprache)   # valide les regex AVANT de lancer 10 minutes de téléchargement
-    compiler_themes(themes_cfg)
+    expressions = compiler_expressions(sprache)          # valide les regex AVANT tout appel réseau
+    themes = compiler_themes(charger_json(cfg["themes_datei"]))
+    aujourdhui = date.today().isoformat()
 
-    offres, doublons, hors_fenetre = collecter(cfg)
-    expressions, themes = classifier(offres, cfg, sprache, themes_cfg)
-    sans_gps = sum(1 for o in offres if o["dist"] is None)
-    if sans_gps:
-        log.info("%d offres sans coordonnées GPS : comptées dans 'Allemagne' uniquement", sans_gps)
-    agg = agreger(offres, sprache, expressions, themes)
-    tab = construire_tableaux(offres, agg, sprache, expressions, themes, cfg,
-                              date.today().isoformat(), doublons, hors_fenetre)
-    sauvegarder_local(offres, tab, agg)
+    archive, nb_nouvelles = mettre_a_jour_archive(cfg, session or requests.Session(), aujourdhui)
 
-    L, D = agg["local"], agg["de"]
-    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%)",
-             D["avec_texte"], D["c1"], pct(D["c1"], D["avec_texte"]))
-    log.info("RÉSULTAT %s +%s km : %d offres, %d C1 ou plus (%.1f %%)",
-             cfg["lieu_reference"]["nom"], cfg["rayon_km"], L["avec_texte"], L["c1"], pct(L["c1"], L["avec_texte"]))
+    periode, debut = offres_de_la_periode(archive, cfg, aujourdhui)
+    debut_archive = min((o.get("premiere_vue") or aujourdhui) for o in archive.values())
+    classifier(periode, cfg, sprache, expressions, themes)
+    uniques = [o for o in dedoublonner(periode, cfg) if o.get("statut") == "ok"]
+    tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive)
+    sauvegarder_local(tab)
+
+    loc = [o for o in uniques if o["zone"] == "local"]
+    log.info("RÉSULTAT (%s -> %s) Allemagne : %d offres, %d C1 ou plus (%.1f %%)", debut, aujourdhui,
+             len(uniques), sum(o["c1"] for o in uniques), pct(sum(o["c1"] for o in uniques), len(uniques)))
+    log.info("RÉSULTAT %s + %s km : %d offres, %d C1 ou plus (%.1f %%)", cfg["lieu_reference"]["nom"],
+             cfg["rayon_km"], len(loc), sum(o["c1"] for o in loc), pct(sum(o["c1"] for o in loc), len(loc)))
 
     if args.sans_sheet:
         log.info("--sans-sheet : écriture Google Sheets ignorée")
@@ -846,9 +712,9 @@ def main(argv=None):
     except StatJobsError:
         raise
     except Exception as e:  # noqa: BLE001
-        raise StatJobsError(f"Écriture Google Sheets échouée ({type(e).__name__}: {e}). "
-                            "Les résultats sont dans l'artefact 'stat-jobs-out' du run GitHub.")
-    log.info("TERMINÉ : Google Sheet mis à jour")
+        raise StatJobsError(f"Écriture Google Sheets échouée ({type(e).__name__}: {e}). L'archive est à jour ; "
+                            "le Sheet sera reconstruit à la prochaine exécution (CSV dans l'artefact 'stat-jobs-out').")
+    log.info("TERMINÉ : %d nouvelles offres archivées, Google Sheet reconstruit", nb_nouvelles)
     return 0
 
 
