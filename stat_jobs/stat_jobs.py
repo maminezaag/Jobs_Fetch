@@ -548,7 +548,8 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, g
         while w <= fin:
             lst = [o for k in range(fenetre) for o in semaines.get(w - timedelta(weeks=k), [])]
             if len(lst) >= minimum:
-                etiquette = w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
+                # apostrophe initiale : Google Sheets garde la semaine en TEXTE (sinon il la convertit en date)
+                etiquette = "'" + w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
                 t.append([etiquette] + [pct(sum(th["name"] in o["themes"] for o in lst), len(lst)) for th in themes]
                          + [len(lst)])
             w += timedelta(weeks=1)
@@ -653,45 +654,67 @@ def ecrire_sheet(tab):
     log.info("Sheet vidé : %d onglets supprimés", len(anciens))
 
     # 2. création et remplissage des onglets
+    #    la grille doit contenir aussi les graphiques : Google refuse un graphique ancré hors de la grille
     feuilles = {}
     for nom, info in tab.items():
         valeurs = info["values"]
         largeur = max([len(x) for x in valeurs] + [1])
-        ws = sh.add_worksheet(title=nom, rows=max(len(valeurs) + 5, 20), cols=max(largeur, info.get("extra_cols", 12)))
+        lignes = max(len(valeurs) + 5, 20)
+        colonnes = max(largeur, info.get("extra_cols", 12))
+        for d in info.get("charts", []):
+            lignes = max(lignes, d["anchor_row"] + math.ceil(d.get("hauteur", 340) / 21) + 3)
+            colonnes = max(colonnes, d["anchor_col"] + math.ceil(d.get("largeur", 640) / 100) + 2)
+        ws = sh.add_worksheet(title=nom, rows=lignes, cols=colonnes)
         ws.update(values=valeurs, range_name="A1", value_input_option="USER_ENTERED")
         feuilles[nom] = ws
         log.info("Onglet '%s' écrit (%d lignes)", nom, len(valeurs))
     sh.del_worksheet(tmp)
 
-    # 3. mise en forme + graphiques (non critique : les tableaux sont déjà écrits)
-    try:
-        reqs = []
-        for nom, ws in feuilles.items():
-            info = tab[nom]
-            for i in info.get("gras", []):
-                reqs.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": i, "endRowIndex": i + 1},
-                                            "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
-                                            "fields": "userEnteredFormat.textFormat.bold"}})
-            if info.get("gris"):
-                a, b = info["gris"]
-                reqs.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": a, "endRowIndex": b + 1},
-                                            "cell": {"userEnteredFormat": {"textFormat": {"foregroundColor": GRIS_CLAIR}}},
-                                            "fields": "userEnteredFormat.textFormat.foregroundColor"}})
-            if info.get("freeze"):
-                reqs.append({"updateSheetProperties": {
-                    "properties": {"sheetId": ws.id, "gridProperties": {"frozenRowCount": info["freeze"]}},
-                    "fields": "gridProperties.frozenRowCount"}})
-            for col, px in info.get("col_widths", {}).items():
-                reqs.append({"updateDimensionProperties": {
-                    "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": col, "endIndex": col + 1},
-                    "properties": {"pixelSize": px}, "fields": "pixelSize"}})
-            for d in info.get("charts", []):
-                reqs.append(_requete_graphique(ws.id, d))
-        if reqs:
-            sh.batch_update({"requests": reqs})
-            log.info("Mise en forme et graphiques appliqués")
-    except Exception as e:  # noqa: BLE001
-        log.warning("Mise en forme / graphiques non appliqués (tableaux écrits quand même) : %s", e)
+    # 3. mise en forme (gras, gris, en-tête figé, largeurs) - non critique
+    formats = []
+    for nom, ws in feuilles.items():
+        info = tab[nom]
+        for i in info.get("gras", []):
+            formats.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": i, "endRowIndex": i + 1},
+                                           "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}},
+                                           "fields": "userEnteredFormat.textFormat.bold"}})
+        if info.get("gris"):
+            a, b = info["gris"]
+            formats.append({"repeatCell": {"range": {"sheetId": ws.id, "startRowIndex": a, "endRowIndex": b + 1},
+                                           "cell": {"userEnteredFormat": {"textFormat": {"foregroundColor": GRIS_CLAIR}}},
+                                           "fields": "userEnteredFormat.textFormat.foregroundColor"}})
+        if info.get("freeze"):
+            formats.append({"updateSheetProperties": {
+                "properties": {"sheetId": ws.id, "gridProperties": {"frozenRowCount": info["freeze"]}},
+                "fields": "gridProperties.frozenRowCount"}})
+        for col, px in info.get("col_widths", {}).items():
+            formats.append({"updateDimensionProperties": {
+                "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": col, "endIndex": col + 1},
+                "properties": {"pixelSize": px}, "fields": "pixelSize"}})
+    if formats:
+        try:
+            sh.batch_update({"requests": formats})
+            log.info("Mise en forme appliquée")
+        except Exception as e:  # noqa: BLE001
+            log.warning("Mise en forme non appliquée (tableaux écrits quand même) : %s", e)
+
+    # 4. graphiques : tous ensemble ; en cas de refus, un par un pour que les autres passent quand même
+    graphiques = [(nom, d, _requete_graphique(ws.id, d)) for nom, ws in feuilles.items()
+                  for d in tab[nom].get("charts", [])]
+    if graphiques:
+        try:
+            sh.batch_update({"requests": [g for _, _, g in graphiques]})
+            log.info("Graphiques créés : %d", len(graphiques))
+        except Exception as e:  # noqa: BLE001
+            log.warning("Création groupée des graphiques refusée (%s) : nouvel essai un par un", e)
+            ok = 0
+            for nom, d, g in graphiques:
+                try:
+                    sh.batch_update({"requests": [g]})
+                    ok += 1
+                except Exception as e2:  # noqa: BLE001
+                    log.warning("Graphique '%s' (onglet %s) non créé : %s", d["titre"], nom, e2)
+            log.info("Graphiques créés : %d / %d", ok, len(graphiques))
 
 
 # =========================================================================== principal
