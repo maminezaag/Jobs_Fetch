@@ -467,7 +467,7 @@ def offres_de_la_periode(archive, cfg, aujourdhui):
 
 # =========================================================================== 5. tableaux du Sheet
 
-def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive):
+def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, groupes=None):
     """offres = offres de la période, classées et dédoublonnées, avec un texte exploitable."""
     lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
     lib_moins = "Moins que C1 ou non précisé"
@@ -530,36 +530,55 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive):
     t += lignes
     fin_classement = len(t) - 1
     t.append([])
-    t.append(["Évolution par semaine de publication - Allemagne (% des offres de la semaine)"])
+    # -- évolution : moyenne glissante sur N semaines, uniquement si assez d'offres dans la fenêtre
+    fenetre = int(cfg.get("tendance_fenetre_semaines", 4))
+    minimum = int(cfg.get("tendance_min_offres", 20))
+    t.append([f"Évolution - Allemagne : % des offres mentionnant chaque terme, moyenne glissante sur {fenetre} "
+              f"semaines (une semaine n'est affichée que si sa fenêtre contient au moins {minimum} offres)"])
     h_sem = len(t)
-    t.append(["Semaine (lundi)"] + [th["name"] for th in themes])
+    t.append(["Semaine (lundi)"] + [th["name"] for th in themes] + ["Offres dans la fenêtre"])
     semaines = {}
     for o in offres:
         w = lundi(o["datum"])
         if w:
             semaines.setdefault(w, []).append(o)
     debut_arch = lundi(debut_archive)
-    for w in sorted(semaines):
-        lst = semaines[w]
-        etiquette = w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
-        t.append([etiquette] + [pct(sum(th["name"] in o["themes"] for o in lst), len(lst)) for th in themes])
+    if semaines:
+        w, fin = min(semaines), max(semaines)
+        while w <= fin:
+            lst = [o for k in range(fenetre) for o in semaines.get(w - timedelta(weeks=k), [])]
+            if len(lst) >= minimum:
+                etiquette = w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
+                t.append([etiquette] + [pct(sum(th["name"] in o["themes"] for o in lst), len(lst)) for th in themes]
+                         + [len(lst)])
+            w += timedelta(weeks=1)
     fin_sem = len(t) - 1
+    if fin_sem == h_sem:
+        t.append(["(pas encore assez d'offres pour tracer une évolution)"])
     t.append([])
     t.append(["* semaine antérieure au démarrage de l'archive : incomplète (seules les offres encore en ligne "
               "à ce moment-là sont comptées)."])
-    ncols = 1 + len(themes)
+    ncols = 2 + len(themes)
+
+    # -- un petit graphique par famille de termes (themes.json -> "groupes")
+    col_de = {th["name"]: i + 1 for i, th in enumerate(themes)}
+    groupes = [g for g in (groupes or []) if any(n in col_de for n in g.get("termes", []))]
+    deja = {n for g in groupes for n in g["termes"]}
+    restants = [th["name"] for th in themes if th["name"] not in deja]
+    if restants:
+        groupes.append({"name": "Autres", "termes": restants})
     charts = [{"type": "BAR", "stacked": False, "titre": "Termes techniques demandés (% des offres)",
                "header_row": h_classement, "last_row": fin_classement, "domain_col": 0, "series_cols": [1, 2],
-               "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420}]
+               "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420, "largeur": 640}]
     if fin_sem > h_sem:
-        charts.append({"type": "LINE", "stacked": False,
-                       "titre": "Évolution des termes techniques - Allemagne (% des offres de la semaine)",
-                       "header_row": h_sem, "last_row": fin_sem, "domain_col": 0,
-                       "series_cols": list(range(1, ncols)), "anchor_row": 24, "anchor_col": ncols + 1,
-                       "x_title": "Semaine de publication", "y_title": "% des offres", "largeur": 900,
-                       "hauteur": 420})
+        for i, g in enumerate(groupes):
+            charts.append({"type": "LINE", "stacked": False, "titre": f"{g['name']} - évolution (% des offres)",
+                           "header_row": h_sem, "last_row": fin_sem, "domain_col": 0,
+                           "series_cols": [col_de[n] for n in g["termes"] if n in col_de],
+                           "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
+                           "y_title": "% des offres", "largeur": 640, "hauteur": 340})
     tab["Tendances"] = {"values": t, "gras": [0, h_classement, h_sem], "col_widths": {0: 200},
-                        "extra_cols": ncols + 14, "charts": charts}
+                        "extra_cols": ncols + 16, "charts": charts}
     return tab
 
 
@@ -686,7 +705,8 @@ def main(argv=None, session=None):
     cfg = charger_json("config.json")
     sprache = charger_json(cfg["sprache_datei"])
     expressions = compiler_expressions(sprache)          # valide les regex AVANT tout appel réseau
-    themes = compiler_themes(charger_json(cfg["themes_datei"]))
+    themes_cfg = charger_json(cfg["themes_datei"])
+    themes = compiler_themes(themes_cfg)
     aujourdhui = date.today().isoformat()
 
     archive, nb_nouvelles = mettre_a_jour_archive(cfg, session or requests.Session(), aujourdhui)
@@ -695,7 +715,7 @@ def main(argv=None, session=None):
     debut_archive = min((o.get("premiere_vue") or aujourdhui) for o in archive.values())
     classifier(periode, cfg, sprache, expressions, themes)
     uniques = [o for o in dedoublonner(periode, cfg) if o.get("statut") == "ok"]
-    tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive)
+    tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive, themes_cfg.get("groupes"))
     sauvegarder_local(tab)
 
     loc = [o for o in uniques if o["zone"] == "local"]
