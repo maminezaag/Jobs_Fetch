@@ -241,6 +241,9 @@ def compiler_expressions(sprache):
                 "name": e["name"], "kategorie": e["kategorie"],
                 "muster": [re.compile(m, re.IGNORECASE) for m in e["muster"]],
                 "ausschluss": [re.compile(m, re.IGNORECASE) for m in e.get("ausschluss", [])],
+                "vor": int(e.get("ausschluss_vor", 40)),
+                "nach": int(e.get("ausschluss_nach", 40)),
+                "explizit": bool(e.get("explizit", False)),
             })
         except re.error as err:
             raise StatJobsError(f"sprache.json : regex invalide dans '{e['name']}' : {err}")
@@ -262,13 +265,15 @@ def classer_langue(titre, texte, expressions):
             hit = None
             for m in motif.finditer(corpus):
                 # 'ausschluss' : ignore la mention si le contexte proche l'infirme (ex. "Führerschein C1")
-                contexte = corpus[max(0, m.start() - 40):m.end() + 40]
+                # zone 'après' coupée au prochain point de liste : on ne lit pas l'exigence suivante
+                apres = re.split(r"\*|•|\s-\s", corpus[m.end():m.end() + e["nach"]], maxsplit=1)[0]
+                contexte = corpus[max(0, m.start() - e["vor"]):m.start()] + corpus[m.start():m.end()] + apres
                 if any(x.search(contexte) for x in e["ausschluss"]):
                     continue
                 hit = m
                 break
             if hit:
-                trouvees.append({"name": e["name"], "kategorie": e["kategorie"],
+                trouvees.append({"name": e["name"], "kategorie": e["kategorie"], "explizit": e["explizit"],
                                  "phrase": extrait(corpus, hit.start(), hit.end())})
                 break
     return trouvees
@@ -303,6 +308,18 @@ def classer_themes(titre, texte, themes):
     return res
 
 
+_FORMES_JURIDIQUES = r"\b(gmbh|ag|se|kg|kgaa|mbh|co|ohg|ug|e\.?\s?v|haftungsbeschränkt|germany|deutschland)\b"
+
+
+def firme_normalisee(nom):
+    """'FERCHAU GmbH Niederlassung Bremen' et 'Ferchau GmbH' -> 'ferchau' (pour compter les entreprises distinctes)."""
+    n = (nom or "").lower()
+    n = re.split(r"\b(niederlassung|standort|filiale|zweigniederlassung|region)\b|[,(/|]", n)[0]
+    n = re.sub(_FORMES_JURIDIQUES, " ", n)
+    n = re.sub(r"[^a-z0-9äöüß]+", " ", n).strip()
+    return n or (nom or "").strip().lower() or "(inconnue)"
+
+
 def classifier(offres, cfg, sprache, themes_cfg):
     expressions = compiler_expressions(sprache)
     themes = compiler_themes(themes_cfg)
@@ -324,6 +341,8 @@ def classifier(offres, cfg, sprache, themes_cfg):
         o["hits"] = classer_langue(o["titel"], o["text"], expressions) if o["statut"] == "ok" else []
         o["cats"] = sorted({h["kategorie"] for h in o["hits"]})
         o["c1"] = any(cats[c]["zaehlt_als_c1"] for c in o["cats"])
+        o["explizit"] = any(h["explizit"] for h in o["hits"])
+        o["firma_norm"] = firme_normalisee(o["firma"])
         o["themes"] = classer_themes(o["titel"], o["text"], themes) if o["statut"] == "ok" else []
     return expressions, themes
 
@@ -355,6 +374,7 @@ def agreger(offres, sprache, expressions, themes):
             "vides": sum(1 for o in lst if o["statut"] == "leer"),
             "erreurs": sum(1 for o in lst if o["statut"] == "fehler"),
             "c1": sum(1 for o in avec if o["c1"]),
+            "explizit": sum(1 for o in avec if o["explizit"]),
             "par_cat": {c: sum(1 for o in avec if c in o["cats"]) for c in cats},
             # catégorie dominante (la 1re de sprache.json présente) : chaque offre compte une seule fois
             "top": {c: sum(1 for o in avec if next((x for x in cats if x in o["cats"]), None) == c)
@@ -373,6 +393,21 @@ def agreger(offres, sprache, expressions, themes):
             for tn in o["themes"]:
                 sem_theme[tn][w] = sem_theme[tn].get(w, 0) + 1
         a["sem_tot"], a["sem_theme"] = sem_tot, sem_theme
+        # entreprises derrière les offres "C1 ou plus"
+        firmes, noms = {}, {}
+        for o in avec:
+            if o["c1"]:
+                firmes[o["firma_norm"]] = firmes.get(o["firma_norm"], 0) + 1
+                noms.setdefault(o["firma_norm"], o["firma"])
+        a["firmes"] = firmes
+        a["distinct"] = len(firmes)
+        if firmes:
+            top = max(firmes, key=firmes.get)
+            a["top_nom"], a["top_n"] = noms[top], firmes[top]
+            a["avec_sans_top"] = sum(1 for o in avec if o["firma_norm"] != top)
+            a["c1_sans_top"] = sum(1 for o in avec if o["c1"] and o["firma_norm"] != top)
+        else:
+            a["top_nom"], a["top_n"], a["avec_sans_top"], a["c1_sans_top"] = "-", 0, len(avec), 0
         agg[cle] = a
     return agg
 
@@ -428,6 +463,16 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     r.append([f"{lib_moins} (nombre d'offres)", moins["L"], moins["D"]])
     r.append([f"{lib_moins} (%)", pct(moins["L"], L["avec_texte"]), pct(moins["D"], D["avec_texte"])])
     r.append([])
+    r.append(["C1 ÉCRIT EXPLICITEMENT (C1 / C2 dans le texte) - nombre", L["explizit"], D["explizit"]])
+    r.append(["C1 ÉCRIT EXPLICITEMENT - %", pct(L["explizit"], L["avec_texte"]), pct(D["explizit"], D["avec_texte"])])
+    r.append([])
+    r.append(["Entreprises distinctes derrière les offres C1 ou plus", L["distinct"], D["distinct"]])
+    r.append(["Entreprise la plus représentée", L["top_nom"], D["top_nom"]])
+    r.append(["... nombre de ses offres C1 ou plus", L["top_n"], D["top_n"]])
+    r.append(["... part des offres C1 ou plus (%)", pct(L["top_n"], L["c1"]), pct(D["top_n"], D["c1"])])
+    r.append(["C1 OU PLUS sans cette entreprise (% des autres offres)", pct(L["c1_sans_top"], L["avec_sans_top"]),
+              pct(D["c1_sans_top"], D["avec_sans_top"])])
+    r.append([])
     r.append([f"Doublons retirés : {doublons}. Offres écartées car publiées pour la première fois il y a plus de "
               f"{cfg['jours']} jours : {hors_fenetre}. Les % sont calculés sur les offres avec texte exploitable. "
               "Une offre compte une seule fois dans 'C1 ou plus', même avec plusieurs mentions (voir l'onglet Expressions)."])
@@ -439,19 +484,26 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     r.append(["Niveau d'allemand exigé (% des offres avec texte)", "C1 ou plus", lib_moins])
     for lib, X, m in ((lib_local, L, moins["L"]), ("Allemagne", D, moins["D"])):
         r.append([lib, pct(X["c1"], X["avec_texte"]), pct(m, X["avec_texte"])])
+    r.append([])
+    h2 = len(r)
+    r.append(["Comparaison (% des offres avec texte)", "C1 écrit explicitement", "C1 ou plus",
+              "C1 ou plus sans l'entreprise principale"])
+    for lib, X in ((lib_local, L), ("Allemagne", D)):
+        r.append([lib, pct(X["explizit"], X["avec_texte"]), pct(X["c1"], X["avec_texte"]),
+                  pct(X["c1_sans_top"], X["avec_sans_top"])])
     charts_r = [
         {"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
          "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
          "anchor_row": 3, "anchor_col": 7, "y_title": "% des offres"},
-        {"type": "COLUMN", "stacked": False, "titre": "Offres exigeant C1 ou plus (% des offres)",
-         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1],
-         "anchor_row": 24, "anchor_col": 7, "y_title": "% des offres"},
+        {"type": "COLUMN", "stacked": False, "titre": "C1 explicite / C1 ou plus / sans l'entreprise principale (%)",
+         "header_row": h2, "last_row": h2 + 2, "domain_col": 0, "series_cols": [1, 2, 3],
+         "anchor_row": 22, "anchor_col": 7, "y_title": "% des offres"},
     ]
-    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1], "charts": charts_r, "col_widths": {0: 430}}
+    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1, h2], "charts": charts_r, "col_widths": {0: 430}}
 
     # ---- Offres C1 ("C1 ou plus")
-    en_tete = ["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien",
-               "Expression(s) déclenchante(s)", "Phrase"]
+    en_tete = ["Zone", "Entreprise", "Offres C1 ou plus de cette entreprise (Allemagne)", "Titre", "Lieu",
+               "Date de publication", "Lien", "C1 écrit explicitement", "Expression(s) déclenchante(s)", "Phrase"]
     c1 = [o for o in offres if o["c1"]]
     # local d'abord ; dans chaque zone, les plus récentes en premier
     loc = sorted([o for o in c1 if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True)
@@ -461,7 +513,8 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
         hits = o["hits"]
         rows.append([cellule(x) for x in [
             lib_local if o["zone"] == "local" else "Reste de l'Allemagne",
-            o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
+            o["firma"], D["firmes"].get(o["firma_norm"], 0), o["titel"], f"{o['plz']} {o['ort']}".strip(),
+            o["datum"], o["link"], "oui" if o["explizit"] else "non",
             " / ".join(h["name"] for h in hits),
             hits[0]["phrase"] if hits else ""]])
     tab["Offres C1"] = {"values": rows, "header_rows": [0]}
@@ -532,10 +585,11 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
 
     # ---- ligne d'historique
     ent = ["Date", "Offres Allemagne", f"Offres {lib_local}", "C1 ou plus Allemagne", "% C1 ou plus Allemagne",
-           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}", "Sans texte / illisible"]
+           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}", "C1 explicite Allemagne",
+           "Entreprises distinctes C1 Allemagne", "Sans texte / illisible"]
     ent += [f"{th['name']} (DE)" for th in themes] + [f"{th['name']} (local)" for th in themes]
     ligne_h = [aujourdhui, D["total"], L["total"], D["c1"], pct(D["c1"], D["avec_texte"]),
-               L["c1"], pct(L["c1"], L["avec_texte"]), D["vides"] + D["erreurs"]]
+               L["c1"], pct(L["c1"], L["avec_texte"]), D["explizit"], D["distinct"], D["vides"] + D["erreurs"]]
     ligne_h += [D["par_theme"][th["name"]] for th in themes] + [L["par_theme"][th["name"]] for th in themes]
     tab["_historique"] = {"header": ent, "row": ligne_h}
     return tab
@@ -785,8 +839,9 @@ def main(argv=None):
     sauvegarder_local(offres, tab, agg)
 
     L, D = agg["local"], agg["de"]
-    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%)",
-             D["total"], D["c1"], pct(D["c1"], D["avec_texte"]))
+    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%), %d C1 explicite, %d entreprises distinctes "
+             "(principale : %s, %d offres)", D["total"], D["c1"], pct(D["c1"], D["avec_texte"]), D["explizit"],
+             D["distinct"], D["top_nom"], D["top_n"])
     log.info("RÉSULTAT %s +%s km : %d offres, %d C1 ou plus (%.1f %%)",
              cfg["lieu_reference"]["nom"], cfg["rayon_km"], L["total"], L["c1"], pct(L["c1"], L["avec_texte"]))
 
