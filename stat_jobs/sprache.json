@@ -1,37 +1,33 @@
 {
   "_hilfe": [
     "Expressions de niveau d'allemand cherchées dans le TITRE et le TEXTE de chaque annonce.",
-    "Trois catégories (ne pas renommer les clés) :",
-    "  c1_explizit       -> C1 explicite, compte comme 'C1 ou équivalent'",
-    "  aequivalent_stark -> équivalent fort, compte comme 'C1 ou équivalent' (chiffre séparé)",
-    "  mehrdeutig        -> niveau ambigu, affiché à part, NE compte PAS comme C1",
-    "Chaque expression a un 'name' (affiché dans le Sheet) et une liste de 'muster' (expressions régulières,",
-    "insensibles à la casse). Les formes allemandes déclinées sont couvertes par \\w* (ex. verhandlungssicher\\w*",
-    "attrape verhandlungssicher, verhandlungssichere, verhandlungssicheres, verhandlungssicherem...).",
+    "UNE SEULE catégorie : 'c1_plus' = niveau C1 ou plus. Toute offre qui contient AU MOINS UNE des expressions",
+    "ci-dessous est comptée UNE fois dans 'C1 ou plus'. Les autres offres sont 'Moins que C1 ou non précisé'.",
+    "Chaque expression a un 'name' (affiché dans l'onglet Expressions) et une liste de 'muster' (expressions",
+    "régulières, insensibles à la casse). Les formes allemandes déclinées sont couvertes par \\w*",
+    "(ex. verhandlungssicher\\w* attrape verhandlungssicher, verhandlungssichere, verhandlungssicheres...).",
+    "'ausschluss' (optionnel) : si une de ces regex apparaît à moins de 40 caractères de la mention, elle est ignorée",
+    "(ex. 'Führerschein C1').",
     "POUR AJOUTER une expression : copie un bloc {name, kategorie, muster} et adapte.",
     "POUR EN RETIRER une : supprime tout son bloc {...}.",
-    "Exemple de test possible : ajouter {\"name\": \"gute Deutschkenntnisse\", \"kategorie\": \"mehrdeutig\", \"muster\": [\"\\\\bgute\\\\w*\\\\s+deutsch\\\\w*\"]}",
-    "pour voir combien d'annonces l'utilisent.",
     "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
   ],
 
   "kategorien": {
-    "c1_explizit": { "label": "C1 explicite", "zaehlt_als_c1": true },
-    "aequivalent_stark": { "label": "Équivalent fort", "zaehlt_als_c1": true },
-    "mehrdeutig": { "label": "Niveau ambigu (non compté)", "zaehlt_als_c1": false }
+    "c1_plus": { "label": "C1 ou plus", "zaehlt_als_c1": true }
   },
 
   "ausdruecke": [
-    { "name": "C1", "kategorie": "c1_explizit", "muster": ["\\bC1\\b"],
+    { "name": "C1", "kategorie": "c1_plus", "muster": ["\\bC1\\b"],
       "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
-    { "name": "C2", "kategorie": "c1_explizit", "muster": ["\\bC2\\b"],
+    { "name": "C2", "kategorie": "c1_plus", "muster": ["\\bC2\\b"],
       "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
-    { "name": "muttersprachlich", "kategorie": "c1_explizit", "muster": ["muttersprach\\w*"] },
-
-    { "name": "verhandlungssicher", "kategorie": "aequivalent_stark", "muster": ["verhandlungssicher\\w*"] },
-    { "name": "fließend", "kategorie": "aequivalent_stark", "muster": ["flie(?:ß|ss)end\\w*"] },
-    { "name": "perfektes Deutsch", "kategorie": "aequivalent_stark", "muster": ["perfekt\\w*\\s+deutsch\\w*"] },
-
-    { "name": "sehr gute Deutschkenntnisse", "kategorie": "mehrdeutig", "muster": ["sehr\\s+gute\\w*\\s+deutsch\\w*"] }
+    { "name": "muttersprachlich", "kategorie": "c1_plus", "muster": ["muttersprach\\w*"] },
+    { "name": "verhandlungssicher", "kategorie": "c1_plus", "muster": ["verhandlungssicher\\w*"] },
+    { "name": "fließend", "kategorie": "c1_plus", "muster": ["flie(?:ß|ss)end\\w*"] },
+    { "name": "perfektes Deutsch", "kategorie": "c1_plus", "muster": ["perfekt\\w*\\s+deutsch\\w*"] },
+    { "name": "sehr gute Deutschkenntnisse", "kategorie": "c1_plus",
+      "muster": ["sehr\\s+gut\\w*\\s+(?:\\w+[\\s,-]+){0,3}?deutsch\\w*",
+                 "sehr\\s+gut\\w*\\s+kenntnisse\\w*\\s+(?:in\\s+|der\\s+)?(?:der\\s+)?deutsch\\w*"] }
   ]
 }
