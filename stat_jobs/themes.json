@@ -1,0 +1,43 @@
+{
+  "_hilfe": [
+    "Thèmes de tendance (onglet 'Tendances'). Aucun lien avec le niveau de langue.",
+    "Chaque thème : 'name' + conditions (toutes doivent être vraies) :",
+    "  alle_von      : liste de groupes ; dans CHAQUE groupe au moins une regex doit matcher (titre + texte)",
+    "  keines_von    : (optionnel) aucune de ces regex ne doit matcher",
+    "  titel_enthaelt_eins_von : (optionnel) au moins une regex doit matcher dans le TITRE seulement",
+    "Regex insensibles à la casse. Chaque antislash doit être doublé dans le JSON (\\\\b pour \\b).",
+    "POUR AJOUTER un thème : copie un bloc et adapte. POUR EN RETIRER un : supprime le bloc.",
+    "Les noms de thèmes sont les en-têtes de colonnes de l'onglet Historique : en changer un crée une nouvelle",
+    "ligne d'en-têtes dans cet onglet (les anciennes lignes restent)."
+  ],
+
+  "themes": [
+    {
+      "name": "Linux (sans Windows)",
+      "alle_von": [["linux"]],
+      "keines_von": ["windows"]
+    },
+    {
+      "name": "Linux + Windows",
+      "alle_von": [["linux"], ["windows"]]
+    },
+    {
+      "name": "Kubernetes",
+      "alle_von": [["kubernetes", "\\bk8s\\b", "\\bk3s\\b"]]
+    },
+    {
+      "name": "Cloud",
+      "alle_von": [["cloud", "azure", "\\baws\\b", "\\bgcp\\b"]]
+    },
+    {
+      "name": "Niveau senior",
+      "alle_von": [],
+      "titel_enthaelt_eins_von": ["senior", "\\blead\\b", "principal", "architekt", "architect", "teamleit", "leiter"]
+    },
+    {
+      "name": "Cloud + senior",
+      "alle_von": [["cloud", "azure", "\\baws\\b", "\\bgcp\\b"]],
+      "titel_enthaelt_eins_von": ["senior", "\\blead\\b", "principal", "architekt", "architect", "teamleit", "leiter"]
+    }
+  ]
+}
