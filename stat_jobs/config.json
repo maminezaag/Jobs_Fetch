@@ -7,6 +7,8 @@
     "periode_jours  : période glissante des statistiques (offres publiées ces N derniers jours, encore en ligne ou retirées).",
     "recherche_jours: paramètre de l'API (100 maximum) ; laisser 100.",
     "archive_dossier: dossier de l'archive (dans stat_jobs/). NE PAS supprimer ce dossier : c'est l'historique.",
+    "tendance_fenetre_semaines : courbes de l'onglet Tendances lissées sur N semaines (moyenne glissante).",
+    "tendance_min_offres       : une semaine n'est tracée que si sa fenêtre contient au moins N offres (évite les pics absurdes).",
     "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément d'une liste."
   ],
 
@@ -35,6 +37,9 @@
   "themes_datei": "themes.json",
   "sprache_datei": "sprache.json",
   "archive_dossier": "archive",
+
+  "tendance_fenetre_semaines": 4,
+  "tendance_min_offres": 20,
 
   "doublon_aehnlichkeit": 0.85,
   "parallele_anfragen": 3,
