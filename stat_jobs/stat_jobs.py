@@ -22,7 +22,7 @@ DÉROULEMENT D'UNE EXÉCUTION
     3. Statistiques calculées sur l'archive, période glissante de 'periode_jours' (90 par défaut),
        doublons retirés en arrière-plan (même annonce publiée par plusieurs agences d'une entreprise).
     4. Google Sheet ENTIÈREMENT vidé (tous les onglets, tous les graphiques) puis reconstruit :
-       Résumé / Offres C1 / Tendances (+ analyse automatique sous les courbes, règles dans analyse.json).
+       Résumé / Offres C1 / Tendances (+ analyse automatique, règles dans analyse.json) / Profils.
 
 SÉCURITÉ
     - Recherche en échec après 3 essais -> arrêt, ni l'archive ni le Sheet ne sont modifiés.
@@ -734,32 +734,6 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
               "à ce moment-là sont comptées)."])
     ncols = 2 + len(themes)
 
-    # -- profils demandés (type de poste d'après le titre, profils.json)
-    noms_profils = [p["name"] for p in (profils or [])] + ["Autre"]
-    h_prof = fin_prof = h_psem = fin_psem = None
-    if profils:
-        t.append([])
-        t.append(["Profils demandés : part des offres par type de poste (d'après le titre ; règles dans profils.json)"])
-        h_prof = len(t)
-        t.append(["Profil", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"])
-        for n in noms_profils:
-            a, b = sum(o["profil"] == n for o in loc), sum(o["profil"] == n for o in offres)
-            t.append([n, pct(a, nL), pct(b, nD), a, b])
-        fin_prof = len(t) - 1
-        t.append([])
-        t.append([f"Évolution des profils - Allemagne : moyenne glissante sur {fenetre} semaines"])
-        h_psem = len(t)
-        t.append(["Semaine (lundi)"] + noms_profils)
-        if semaines:
-            w, fin = min(semaines), max(semaines)
-            while w <= fin:
-                lst = [o for k in range(fenetre) for o in semaines.get(w - timedelta(weeks=k), [])]
-                if len(lst) >= minimum:
-                    etiquette = "'" + w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
-                    t.append([etiquette] + [pct(sum(o["profil"] == n for o in lst), len(lst)) for n in noms_profils])
-                w += timedelta(weeks=1)
-        fin_psem = len(t) - 1
-
     # -- un petit graphique par famille de termes (themes.json -> "groupes")
     col_de = {th["name"]: i + 1 for i, th in enumerate(themes)}
     groupes = [g for g in (groupes or []) if any(n in col_de for n in g.get("termes", []))]
@@ -770,14 +744,7 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
     charts = [{"type": "BAR", "stacked": False, "titre": "Termes techniques demandés (% des offres)",
                "header_row": h_classement, "last_row": fin_classement, "domain_col": 0, "series_cols": [1, 2],
                "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420, "largeur": 640}]
-    if h_prof is not None:   # répartition actuelle des profils, à droite du classement
-        charts.append({"type": "BAR", "stacked": False, "titre": "Profils demandés (% des offres)",
-                       "header_row": h_prof, "last_row": fin_prof, "domain_col": 0, "series_cols": [1, 2],
-                       "anchor_row": 2, "anchor_col": ncols + 8, "hauteur": 420, "largeur": 640})
-    courbes = []             # (titre, ligne d'en-tête, dernière ligne, colonnes)
-    if h_psem is not None and fin_psem > h_psem:
-        courbes.append(("Profils demandés - évolution (% des offres)", h_psem, fin_psem,
-                        list(range(1, len(noms_profils) + 1))))
+    courbes = []             # (titre, ligne d'en-tête, dernière ligne, colonnes) : un graphique par volet d'outils
     if fin_sem > h_sem:
         for g in groupes:
             courbes.append((f"{g['name']} - évolution (% des offres)", h_sem, fin_sem,
@@ -788,7 +755,7 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
                        "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
                        "y_title": "% des offres", "largeur": 640, "hauteur": 340})
     # -- analyse automatique : écrite SOUS les graphiques (même colonne que les graphiques)
-    gras = [0, h_classement, h_sem] + [x for x in (h_prof, h_psem) if x is not None]
+    gras = [0, h_classement, h_sem]
     if analyse:
         bas = max(d["anchor_row"] + math.ceil(d.get("hauteur", 340) / 21) for d in charts) + 1
         col = ncols + 1
@@ -800,6 +767,25 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
         gras.append(bas)
     tab["Tendances"] = {"values": t, "gras": gras, "col_widths": {0: 200},
                         "extra_cols": ncols + 16, "charts": charts}
+
+    # ---------------------------------------------------------------- Profils (type de poste, d'après le titre)
+    if profils:
+        noms = [p["name"] for p in profils] + ["Autre"]
+        pr = [["Profils demandés : part des offres par type de poste (d'après le titre ; règles dans profils.json)"],
+              [f"Offres publiées du {debut} au {aujourdhui} : mes postes + postes voisins, {nD} offres."],
+              [],
+              ["Profil", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"]]
+        lignes = []
+        for n in noms:
+            a, b = sum(o["profil"] == n for o in loc), sum(o["profil"] == n for o in offres)
+            lignes.append([n, pct(a, nL), pct(b, nD), a, b])
+        lignes.sort(key=lambda x: x[2], reverse=True)
+        pr += lignes
+        tab["Profils"] = {"values": pr, "gras": [0, 3], "col_widths": {0: 260},
+                          "charts": [{"type": "BAR", "stacked": False, "titre": "Profils demandés (% des offres)",
+                                      "header_row": 3, "last_row": len(pr) - 1, "domain_col": 0,
+                                      "series_cols": [1, 2], "anchor_row": 2, "anchor_col": 6,
+                                      "hauteur": 400, "largeur": 640}]}
     return tab
 
 
@@ -862,7 +848,7 @@ def _requete_graphique(sid, d):
 
 
 def ecrire_sheet(tab):
-    """VIDE ENTIÈREMENT le Sheet (tous les onglets et graphiques), puis recrée Résumé / Offres C1 / Tendances."""
+    """VIDE ENTIÈREMENT le Sheet (tous les onglets et graphiques), puis recrée Résumé / Offres C1 / Tendances / Profils."""
     sh = ouvrir_sheet()
     log.info("Sheet ouvert : %s", sh.title)
 
@@ -958,6 +944,14 @@ def main(argv=None, session=None):
     # toute l'archive est classée (l'analyse a besoin de plus que la période) ; la période en est un sous-ensemble
     tous = [dict(o, datum=o.get("datum") or o.get("premiere_vue") or "") for o in archive.values()]
     debut_archive = min((o.get("premiere_vue") or aujourdhui) for o in archive.values())
+    # métiers hors domaine (titre) : retirés PARTOUT (Résumé, Offres C1, Tendances, Profils)
+    try:
+        exclus = [re.compile(r, re.I) for r in cfg.get("titres_exclus", [])]
+    except re.error as e:
+        raise StatJobsError(f"config.json : regex invalide dans 'titres_exclus' : {e}")
+    avant = len(tous)
+    tous = [o for o in tous if not any(r.search(o.get("titel") or "") for r in exclus)]
+    log.info("Métiers hors domaine retirés (titres_exclus) : %d offres", avant - len(tous))
     classifier(tous, cfg, sprache, expressions, themes, profils)
     tous = [o for o in dedoublonner(tous, cfg) if o.get("statut") == "ok"]
     debut = (date.today() - timedelta(days=int(cfg.get("periode_jours", 90)))).isoformat()
