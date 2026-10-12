@@ -22,7 +22,7 @@ DÉROULEMENT D'UNE EXÉCUTION
     3. Statistiques calculées sur l'archive, période glissante de 'periode_jours' (90 par défaut),
        doublons retirés en arrière-plan (même annonce publiée par plusieurs agences d'une entreprise).
     4. Google Sheet ENTIÈREMENT vidé (tous les onglets, tous les graphiques) puis reconstruit :
-       Résumé / Offres C1 / Tendances.
+       Résumé / Offres C1 / Tendances (+ analyse automatique sous les courbes, règles dans analyse.json).
 
 SÉCURITÉ
     - Recherche en échec après 3 essais -> arrêt, ni l'archive ni le Sheet ne sont modifiés.
@@ -453,21 +453,144 @@ def classifier(offres, cfg, sprache, expressions, themes):
         o["themes"] = [t["name"] for t in themes if any(r.search(corpus) for r in t["muster"])] if ok else []
 
 
-def offres_de_la_periode(archive, cfg, aujourdhui):
-    """Offres de l'archive publiées pour la 1re fois dans la période glissante (en ligne ou déjà retirées)."""
-    jours = int(cfg.get("periode_jours", 90))
-    debut = (datetime.strptime(aujourdhui, "%Y-%m-%d").date() - timedelta(days=jours)).isoformat()
-    res = []
-    for o in archive.values():
-        d = o.get("datum") or o.get("premiere_vue") or ""
-        if d >= debut:
-            res.append(dict(o, datum=d))
-    return res, debut
+# =========================================================================== 5. analyse automatique (analyse.json)
+
+def _fr(x):
+    return f"{x:.1f}".replace(".", ",")
 
 
-# =========================================================================== 5. tableaux du Sheet
+def _phrase(modele, valeurs):
+    """Remplit {mots} ; un mot inconnu reste tel quel au lieu de faire planter le script."""
+    class _Defaut(dict):
+        def __missing__(self, cle):
+            return "{" + cle + "}"
+    try:
+        return modele.format_map(_Defaut(valeurs))
+    except (ValueError, IndexError):
+        return modele
 
-def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, groupes=None):
+
+def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujourdhui):
+    """
+    Analyse par règles (aucune IA). offres = toutes les offres de l'archive, classées et dédoublonnées.
+    Retourne une liste de lignes de texte : titre + phrases.
+    """
+    P = regles_cfg.get("parametres", {})
+    M = regles_cfg.get("messages", {})
+    F = int(P.get("fenetre_semaines", 4))
+    seuil = float(P.get("seuil_points", 1.5))
+    mini = int(P.get("min_offres_fenetre", 30))
+    W = lundi(aujourdhui)
+    debut_fiable = None if P.get("inclure_semaines_avant_archive") else lundi(debut_archive)
+    titre = _phrase(M.get("titre", "Analyse automatique du {date}"),
+                    {"date": datetime.strptime(aujourdhui, "%Y-%m-%d").strftime("%d.%m.%Y")})
+
+    par_semaine = {}
+    for o in offres:
+        w = lundi(o["datum"])
+        if w:
+            par_semaine.setdefault(w, []).append(o)
+
+    def fenetre(k):
+        """Offres de la k-ième fenêtre (0 = récente) ; None si incomplète ou trop maigre."""
+        semaines = [W - timedelta(weeks=k * F + i) for i in range(F)]
+        if debut_fiable and min(semaines) < debut_fiable:
+            return None
+        lst = [o for w in semaines for o in par_semaine.get(w, [])]
+        return lst if len(lst) >= mini else None
+
+    f0, f1, f2 = fenetre(0), fenetre(1), fenetre(2)
+    if f0 is None or f1 is None:
+        pret = (debut_fiable or W) + timedelta(weeks=2 * F - 1)
+        return [titre, _phrase(M.get("pas_assez", "Pas encore assez de recul."),
+                               {"date_debut": pret.strftime("%d.%m.%Y"), "semaines": F})]
+
+    zmin = float(P.get("confiance_z", 1.96))
+
+    def part(lst, test):
+        return 100.0 * sum(1 for o in lst if test(o)) / len(lst) if lst else 0.0
+
+    def etat(pa, na, pb, nb):
+        """
+        Évolution de pb (avant) vers pa (après), en points de %. 'hausse'/'baisse' seulement si l'écart dépasse
+        seuil_points ET n'est pas dû au hasard (test de deux proportions, z >= confiance_z). Sinon 'stable'.
+        """
+        d = pa - pb
+        p = (pa * na + pb * nb) / (100.0 * (na + nb))
+        err = math.sqrt(p * (1 - p) * (1.0 / na + 1.0 / nb)) * 100.0 if 0 < p < 1 else 0.0
+        if abs(d) < seuil or (err and abs(d) / err < zmin):
+            return "stable"
+        return "hausse" if d > 0 else "baisse"
+
+    # sujets : chaque terme + chaque famille
+    sujets = []
+    for th in themes:
+        n = th["name"]
+        sujets.append(("termes", n, lambda o, n=n: n in o["themes"]))
+    for g in groupes or []:
+        membres = set(g.get("termes", []))
+        sujets.append(("groupes", g["name"], lambda o, m=membres: bool(m & set(o["themes"]))))
+    ind = {}
+    for cible, nom, test in sujets:
+        p0, p1 = part(f0, test), part(f1, test)
+        p2 = part(f2, test) if f2 is not None else None
+        ind[(cible, nom)] = {
+            "terme": nom, "p0": p0, "p1": p1, "p2": p2, "delta": p0 - p1,
+            "delta_prec": (p1 - p2) if p2 is not None else None,
+            "recente": etat(p0, len(f0), p1, len(f1)),
+            "precedente": etat(p1, len(f1), p2, len(f2)) if p2 is not None else "inconnu"}
+
+    def valeurs(i):
+        v = {"terme": i["terme"], "semaines": F, "p0": _fr(i["p0"]), "p1": _fr(i["p1"]),
+             "delta": ("+" if i["delta"] >= 0 else "") + _fr(i["delta"])}
+        if i["p2"] is not None:
+            v["p2"] = _fr(i["p2"])
+            v["delta_prec"] = ("+" if i["delta_prec"] >= 0 else "") + _fr(i["delta_prec"])
+        return v
+
+    phrases, deja = [], set()       # deja = sujets ayant déjà leur phrase
+    for r in sorted(regles_cfg.get("regles", []), key=lambda r: -r.get("priorite", 0)):
+        typ, prio = r.get("type", "terme"), r.get("priorite", 0)
+        if typ == "orientation":
+            fam = [i for (c, _), i in ind.items() if c == "groupes"]
+            hausse = max(fam, key=lambda i: i["delta"], default=None)
+            baisse = min(fam, key=lambda i: i["delta"], default=None)
+            if hausse and baisse and hausse["recente"] == "hausse" and baisse["recente"] == "baisse":
+                phrases.append((prio, abs(hausse["delta"]) + abs(baisse["delta"]), _phrase(r["phrase"], {
+                    "hausse": hausse["terme"], "h0": _fr(hausse["p0"]), "h1": _fr(hausse["p1"]),
+                    "baisse": baisse["terme"], "b0": _fr(baisse["p0"]), "b1": _fr(baisse["p1"])})))
+                deja.update({("groupes", hausse["terme"]), ("groupes", baisse["terme"])})
+        elif typ == "leader":
+            cands = [i for (c, _), i in ind.items() if c == "termes"]
+            if cands:
+                i = max(cands, key=lambda i: i["p0"])
+                phrases.append((prio, i["p0"], _phrase(r["phrase"], valeurs(i))))
+                deja.add(("termes", i["terme"]))
+        elif typ == "apparition":
+            for (c, nom), i in ind.items():
+                if c == r.get("cible", "termes") and (c, nom) not in deja and i["recente"] == "hausse" and \
+                        i["p1"] < float(P.get("seuil_absent", 1.0)) and i["p0"] >= float(P.get("seuil_apparition", 2.0)):
+                    phrases.append((prio, abs(i["delta"]), _phrase(r["phrase"], valeurs(i))))
+                    deja.add((c, nom))
+        else:   # "terme" : conditions sur recente / precedente
+            cond = r.get("si", {})
+            for (c, nom), i in ind.items():
+                if c != r.get("cible", "termes") or (c, nom) in deja:
+                    continue
+                if all(i.get(k) == v for k, v in cond.items()):
+                    phrases.append((prio, abs(i["delta"]), _phrase(r["phrase"], valeurs(i))))
+                    deja.add((c, nom))
+
+    phrases.sort(key=lambda x: (-x[0], -x[1]))
+    texte = [p for _, _, p in phrases[:int(P.get("max_phrases", 8))]]
+    if len(texte) <= 1:     # seulement le leader (ou rien) : marché stable
+        texte.append(_phrase(M.get("rien", "Aucun mouvement notable."), {"semaines": F}))
+    return [titre] + texte
+
+
+# =========================================================================== 5b. tableaux du Sheet
+
+def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, groupes=None, analyse=None):
     """offres = offres de la période, classées et dédoublonnées, avec un texte exploitable."""
     lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
     lib_moins = "Moins que C1 ou non précisé"
@@ -578,7 +701,18 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, g
                            "series_cols": [col_de[n] for n in g["termes"] if n in col_de],
                            "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
                            "y_title": "% des offres", "largeur": 640, "hauteur": 340})
-    tab["Tendances"] = {"values": t, "gras": [0, h_classement, h_sem], "col_widths": {0: 200},
+    # -- analyse automatique : écrite SOUS les graphiques (même colonne que les graphiques)
+    gras = [0, h_classement, h_sem]
+    if analyse:
+        bas = max(d["anchor_row"] + math.ceil(d.get("hauteur", 340) / 21) for d in charts) + 1
+        col = ncols + 1
+        for k, ligne in enumerate(analyse):
+            r_idx = bas + k + (1 if k else 0)          # une ligne vide entre le titre et les phrases
+            while len(t) <= r_idx:
+                t.append([])
+            t[r_idx] = list(t[r_idx]) + [""] * (col - len(t[r_idx])) + [("• " if k else "") + ligne]
+        gras.append(bas)
+    tab["Tendances"] = {"values": t, "gras": gras, "col_widths": {0: 200},
                         "extra_cols": ncols + 16, "charts": charts}
     return tab
 
@@ -734,11 +868,27 @@ def main(argv=None, session=None):
 
     archive, nb_nouvelles = mettre_a_jour_archive(cfg, session or requests.Session(), aujourdhui)
 
-    periode, debut = offres_de_la_periode(archive, cfg, aujourdhui)
+    # toute l'archive est classée (l'analyse a besoin de plus que la période) ; la période en est un sous-ensemble
+    tous = [dict(o, datum=o.get("datum") or o.get("premiere_vue") or "") for o in archive.values()]
     debut_archive = min((o.get("premiere_vue") or aujourdhui) for o in archive.values())
-    classifier(periode, cfg, sprache, expressions, themes)
-    uniques = [o for o in dedoublonner(periode, cfg) if o.get("statut") == "ok"]
-    tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive, themes_cfg.get("groupes"))
+    classifier(tous, cfg, sprache, expressions, themes)
+    tous = [o for o in dedoublonner(tous, cfg) if o.get("statut") == "ok"]
+    debut = (date.today() - timedelta(days=int(cfg.get("periode_jours", 90)))).isoformat()
+    uniques = [o for o in tous if o["datum"] >= debut]
+
+    analyse = None
+    if cfg.get("analyse_datei") and os.path.exists(os.path.join(BASE_DIR, cfg["analyse_datei"])):
+        try:
+            analyse = analyser_tendances(tous, themes, themes_cfg.get("groupes"), charger_json(cfg["analyse_datei"]),
+                                         debut_archive, aujourdhui)
+            for ligne in analyse:
+                log.info("ANALYSE : %s", ligne)
+        except Exception as e:  # noqa: BLE001 - l'analyse ne doit jamais empêcher la mise à jour du Sheet
+            log.warning("Analyse automatique impossible (%s) : Sheet construit sans analyse", e)
+
+    tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive, themes_cfg.get("groupes"),
+                              analyse)
+    sauvegarder_local(tab)
     sauvegarder_local(tab)
 
     loc = [o for o in uniques if o["zone"] == "local"]
