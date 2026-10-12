@@ -1,43 +1,28 @@
 {
   "_hilfe": [
-    "Thèmes de tendance (onglet 'Tendances'). Aucun lien avec le niveau de langue.",
-    "Chaque thème : 'name' + conditions (toutes doivent être vraies) :",
-    "  alle_von      : liste de groupes ; dans CHAQUE groupe au moins une regex doit matcher (titre + texte)",
-    "  keines_von    : (optionnel) aucune de ces regex ne doit matcher",
-    "  titel_enthaelt_eins_von : (optionnel) au moins une regex doit matcher dans le TITRE seulement",
-    "Regex insensibles à la casse. Chaque antislash doit être doublé dans le JSON (\\\\b pour \\b).",
-    "POUR AJOUTER un thème : copie un bloc et adapte. POUR EN RETIRER un : supprime le bloc.",
-    "Les noms de thèmes sont les en-têtes de colonnes de l'onglet Historique : en changer un crée une nouvelle",
-    "ligne d'en-têtes dans cet onglet (les anciennes lignes restent)."
+    "Termes techniques suivis dans l'onglet 'Tendances' (aucun lien avec le niveau d'allemand).",
+    "Chaque terme : 'name' (affiché) + 'muster' (expressions régulières, insensibles à la casse).",
+    "Une offre compte pour un terme si AU MOINS UNE de ses regex apparaît dans le titre ou le texte.",
+    "\\b = limite de mot : \\bhorizon\\b trouve 'Horizon' mais pas 'Horizont'.",
+    "POUR AJOUTER un terme : copie une ligne et adapte. Il s'applique aussi aux anciennes offres de l'archive.",
+    "POUR EN RETIRER un : supprime sa ligne.",
+    "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
   ],
 
   "themes": [
-    {
-      "name": "Linux (sans Windows)",
-      "alle_von": [["linux"]],
-      "keines_von": ["windows"]
-    },
-    {
-      "name": "Linux + Windows",
-      "alle_von": [["linux"], ["windows"]]
-    },
-    {
-      "name": "Kubernetes",
-      "alle_von": [["kubernetes", "\\bk8s\\b", "\\bk3s\\b"]]
-    },
-    {
-      "name": "Cloud",
-      "alle_von": [["cloud", "azure", "\\baws\\b", "\\bgcp\\b"]]
-    },
-    {
-      "name": "Niveau senior",
-      "alle_von": [],
-      "titel_enthaelt_eins_von": ["senior", "\\blead\\b", "principal", "architekt", "architect", "teamleit", "leiter"]
-    },
-    {
-      "name": "Cloud + senior",
-      "alle_von": [["cloud", "azure", "\\baws\\b", "\\bgcp\\b"]],
-      "titel_enthaelt_eins_von": ["senior", "\\blead\\b", "principal", "architekt", "architect", "teamleit", "leiter"]
-    }
+    { "name": "Kubernetes", "muster": ["kubernetes", "\\bk8s\\b", "\\bk3s\\b"] },
+    { "name": "Ansible",    "muster": ["\\bansible\\b"] },
+    { "name": "Puppet",     "muster": ["\\bpuppet\\b"] },
+    { "name": "Citrix",     "muster": ["\\bcitrix\\b"] },
+    { "name": "Horizon",    "muster": ["\\bhorizon\\b"] },
+    { "name": "Intune",     "muster": ["\\bintune\\b"] },
+    { "name": "Exchange",   "muster": ["\\bexchange\\b"] },
+    { "name": "Azure",      "muster": ["\\bazure\\b"] },
+    { "name": "AWS",        "muster": ["\\baws\\b", "amazon web services"] },
+    { "name": "CI/CD",      "muster": ["\\bci\\s*/\\s*cd\\b", "\\bcicd\\b", "\\bjenkins\\b", "gitlab[\\s-]?ci", "github actions"] },
+    { "name": "Terraform",  "muster": ["\\bterraform\\b"] },
+    { "name": "Linux",      "muster": ["\\blinux\\b"] },
+    { "name": "VMware",     "muster": ["\\bvmware\\b", "\\bvsphere\\b", "\\besxi?\\b", "\\bvcenter\\b"] },
+    { "name": "Proxmox",    "muster": ["\\bproxmox\\b"] }
   ]
 }
