@@ -2,7 +2,10 @@
   "_hilfe": [
     "Configuration technique de stat_jobs.py. Aucun secret ici (la clé Google et l'identifiant du Sheet",
     "viennent des secrets GitHub GCP_SA_KEY et STAT_JOBS_SHEET_ID).",
-    "mots_cles      : recherches lancées chaque nuit (ajoute / supprime une ligne).",
+    "mots_cles      : MES postes (liste 'domaine') -> Résumé, Offres C1 et Tendances. Ajoute / supprime une ligne.",
+    "mots_cles_marche : postes VOISINS (liste 'marché') -> uniquement l'onglet Tendances (expertises et profils).",
+    "berufsfeld_marche: filtre domaine pour la liste 'marché' ; null = aucun filtre (ces postes sont classés ailleurs).",
+    "profils_datei  : règles qui déduisent le type de poste du titre (graphique 'Profils demandés').",
     "berufsfeld     : filtre domaine de l'API. Mets null (sans guillemets) pour le désactiver (plus d'offres, plus de bruit).",
     "periode_jours  : période glissante des statistiques (offres publiées ces N derniers jours, encore en ligne ou retirées).",
     "recherche_jours: paramètre de l'API (100 maximum) ; laisser 100.",
@@ -21,6 +24,18 @@
     "System Engineer"
   ],
 
+  "mots_cles_marche": [
+    "Cloud Engineer",
+    "Cloud Administrator",
+    "DevOps Engineer",
+    "Platform Engineer",
+    "Site Reliability Engineer",
+    "Infrastructure Engineer",
+    "Linux Engineer",
+    "VDI Engineer"
+  ],
+  "berufsfeld_marche": null,
+
   "berufsfeld": "IT-Netzwerktechnik, -Administration, -Organisation",
   "angebotsart": 1,
   "zeitarbeit": true,
@@ -38,6 +53,7 @@
   "themes_datei": "themes.json",
   "sprache_datei": "sprache.json",
   "analyse_datei": "analyse.json",
+  "profils_datei": "profils.json",
   "archive_dossier": "archive",
 
   "tendance_fenetre_semaines": 4,
