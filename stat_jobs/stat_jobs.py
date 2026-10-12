@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-stat_jobs.py - Statistique du marché : combien d'offres IT exigent un allemand C1 (ou équivalent) ?
+stat_jobs.py - Statistique du marché : combien d'offres IT exigent un allemand C1 ou plus ?
 
 BUT
     Argumenter auprès du conseiller (Agentur für Arbeit) pour financer un cours d'allemand C1 :
     sur les ~90 derniers jours, combien d'offres de mon domaine (administrateur système, Linux,
-    IT-Support...) demandent du C1 ou un équivalent, autour d'Oldenburg (+60 km) et dans toute
+    IT-Support...) demandent du C1 ou plus, autour d'Oldenburg (+60 km) et dans toute
     l'Allemagne ?
 
 CE SCRIPT EST INDÉPENDANT DE job_watcher.py (autres fichiers, autre workflow, autres secrets).
@@ -324,7 +324,6 @@ def classifier(offres, cfg, sprache, themes_cfg):
         o["hits"] = classer_langue(o["titel"], o["text"], expressions) if o["statut"] == "ok" else []
         o["cats"] = sorted({h["kategorie"] for h in o["hits"]})
         o["c1"] = any(cats[c]["zaehlt_als_c1"] for c in o["cats"])
-        o["ambigu"] = (not o["c1"]) and bool(o["cats"])
         o["themes"] = classer_themes(o["titel"], o["text"], themes) if o["statut"] == "ok" else []
     return expressions, themes
 
@@ -356,8 +355,6 @@ def agreger(offres, sprache, expressions, themes):
             "vides": sum(1 for o in lst if o["statut"] == "leer"),
             "erreurs": sum(1 for o in lst if o["statut"] == "fehler"),
             "c1": sum(1 for o in avec if o["c1"]),
-            "ambigu": sum(1 for o in avec if o["ambigu"]),
-            "aucune": sum(1 for o in avec if not o["cats"]),
             "par_cat": {c: sum(1 for o in avec if c in o["cats"]) for c in cats},
             # catégorie dominante (la 1re de sprache.json présente) : chaque offre compte une seule fois
             "top": {c: sum(1 for o in avec if next((x for x in cats if x in o["cats"]), None) == c)
@@ -408,7 +405,8 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
     tab = {}
 
     # ---- Résumé
-    r = [["STATISTIQUE : offres IT exigeant un allemand C1 ou équivalent"],
+    lib_moins = "Moins que C1 ou non précisé"
+    r = [["STATISTIQUE : offres IT exigeant un allemand C1 ou plus"],
          [f"Mise à jour : {aujourdhui} | Fenêtre : {cfg['jours']} derniers jours | "
           f"Mots-clés : {', '.join(cfg['mots_cles'])}"],
          ["Note : instantané des offres encore en ligne à cette date (pas une évolution réelle). "
@@ -416,89 +414,72 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
          [],
          ["Indicateur", lib_local, "Allemagne"]]
 
-    def ligne(lib, k, d=None):
+    def ligne(lib, k):
         r.append([lib, L[k], D[k]])
 
+    moins = {k: X["avec_texte"] - X["c1"] for k, X in (("L", L), ("D", D))}
     ligne("Offres analysées (après dédoublonnage)", "total")
     ligne("dont avec texte exploitable", "avec_texte")
     ligne("dont sans texte (offre vide / introuvable)", "vides")
     ligne("dont texte illisible (erreur technique)", "erreurs")
     r.append([])
-    for c, info in cats.items():
-        r.append([f"{info['label']} - offres avec au moins une mention", L["par_cat"][c], D["par_cat"][c]])
-    r.append([])
-    r.append(["C1 OU ÉQUIVALENT (nombre d'offres)", L["c1"], D["c1"]])
-    r.append(["C1 OU ÉQUIVALENT (% des offres avec texte)", pct(L["c1"], L["avec_texte"]),
-              pct(D["c1"], D["avec_texte"])])
-    r.append(["Niveau ambigu seulement (nombre, non compté dans C1)", L["ambigu"], D["ambigu"]])
-    r.append(["Niveau ambigu seulement (%)", pct(L["ambigu"], L["avec_texte"]),
-              pct(D["ambigu"], D["avec_texte"])])
-    r.append(["Aucune mention de niveau (nombre)", L["aucune"], D["aucune"]])
-    r.append(["Aucune mention de niveau (%)", pct(L["aucune"], L["avec_texte"]),
-              pct(D["aucune"], D["avec_texte"])])
+    r.append(["C1 OU PLUS (nombre d'offres)", L["c1"], D["c1"]])
+    r.append(["C1 OU PLUS (% des offres avec texte)", pct(L["c1"], L["avec_texte"]), pct(D["c1"], D["avec_texte"])])
+    r.append([f"{lib_moins} (nombre d'offres)", moins["L"], moins["D"]])
+    r.append([f"{lib_moins} (%)", pct(moins["L"], L["avec_texte"]), pct(moins["D"], D["avec_texte"])])
     r.append([])
     r.append([f"Doublons retirés : {doublons}. Offres écartées car publiées pour la première fois il y a plus de "
               f"{cfg['jours']} jours : {hors_fenetre}. Les % sont calculés sur les offres avec texte exploitable. "
-              "Une offre compte une seule fois dans 'C1 ou équivalent', même avec plusieurs mentions."])
+              "Une offre compte une seule fois dans 'C1 ou plus', même avec plusieurs mentions (voir l'onglet Expressions)."])
 
-    # -- données des graphiques (tableaux visibles sous le résumé ; les graphiques les lisent)
-    cles_cats = list(cats.keys())
-    c1_cats = [c for c in cles_cats if cats[c]["zaehlt_als_c1"]]
+    # -- données des graphiques (tableau visible sous le résumé ; les graphiques le lisent)
     r.append([])
     r.append(["DONNÉES DES GRAPHIQUES (ne pas modifier)"])
     h1 = len(r)
-    r.append(["Niveau exigé (% des offres avec texte)"] + [cats[c]["label"] for c in cles_cats] + ["Aucune mention"])
-    for lib, X in ((lib_local, L), ("Allemagne", D)):
-        r.append([lib] + [pct(X["top"][c], X["avec_texte"]) for c in cles_cats] + [pct(X["aucune"], X["avec_texte"])])
-    h2 = len(r) + 1
-    r.append([])
-    r.append(["Comparaison (% des offres avec texte)", f"{cats[c1_cats[0]]['label']} (%)", "C1 ou équivalent (%)"])
-    for lib, X in ((lib_local, L), ("Allemagne", D)):
-        r.append([lib, pct(X["par_cat"][c1_cats[0]], X["avec_texte"]), pct(X["c1"], X["avec_texte"])])
+    r.append(["Niveau d'allemand exigé (% des offres avec texte)", "C1 ou plus", lib_moins])
+    for lib, X, m in ((lib_local, L, moins["L"]), ("Allemagne", D, moins["D"])):
+        r.append([lib, pct(X["c1"], X["avec_texte"]), pct(m, X["avec_texte"])])
     charts_r = [
         {"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
-         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": list(range(1, len(cles_cats) + 2)),
+         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
          "anchor_row": 3, "anchor_col": 7, "y_title": "% des offres"},
-        {"type": "COLUMN", "stacked": False, "titre": "C1 explicite vs C1 ou équivalent (% des offres)",
-         "header_row": h2, "last_row": h2 + 2, "domain_col": 0, "series_cols": [1, 2],
+        {"type": "COLUMN", "stacked": False, "titre": "Offres exigeant C1 ou plus (% des offres)",
+         "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1],
          "anchor_row": 24, "anchor_col": 7, "y_title": "% des offres"},
     ]
-    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1, h2], "charts": charts_r, "col_widths": {0: 430}}
+    tab["Résumé"] = {"values": r, "header_rows": [0, 4, h1], "charts": charts_r, "col_widths": {0: 430}}
 
-    # ---- Offres C1
+    # ---- Offres C1 ("C1 ou plus")
     en_tete = ["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien",
-               "Catégorie", "Expression(s) déclenchante(s)", "Phrase"]
+               "Expression(s) déclenchante(s)", "Phrase"]
     c1 = [o for o in offres if o["c1"]]
     # local d'abord ; dans chaque zone, les plus récentes en premier
     loc = sorted([o for o in c1 if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True)
     rest = sorted([o for o in c1 if o["zone"] != "local"], key=lambda o: o["datum"], reverse=True)
     rows = [en_tete]
     for o in loc + rest:
-        hits = [h for h in o["hits"] if cats[h["kategorie"]]["zaehlt_als_c1"]]
+        hits = o["hits"]
         rows.append([cellule(x) for x in [
             lib_local if o["zone"] == "local" else "Reste de l'Allemagne",
             o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
-            " / ".join(sorted({cats[h["kategorie"]]["label"] for h in hits})),
             " / ".join(h["name"] for h in hits),
             hits[0]["phrase"] if hits else ""]])
     tab["Offres C1"] = {"values": rows, "header_rows": [0]}
 
     # ---- Expressions
-    rows = [["Expression", "Catégorie", f"Offres {lib_local}", f"% {lib_local}",
-             "Offres Allemagne", "% Allemagne"]]
+    rows = [["Expression", f"Offres {lib_local}", f"% {lib_local}", "Offres Allemagne", "% Allemagne"]]
     for e in expressions:
         n = e["name"]
-        rows.append([cellule(n), cats[e["kategorie"]]["label"],
-                     L["par_expr"][n], pct(L["par_expr"][n], L["avec_texte"]),
+        rows.append([cellule(n), L["par_expr"][n], pct(L["par_expr"][n], L["avec_texte"]),
                      D["par_expr"][n], pct(D["par_expr"][n], D["avec_texte"])])
     rows.append([])
     rows.append(["Une offre peut apparaître sous plusieurs expressions ; les lignes ne s'additionnent donc pas. "
-                 "Les % sont calculés sur les offres avec texte."])
-    tab["Expressions"] = {"values": rows, "header_rows": [0], "col_widths": {0: 240, 1: 200},
+                 "Les % sont calculés sur les offres avec texte. Toutes ces expressions comptent comme 'C1 ou plus'."])
+    tab["Expressions"] = {"values": rows, "header_rows": [0], "col_widths": {0: 240},
                           "charts": [{"type": "BAR", "stacked": False,
                                       "titre": "Offres par expression (% des offres avec texte)",
                                       "header_row": 0, "last_row": len(expressions), "domain_col": 0,
-                                      "series_cols": [3, 5], "anchor_row": 12, "anchor_col": 0}]}
+                                      "series_cols": [2, 4], "anchor_row": 12, "anchor_col": 0}]}
 
     # ---- Tendances
     semaines = liste_semaines(agg)
@@ -539,22 +520,22 @@ def construire_tableaux(offres, agg, sprache, expressions, themes, cfg, aujourdh
 
     # ---- Données
     rows = [["Référence", "Zone", "Distance (km)", "Entreprise", "Titre", "Lieu", "Date", "Lien",
-             "Statut du texte", "Niveau (catégories)", "C1 ou équivalent", "Expressions", "Thèmes"]]
+             "Statut du texte", "C1 ou plus", "Expressions", "Thèmes"]]
     for o in sorted(offres, key=lambda x: x["datum"], reverse=True):
         rows.append([cellule(x) for x in [
             o["refnr"], "local" if o["zone"] == "local" else "reste", o["dist"] if o["dist"] is not None else "",
             o["firma"], o["titel"], f"{o['plz']} {o['ort']}".strip(), o["datum"], o["link"],
             {"ok": "ok", "leer": "vide", "fehler": "erreur"}[o["statut"]],
-            " / ".join(cats[c]["label"] for c in o["cats"]), "oui" if o["c1"] else "non",
+            "oui" if o["c1"] else "non",
             " / ".join(h["name"] for h in o["hits"]), " / ".join(o["themes"])]])
     tab["Données"] = {"values": rows, "header_rows": [0]}
 
     # ---- ligne d'historique
-    ent = ["Date", "Offres Allemagne", f"Offres {lib_local}", "C1+équiv. Allemagne", "% C1 Allemagne",
-           f"C1+équiv. {lib_local}", f"% C1 {lib_local}", "Ambigu Allemagne", "Sans texte / illisible"]
+    ent = ["Date", "Offres Allemagne", f"Offres {lib_local}", "C1 ou plus Allemagne", "% C1 ou plus Allemagne",
+           f"C1 ou plus {lib_local}", f"% C1 ou plus {lib_local}", "Sans texte / illisible"]
     ent += [f"{th['name']} (DE)" for th in themes] + [f"{th['name']} (local)" for th in themes]
     ligne_h = [aujourdhui, D["total"], L["total"], D["c1"], pct(D["c1"], D["avec_texte"]),
-               L["c1"], pct(L["c1"], L["avec_texte"]), D["ambigu"], D["vides"] + D["erreurs"]]
+               L["c1"], pct(L["c1"], L["avec_texte"]), D["vides"] + D["erreurs"]]
     ligne_h += [D["par_theme"][th["name"]] for th in themes] + [L["par_theme"][th["name"]] for th in themes]
     tab["_historique"] = {"header": ent, "row": ligne_h}
     return tab
@@ -804,9 +785,9 @@ def main(argv=None):
     sauvegarder_local(offres, tab, agg)
 
     L, D = agg["local"], agg["de"]
-    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou équivalent (%.1f %%)",
+    log.info("RÉSULTAT Allemagne : %d offres, %d C1 ou plus (%.1f %%)",
              D["total"], D["c1"], pct(D["c1"], D["avec_texte"]))
-    log.info("RÉSULTAT %s +%s km : %d offres, %d C1 ou équivalent (%.1f %%)",
+    log.info("RÉSULTAT %s +%s km : %d offres, %d C1 ou plus (%.1f %%)",
              cfg["lieu_reference"]["nom"], cfg["rayon_km"], L["total"], L["c1"], pct(L["c1"], L["avec_texte"]))
 
     if args.sans_sheet:
