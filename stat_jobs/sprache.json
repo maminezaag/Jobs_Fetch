@@ -6,8 +6,10 @@
     "Chaque expression a un 'name' (affiché dans l'onglet Expressions) et une liste de 'muster' (expressions",
     "régulières, insensibles à la casse). Les formes allemandes déclinées sont couvertes par \\w*",
     "(ex. verhandlungssicher\\w* attrape verhandlungssicher, verhandlungssichere, verhandlungssicheres...).",
-    "'ausschluss' (optionnel) : si une de ces regex apparaît à moins de 40 caractères de la mention, elle est ignorée",
-    "(ex. 'Führerschein C1').",
+    "'ausschluss' (optionnel) : si une de ces regex apparaît près de la mention, la mention est ignorée",
+    "(ex. 'Führerschein C1'). 'ausschluss_vor' / 'ausschluss_nach' = nombre de caractères regardés avant / après",
+    "la mention (40 par défaut). La zone 'après' s'arrête au prochain point de liste (*, •, ' - ').",
+    "'explizit': true = l'expression écrit le niveau en toutes lettres (C1, C2) -> compte aussi dans 'C1 écrit explicitement'.",
     "POUR AJOUTER une expression : copie un bloc {name, kategorie, muster} et adapte.",
     "POUR EN RETIRER une : supprime tout son bloc {...}.",
     "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
@@ -18,16 +20,19 @@
   },
 
   "ausdruecke": [
-    { "name": "C1", "kategorie": "c1_plus", "muster": ["\\bC1\\b"],
-      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
-    { "name": "C2", "kategorie": "c1_plus", "muster": ["\\bC2\\b"],
-      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"] },
+    { "name": "C1", "kategorie": "c1_plus", "explizit": true, "muster": ["\\bC1\\b"],
+      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"],
+      "ausschluss_vor": 30, "ausschluss_nach": 0 },
+    { "name": "C2", "kategorie": "c1_plus", "explizit": true, "muster": ["\\bC2\\b"],
+      "ausschluss": ["f(?:ü|ue)hrerschein", "fahrerlaubnis", "klasse\\s*[A-Z]\\b"],
+      "ausschluss_vor": 30, "ausschluss_nach": 0 },
     { "name": "muttersprachlich", "kategorie": "c1_plus", "muster": ["muttersprach\\w*"] },
     { "name": "verhandlungssicher", "kategorie": "c1_plus", "muster": ["verhandlungssicher\\w*"] },
     { "name": "fließend", "kategorie": "c1_plus", "muster": ["flie(?:ß|ss)end\\w*"] },
     { "name": "perfektes Deutsch", "kategorie": "c1_plus", "muster": ["perfekt\\w*\\s+deutsch\\w*"] },
     { "name": "sehr gute Deutschkenntnisse", "kategorie": "c1_plus",
       "muster": ["sehr\\s+gut\\w*\\s+(?:\\w+[\\s,-]+){0,3}?deutsch\\w*",
-                 "sehr\\s+gut\\w*\\s+kenntnisse\\w*\\s+(?:in\\s+|der\\s+)?(?:der\\s+)?deutsch\\w*"] }
+                 "sehr\\s+gut\\w*\\s+kenntnisse\\w*\\s+(?:in\\s+|der\\s+)?(?:der\\s+)?deutsch\\w*"],
+      "ausschluss": ["\\bB1\\b", "\\bB2\\b", "\\bA2\\b"], "ausschluss_vor": 0, "ausschluss_nach": 90 }
   ]
 }
