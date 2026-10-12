@@ -24,14 +24,20 @@
     { "name": "Terraform",  "muster": ["\\bterraform\\b"] },
     { "name": "Linux",      "muster": ["\\blinux\\b"] },
     { "name": "VMware",     "muster": ["\\bvmware\\b", "\\bvsphere\\b", "\\besxi?\\b", "\\bvcenter\\b"] },
-    { "name": "Proxmox",    "muster": ["\\bproxmox\\b"] }
+    { "name": "Proxmox",    "muster": ["\\bproxmox\\b"] },
+    { "name": "Docker",     "muster": ["\\bdocker\\b"] },
+    { "name": "Prometheus", "muster": ["\\bprometheus\\b"] },
+    { "name": "Grafana",    "muster": ["\\bgrafana\\b"] },
+    { "name": "Checkmk",    "muster": ["\\bcheck[\\s_-]?mk\\b"] }
   ],
 
   "groupes": [
     { "name": "Linux",           "termes": ["Linux"] },
     { "name": "Virtualisation",  "termes": ["VMware", "Proxmox", "Citrix", "Horizon"] },
     { "name": "Cloud",           "termes": ["Azure", "AWS"] },
-    { "name": "Automatisation",  "termes": ["Ansible", "Terraform", "Puppet", "CI/CD", "Kubernetes"] },
+    { "name": "Automatisation",  "termes": ["Ansible", "Terraform", "Puppet", "CI/CD"] },
+    { "name": "Conteneurs",      "termes": ["Docker", "Kubernetes"] },
+    { "name": "Monitoring",      "termes": ["Prometheus", "Grafana", "Checkmk"] },
     { "name": "Microsoft",       "termes": ["Exchange", "Intune"] }
   ]
 }
