@@ -149,7 +149,7 @@ def ecrire_atomique(chemin, contenu):
 
 # =========================================================================== 1. API
 
-def lancer_recherche(session, cfg, mot_cle):
+def lancer_recherche(session, cfg, mot_cle, berufsfeld=None):
     """Toutes les pages d'un mot-clé (toute l'Allemagne). Retourne la liste brute d'offres."""
     resultats, page = [], 1
     while page <= MAX_PAGES:
@@ -162,8 +162,8 @@ def lancer_recherche(session, cfg, mot_cle):
             # IMPORTANT : booléen en minuscules ("true"), sinon l'API renvoie 0 résultat
             "zeitarbeit": str(bool(cfg.get("zeitarbeit", True))).lower(),
         }
-        if cfg.get("berufsfeld"):
-            params["berufsfeld"] = cfg["berufsfeld"]
+        if berufsfeld:
+            params["berufsfeld"] = berufsfeld
 
         def appel():
             r = session.get(API_SEARCH, params=params, headers=API_HEADERS, timeout=40)
@@ -238,7 +238,9 @@ def dossier_archive(cfg):
 def charger_archive(cfg):
     """
     Lit toutes les offres archivées : archive/AAAA-MM.jsonl (une offre par ligne)
-    + archive/derniere_vue.json ({référence: date de dernière vue}).
+    + archive/derniere_vue.json ({référence: {"vue": date de dernière vue, "src": listes de recherche}}).
+    'recherches' = listes qui ont trouvé l'offre : "domaine" (mes postes) et/ou "marche" (postes voisins).
+    Les offres archivées avant l'existence des deux listes sont considérées "domaine".
     """
     dossier = dossier_archive(cfg)
     archive = {}
@@ -258,9 +260,15 @@ def charger_archive(cfg):
     if os.path.exists(chemin_vues):
         with open(chemin_vues, encoding="utf-8") as f:
             vues = json.load(f)
+    for o in archive.values():
+        o["recherches"] = sorted(set(o.get("recherches") or ["domaine"]))
     for ref, d in vues.items():
         if ref in archive:
-            archive[ref]["derniere_vue"] = d
+            if isinstance(d, dict):            # format actuel
+                archive[ref]["derniere_vue"] = d.get("vue")
+                archive[ref]["recherches"] = sorted(set(archive[ref]["recherches"]) | set(d.get("src") or []))
+            else:                              # ancien format : juste la date
+                archive[ref]["derniere_vue"] = d
     log.info("Archive : %d offres déjà connues", len(archive))
     return archive
 
@@ -278,10 +286,11 @@ def enregistrer_archive(cfg, nouvelles, archive, aujourdhui):
             if existant and not existant.endswith("\n"):
                 existant += "\n"
         champs = ("refnr", "titel", "firma", "ort", "plz", "region", "lat", "lon", "datum",
-                  "premiere_vue", "statut", "text")
+                  "premiere_vue", "recherches", "statut", "text")
         lignes = "".join(json.dumps({k: o.get(k) for k in champs}, ensure_ascii=False) + "\n" for o in nouvelles)
         ecrire_atomique(chemin, existant + lignes)
-    vues = {ref: o.get("derniere_vue") or o.get("premiere_vue") for ref, o in sorted(archive.items())}
+    vues = {ref: {"vue": o.get("derniere_vue") or o.get("premiere_vue"), "src": o.get("recherches") or ["domaine"]}
+            for ref, o in sorted(archive.items())}
     ecrire_atomique(os.path.join(dossier, "derniere_vue.json"), json.dumps(vues, ensure_ascii=False, indent=0))
     log.info("Archive enregistrée : %d nouvelles offres, %d au total", len(nouvelles), len(archive))
 
@@ -290,23 +299,32 @@ def mettre_a_jour_archive(cfg, session, aujourdhui):
     """Étapes 1-2 : recherche, téléchargement des seules nouvelles offres, archivage. Retourne l'archive."""
     archive = charger_archive(cfg)
 
-    en_ligne = {}
-    for mot in cfg["mots_cles"]:
-        try:
-            liste = lancer_recherche(session, cfg, mot)
-        except (requests.RequestException, ValueError) as e:
-            raise StatJobsError(f"Recherche '{mot}' échouée après {ESSAIS} essais ({e}). Rien n'est modifié.")
-        for o in liste:
-            m = mapper_offre(o)
-            if m["refnr"]:
-                en_ligne.setdefault(m["refnr"], m)
-        log.info("Mot-clé '%s' : %d offres (total unique en ligne : %d)", mot, len(liste), len(en_ligne))
+    # deux listes : "domaine" (mes postes -> Résumé, Offres C1, Tendances) et "marche" (postes voisins -> Tendances)
+    listes = [("domaine", cfg["mots_cles"], cfg.get("berufsfeld")),
+              ("marche", cfg.get("mots_cles_marche", []), cfg.get("berufsfeld_marche"))]
+    en_ligne, sources = {}, {}
+    for source, mots, berufsfeld in listes:
+        for mot in mots:
+            try:
+                liste = lancer_recherche(session, cfg, mot, berufsfeld)
+            except (requests.RequestException, ValueError) as e:
+                raise StatJobsError(f"Recherche '{mot}' échouée après {ESSAIS} essais ({e}). Rien n'est modifié.")
+            for o in liste:
+                m = mapper_offre(o)
+                if m["refnr"]:
+                    en_ligne.setdefault(m["refnr"], m)
+                    sources.setdefault(m["refnr"], set()).add(source)
+            log.info("[%s] mot-clé '%s' : %d offres (total unique en ligne : %d)", source, mot, len(liste),
+                     len(en_ligne))
     if not en_ligne:
         raise StatJobsError("Aucune offre trouvée : recherche suspecte (API ou paramètres). Rien n'est modifié.")
+    for ref, m in en_ligne.items():
+        m["recherches"] = sorted(sources[ref])
 
     for ref in en_ligne:
         if ref in archive:
             archive[ref]["derniere_vue"] = aujourdhui
+            archive[ref]["recherches"] = sorted(set(archive[ref].get("recherches") or []) | sources[ref])
     a_telecharger = [m for ref, m in en_ligne.items() if ref not in archive]
     log.info("Offres en ligne : %d, dont %d nouvelles à télécharger", len(en_ligne), len(a_telecharger))
 
@@ -373,10 +391,14 @@ def dedoublonner(offres, cfg):
             continue
         cle = (firme_normalisee(o["firma"]), norm(o["titel"]))
         sh = _shingles(o["text"])
-        if any(len(sh & autre) / len(sh | autre) >= seuil for autre in groupes.get(cle, []) if sh & autre):
+        garde = next((g for autre, g in groupes.get(cle, []) if sh & autre and
+                      len(sh & autre) / len(sh | autre) >= seuil), None)
+        if garde is not None:
             doublons += 1
+            # l'exemplaire gardé hérite des listes de recherche du doublon (domaine / marché)
+            garde["recherches"] = sorted(set(garde.get("recherches") or []) | set(o.get("recherches") or []))
             continue
-        groupes.setdefault(cle, []).append(sh)
+        groupes.setdefault(cle, []).append((sh, o))
         uniques.append(o)
     log.info("Dédoublonnage : %d doublons retirés, %d offres uniques", doublons, len(uniques))
     return uniques
@@ -436,7 +458,22 @@ def compiler_themes(cfg_themes):
     return out
 
 
-def classifier(offres, cfg, sprache, expressions, themes):
+def compiler_profils(cfg_profils):
+    """profils.json : type de poste déduit du TITRE ; le premier profil dont une regex correspond l'emporte."""
+    out = []
+    try:
+        for p in (cfg_profils or {}).get("profils", []):
+            out.append({"name": p["name"], "muster": [re.compile(r, re.I) for r in p["muster"]]})
+    except (re.error, KeyError) as e:
+        raise StatJobsError(f"profils.json invalide : {e}")
+    return out
+
+
+def profil_de(titre, profils, defaut="Autre"):
+    return next((p["name"] for p in profils if any(r.search(titre or "") for r in p["muster"])), defaut)
+
+
+def classifier(offres, cfg, sprache, expressions, themes, profils=None):
     cats = sprache["kategorien"]
     ref = cfg["lieu_reference"]
     rayon = float(cfg["rayon_km"])
@@ -451,6 +488,7 @@ def classifier(offres, cfg, sprache, expressions, themes):
         o["c1"] = any(cats[h["kategorie"]]["zaehlt_als_c1"] for h in o["hits"])
         corpus = f"{o['titel']} {o['text']}"
         o["themes"] = [t["name"] for t in themes if any(r.search(corpus) for r in t["muster"])] if ok else []
+        o["profil"] = profil_de(o["titel"], profils or [])
 
 
 # =========================================================================== 5. analyse automatique (analyse.json)
@@ -470,7 +508,7 @@ def _phrase(modele, valeurs):
         return modele
 
 
-def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujourdhui):
+def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujourdhui, profils=None):
     """
     Analyse par règles (aucune IA). offres = toutes les offres de l'archive, classées et dédoublonnées.
     Retourne une liste de lignes de texte : titre + phrases.
@@ -530,6 +568,8 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     for g in groupes or []:
         membres = set(g.get("termes", []))
         sujets.append(("groupes", g["name"], lambda o, m=membres: bool(m & set(o["themes"]))))
+    for n in [p["name"] for p in (profils or [])]:
+        sujets.append(("profils", n, lambda o, n=n: o.get("profil") == n))
     ind = {}
     for cible, nom, test in sujets:
         p0, p1 = part(f0, test), part(f1, test)
@@ -552,14 +592,15 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     for r in sorted(regles_cfg.get("regles", []), key=lambda r: -r.get("priorite", 0)):
         typ, prio = r.get("type", "terme"), r.get("priorite", 0)
         if typ == "orientation":
-            fam = [i for (c, _), i in ind.items() if c == "groupes"]
+            cible = r.get("cible", "groupes")
+            fam = [i for (c, _), i in ind.items() if c == cible]
             hausse = max(fam, key=lambda i: i["delta"], default=None)
             baisse = min(fam, key=lambda i: i["delta"], default=None)
             if hausse and baisse and hausse["recente"] == "hausse" and baisse["recente"] == "baisse":
                 phrases.append((prio, abs(hausse["delta"]) + abs(baisse["delta"]), _phrase(r["phrase"], {
                     "hausse": hausse["terme"], "h0": _fr(hausse["p0"]), "h1": _fr(hausse["p1"]),
                     "baisse": baisse["terme"], "b0": _fr(baisse["p0"]), "b1": _fr(baisse["p1"])})))
-                deja.update({("groupes", hausse["terme"]), ("groupes", baisse["terme"])})
+                deja.update({(cible, hausse["terme"]), (cible, baisse["terme"])})
         elif typ == "leader":
             cands = [i for (c, _), i in ind.items() if c == "termes"]
             if cands:
@@ -590,8 +631,13 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
 
 # =========================================================================== 5b. tableaux du Sheet
 
-def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, groupes=None, analyse=None):
-    """offres = offres de la période, classées et dédoublonnées, avec un texte exploitable."""
+def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archive, groupes=None, analyse=None,
+                        profils=None):
+    """
+    offres_tous = offres de la période (classées, dédoublonnées, avec texte), listes 'domaine' ET 'marche'.
+    Résumé + Offres C1 : uniquement la liste 'domaine' (mes postes). Tendances : tout (domaine + marché).
+    """
+    offres = [o for o in offres_tous if "domaine" in (o.get("recherches") or ["domaine"])]
     lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
     lib_moins = "Moins que C1 ou non précisé"
     loc = [o for o in offres if o["zone"] == "local"]
@@ -638,9 +684,13 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, g
     tab["Offres C1"] = {"values": rows, "gras": [0], "freeze": 1,
                         "col_widths": {0: 170, 1: 260, 2: 330, 3: 200, 4: 130, 5: 120, 6: 200}}
 
-    # ---------------------------------------------------------------- Tendances
+    # ---------------------------------------------------------------- Tendances (domaine + marché)
+    offres = offres_tous
+    loc = [o for o in offres if o["zone"] == "local"]
+    nL, nD = len(loc), len(offres)
     t = [["Expertise technique demandée (part des offres qui mentionnent chaque terme)"],
-         [f"Offres publiées du {debut} au {aujourdhui}. Termes modifiables dans themes.json.{note_archive}"],
+         [f"Offres publiées du {debut} au {aujourdhui} : mes postes + postes voisins (Cloud, DevOps, Platform, SRE...), "
+          f"{nD} offres. Termes modifiables dans themes.json.{note_archive}"],
          [],
          ["Terme", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"]]
     h_classement = len(t) - 1
@@ -684,6 +734,32 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, g
               "à ce moment-là sont comptées)."])
     ncols = 2 + len(themes)
 
+    # -- profils demandés (type de poste d'après le titre, profils.json)
+    noms_profils = [p["name"] for p in (profils or [])] + ["Autre"]
+    h_prof = fin_prof = h_psem = fin_psem = None
+    if profils:
+        t.append([])
+        t.append(["Profils demandés : part des offres par type de poste (d'après le titre ; règles dans profils.json)"])
+        h_prof = len(t)
+        t.append(["Profil", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"])
+        for n in noms_profils:
+            a, b = sum(o["profil"] == n for o in loc), sum(o["profil"] == n for o in offres)
+            t.append([n, pct(a, nL), pct(b, nD), a, b])
+        fin_prof = len(t) - 1
+        t.append([])
+        t.append([f"Évolution des profils - Allemagne : moyenne glissante sur {fenetre} semaines"])
+        h_psem = len(t)
+        t.append(["Semaine (lundi)"] + noms_profils)
+        if semaines:
+            w, fin = min(semaines), max(semaines)
+            while w <= fin:
+                lst = [o for k in range(fenetre) for o in semaines.get(w - timedelta(weeks=k), [])]
+                if len(lst) >= minimum:
+                    etiquette = "'" + w.isoformat() + (" *" if debut_arch and w < debut_arch else "")
+                    t.append([etiquette] + [pct(sum(o["profil"] == n for o in lst), len(lst)) for n in noms_profils])
+                w += timedelta(weeks=1)
+        fin_psem = len(t) - 1
+
     # -- un petit graphique par famille de termes (themes.json -> "groupes")
     col_de = {th["name"]: i + 1 for i, th in enumerate(themes)}
     groupes = [g for g in (groupes or []) if any(n in col_de for n in g.get("termes", []))]
@@ -694,15 +770,25 @@ def construire_tableaux(offres, cfg, themes, aujourdhui, debut, debut_archive, g
     charts = [{"type": "BAR", "stacked": False, "titre": "Termes techniques demandés (% des offres)",
                "header_row": h_classement, "last_row": fin_classement, "domain_col": 0, "series_cols": [1, 2],
                "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420, "largeur": 640}]
+    if h_prof is not None:   # répartition actuelle des profils, à droite du classement
+        charts.append({"type": "BAR", "stacked": False, "titre": "Profils demandés (% des offres)",
+                       "header_row": h_prof, "last_row": fin_prof, "domain_col": 0, "series_cols": [1, 2],
+                       "anchor_row": 2, "anchor_col": ncols + 8, "hauteur": 420, "largeur": 640})
+    courbes = []             # (titre, ligne d'en-tête, dernière ligne, colonnes)
+    if h_psem is not None and fin_psem > h_psem:
+        courbes.append(("Profils demandés - évolution (% des offres)", h_psem, fin_psem,
+                        list(range(1, len(noms_profils) + 1))))
     if fin_sem > h_sem:
-        for i, g in enumerate(groupes):
-            charts.append({"type": "LINE", "stacked": False, "titre": f"{g['name']} - évolution (% des offres)",
-                           "header_row": h_sem, "last_row": fin_sem, "domain_col": 0,
-                           "series_cols": [col_de[n] for n in g["termes"] if n in col_de],
-                           "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
-                           "y_title": "% des offres", "largeur": 640, "hauteur": 340})
+        for g in groupes:
+            courbes.append((f"{g['name']} - évolution (% des offres)", h_sem, fin_sem,
+                            [col_de[n] for n in g["termes"] if n in col_de]))
+    for i, (titre, h, f, cols) in enumerate(courbes):
+        charts.append({"type": "LINE", "stacked": False, "titre": titre, "header_row": h, "last_row": f,
+                       "domain_col": 0, "series_cols": cols,
+                       "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
+                       "y_title": "% des offres", "largeur": 640, "hauteur": 340})
     # -- analyse automatique : écrite SOUS les graphiques (même colonne que les graphiques)
-    gras = [0, h_classement, h_sem]
+    gras = [0, h_classement, h_sem] + [x for x in (h_prof, h_psem) if x is not None]
     if analyse:
         bas = max(d["anchor_row"] + math.ceil(d.get("hauteur", 340) / 21) for d in charts) + 1
         col = ncols + 1
@@ -864,6 +950,7 @@ def main(argv=None, session=None):
     expressions = compiler_expressions(sprache)          # valide les regex AVANT tout appel réseau
     themes_cfg = charger_json(cfg["themes_datei"])
     themes = compiler_themes(themes_cfg)
+    profils = compiler_profils(charger_json(cfg["profils_datei"])) if cfg.get("profils_datei") else []
     aujourdhui = date.today().isoformat()
 
     archive, nb_nouvelles = mettre_a_jour_archive(cfg, session or requests.Session(), aujourdhui)
@@ -871,7 +958,7 @@ def main(argv=None, session=None):
     # toute l'archive est classée (l'analyse a besoin de plus que la période) ; la période en est un sous-ensemble
     tous = [dict(o, datum=o.get("datum") or o.get("premiere_vue") or "") for o in archive.values()]
     debut_archive = min((o.get("premiere_vue") or aujourdhui) for o in archive.values())
-    classifier(tous, cfg, sprache, expressions, themes)
+    classifier(tous, cfg, sprache, expressions, themes, profils)
     tous = [o for o in dedoublonner(tous, cfg) if o.get("statut") == "ok"]
     debut = (date.today() - timedelta(days=int(cfg.get("periode_jours", 90)))).isoformat()
     uniques = [o for o in tous if o["datum"] >= debut]
@@ -880,17 +967,17 @@ def main(argv=None, session=None):
     if cfg.get("analyse_datei") and os.path.exists(os.path.join(BASE_DIR, cfg["analyse_datei"])):
         try:
             analyse = analyser_tendances(tous, themes, themes_cfg.get("groupes"), charger_json(cfg["analyse_datei"]),
-                                         debut_archive, aujourdhui)
+                                         debut_archive, aujourdhui, profils)
             for ligne in analyse:
                 log.info("ANALYSE : %s", ligne)
         except Exception as e:  # noqa: BLE001 - l'analyse ne doit jamais empêcher la mise à jour du Sheet
             log.warning("Analyse automatique impossible (%s) : Sheet construit sans analyse", e)
 
     tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive, themes_cfg.get("groupes"),
-                              analyse)
-    sauvegarder_local(tab)
+                              analyse, profils)
     sauvegarder_local(tab)
 
+    uniques = [o for o in uniques if "domaine" in (o.get("recherches") or ["domaine"])]   # chiffres C1 = mes postes
     loc = [o for o in uniques if o["zone"] == "local"]
     log.info("RÉSULTAT (%s -> %s) Allemagne : %d offres, %d C1 ou plus (%.1f %%)", debut, aujourdhui,
              len(uniques), sum(o["c1"] for o in uniques), pct(sum(o["c1"] for o in uniques), len(uniques)))
