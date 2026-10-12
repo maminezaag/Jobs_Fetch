@@ -6,6 +6,7 @@
     "\\b = limite de mot : \\bhorizon\\b trouve 'Horizon' mais pas 'Horizont'.",
     "POUR AJOUTER un terme : copie une ligne et adapte. Il s'applique aussi aux anciennes offres de l'archive.",
     "POUR EN RETIRER un : supprime sa ligne.",
+    "groupes : un petit graphique d'évolution par famille. Un terme absent des groupes va dans 'Autres'.",
     "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
   ],
 
@@ -24,5 +25,13 @@
     { "name": "Linux",      "muster": ["\\blinux\\b"] },
     { "name": "VMware",     "muster": ["\\bvmware\\b", "\\bvsphere\\b", "\\besxi?\\b", "\\bvcenter\\b"] },
     { "name": "Proxmox",    "muster": ["\\bproxmox\\b"] }
+  ],
+
+  "groupes": [
+    { "name": "Linux",           "termes": ["Linux"] },
+    { "name": "Virtualisation",  "termes": ["VMware", "Proxmox", "Citrix", "Horizon"] },
+    { "name": "Cloud",           "termes": ["Azure", "AWS"] },
+    { "name": "Automatisation",  "termes": ["Ansible", "Terraform", "Puppet", "CI/CD", "Kubernetes"] },
+    { "name": "Microsoft",       "termes": ["Exchange", "Intune"] }
   ]
 }
