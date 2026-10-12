@@ -1,0 +1,91 @@
+{
+  "_hilfe": [
+    "Règles de l'ANALYSE AUTOMATIQUE écrite sous les courbes de l'onglet 'Tendances'. Aucune IA : conditions + phrases.",
+    "",
+    "COMMENT LE SCRIPT CALCULE",
+    "  Il découpe le temps en 3 fenêtres de 'fenetre_semaines' semaines (4 par défaut), en partant de la semaine en cours :",
+    "    p0 = part des offres qui citent le terme sur la fenêtre RÉCENTE      (semaines 0 à 3)",
+    "    p1 = part sur la fenêtre PRÉCÉDENTE                                   (semaines 4 à 7)",
+    "    p2 = part sur la fenêtre d'AVANT                                      (semaines 8 à 11)",
+    "  'recente'    = évolution p1 -> p0 ; 'precedente' = évolution p2 -> p1",
+    "  Chaque évolution vaut 'hausse' / 'baisse' si l'écart dépasse seuil_points (en points de %) ET n'est pas dû au",
+    "  hasard (test statistique : confiance_z = 1.96 -> 95 % de confiance ; 1.65 -> 90 %, plus sensible). Sinon 'stable'.",
+    "  Familles (groupes de themes.json) : part des offres qui citent AU MOINS UN terme de la famille.",
+    "",
+    "TYPES DE RÈGLES",
+    "  orientation : compare les familles -> la famille qui monte le plus vs celle qui baisse le plus",
+    "  leader      : le terme le plus demandé",
+    "  apparition  : terme presque absent avant (p1 < seuil_absent) qui dépasse seuil_apparition maintenant",
+    "  terme       : conditions 'si' sur 'recente' / 'precedente' ; 'cible' = termes | groupes",
+    "  Un même terme ne reçoit qu'UNE phrase : la règle de plus haute 'priorite' qui s'applique.",
+    "",
+    "MOTS À PLACER DANS LES PHRASES (entre accolades)",
+    "  {terme} {p0} {p1} {p2} {delta} (p0-p1) {delta_prec} (p1-p2) {semaines} (taille d'une fenêtre)",
+    "  orientation : {hausse} {h1} {h0} {baisse} {b1} {b0}",
+    "",
+    "MODIFIER : change les phrases, les seuils, les priorités ; ajoute ou supprime une règle (copie un bloc).",
+    "inclure_semaines_avant_archive : true = analyse dès maintenant avec les semaines antérieures à l'archive",
+    "  (incomplètes -> moins fiable). false = attendre d'avoir assez de semaines complètes (recommandé).",
+    "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément d'une liste."
+  ],
+
+  "parametres": {
+    "fenetre_semaines": 4,
+    "seuil_points": 1.5,
+    "confiance_z": 1.96,
+    "seuil_absent": 1.0,
+    "seuil_apparition": 2.0,
+    "min_offres_fenetre": 30,
+    "max_phrases": 8,
+    "inclure_semaines_avant_archive": false
+  },
+
+  "messages": {
+    "titre": "Analyse automatique du {date} (règles du fichier analyse.json)",
+    "pas_assez": "Pas encore assez de recul pour analyser l'évolution du marché : l'analyse démarrera vers le {date_debut}, quand l'archive couvrira assez de semaines complètes.",
+    "rien": "Aucun mouvement notable ces {semaines} dernières semaines : le marché est stable."
+  },
+
+  "regles": [
+    { "nom": "orientation_marche", "type": "orientation", "priorite": 100,
+      "phrase": "Le marché s'oriente vers {hausse} ({h1} % → {h0} % des offres) tandis que {baisse} recule ({b1} % → {b0} %)." },
+
+    { "nom": "leader", "type": "leader", "priorite": 90,
+      "phrase": "{terme} reste la compétence la plus demandée ({p0} % des offres)." },
+
+    { "nom": "retournement_hausse", "type": "terme", "cible": "termes", "priorite": 80,
+      "si": { "precedente": "baisse", "recente": "hausse" },
+      "phrase": "{terme} repart à la hausse ({p1} % → {p0} %) après une période de baisse ({p2} % → {p1} %)." },
+
+    { "nom": "retournement_baisse", "type": "terme", "cible": "termes", "priorite": 80,
+      "si": { "precedente": "hausse", "recente": "baisse" },
+      "phrase": "{terme} recule à nouveau ({p1} % → {p0} %) après avoir progressé ({p2} % → {p1} %)." },
+
+    { "nom": "apparition", "type": "apparition", "cible": "termes", "priorite": 75,
+      "phrase": "{terme} commence à apparaître dans les offres ({p1} % → {p0} %)." },
+
+    { "nom": "famille_hausse_continue", "type": "terme", "cible": "groupes", "priorite": 72,
+      "si": { "precedente": "hausse", "recente": "hausse" },
+      "phrase": "La famille {terme} gagne du terrain de façon continue ({p2} % → {p1} % → {p0} %)." },
+
+    { "nom": "famille_baisse_continue", "type": "terme", "cible": "groupes", "priorite": 72,
+      "si": { "precedente": "baisse", "recente": "baisse" },
+      "phrase": "La famille {terme} perd du terrain de façon continue ({p2} % → {p1} % → {p0} %)." },
+
+    { "nom": "hausse_continue", "type": "terme", "cible": "termes", "priorite": 70,
+      "si": { "precedente": "hausse", "recente": "hausse" },
+      "phrase": "{terme} progresse régulièrement ({p2} % → {p1} % → {p0} %)." },
+
+    { "nom": "baisse_continue", "type": "terme", "cible": "termes", "priorite": 70,
+      "si": { "precedente": "baisse", "recente": "baisse" },
+      "phrase": "{terme} recule régulièrement ({p2} % → {p1} % → {p0} %)." },
+
+    { "nom": "hausse_recente", "type": "terme", "cible": "termes", "priorite": 50,
+      "si": { "recente": "hausse" },
+      "phrase": "{terme} progresse ces {semaines} dernières semaines ({p1} % → {p0} %)." },
+
+    { "nom": "baisse_recente", "type": "terme", "cible": "termes", "priorite": 50,
+      "si": { "recente": "baisse" },
+      "phrase": "{terme} recule ces {semaines} dernières semaines ({p1} % → {p0} %)." }
+  ]
+}
