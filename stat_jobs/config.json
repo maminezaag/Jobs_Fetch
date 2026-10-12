@@ -1,0 +1,37 @@
+{
+  "_hilfe": [
+    "Configuration technique de stat_jobs.py. Aucun secret ici (la clé Google et l'identifiant du Sheet",
+    "viennent des secrets GitHub GCP_SA_KEY et STAT_JOBS_SHEET_ID).",
+    "POUR AJOUTER un mot-clé de recherche : ajoute une ligne dans 'mots_cles'. POUR EN RETIRER un : supprime la ligne.",
+    "'berufsfeld' = filtre domaine de l'API (le même que job_watcher). Mets null (sans guillemets) pour le désactiver.",
+    "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément d'une liste."
+  ],
+
+  "mots_cles": [
+    "Systemadministrator",
+    "IT-Administrator",
+    "Linux Administrator",
+    "IT Support",
+    "System Engineer"
+  ],
+
+  "jours": 90,
+  "berufsfeld": "IT-Netzwerktechnik, -Administration, -Organisation",
+  "angebotsart": 1,
+  "zeitarbeit": true,
+
+  "lieu_reference": {
+    "nom": "Oldenburg",
+    "latitude": 53.1435,
+    "longitude": 8.2146
+  },
+  "rayon_km": 60,
+
+  "themes_datei": "themes.json",
+  "sprache_datei": "sprache.json",
+
+  "max_ohne_text_anteil": 0.05,
+
+  "parallele_anfragen": 3,
+  "pause_s": 0.15
+}
