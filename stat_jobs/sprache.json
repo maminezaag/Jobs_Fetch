@@ -34,5 +34,20 @@
       "muster": ["sehr\\s+gut\\w*\\s+(?:\\w+[\\s,-]+){0,3}?deutsch\\w*",
                  "sehr\\s+gut\\w*\\s+kenntnisse\\w*\\s+(?:in\\s+|der\\s+)?(?:der\\s+)?deutsch\\w*"],
       "ausschluss": ["\\bB1\\b", "\\bB2\\b", "\\bA2\\b"], "ausschluss_vor": 0, "ausschluss_nach": 90 }
+  ],
+
+  "_hilfe_niveaux_info": [
+    "niveaux_info : niveau affiché dans l'onglet 'Offres B2 ou moins' (colonne 'Niveau indiqué'). Simple affichage,",
+    "ne change aucun chiffre. Les règles sont testées DANS L'ORDRE : la première qui correspond l'emporte.",
+    "Pour B2/B1/A2, le niveau doit être écrit à moins de 60 caractères de 'Deutsch' (pour ne pas prendre 'Englisch B2').",
+    "Aucune règle ne correspond -> 'non précisé'."
+  ],
+  "niveaux_info": [
+    { "name": "B2", "muster": ["deutsch[^*•]{0,60}?\\bB2\\b", "\\bB2\\b[^*•]{0,40}?deutsch"] },
+    { "name": "B1", "muster": ["deutsch[^*•]{0,60}?\\bB1\\b", "\\bB1\\b[^*•]{0,40}?deutsch"] },
+    { "name": "A2", "muster": ["deutsch[^*•]{0,60}?\\bA2\\b", "\\bA2\\b[^*•]{0,40}?deutsch"] },
+    { "name": "gute Deutschkenntnisse", "muster": ["(?<!sehr )\\bgute?\\w*\\s+(?:\\w+[\\s,-]+){0,3}?deutsch\\w*", "deutsch\\w*\\s+(?:in wort und schrift\\s+)?(?:auf\\s+)?gut"] },
+    { "name": "Grundkenntnisse", "muster": ["grundkenntnisse\\w*\\s+(?:in\\s+|der\\s+)?(?:der\\s+)?deutsch", "deutsch\\w*[^*•]{0,20}?grundkenntnisse"] },
+    { "name": "Deutsch demandé (sans niveau)", "muster": ["deutschkenntnisse", "deutsch in wort und schrift", "deutschsprachig"] }
   ]
 }
