@@ -469,7 +469,7 @@ def compiler_profils(cfg_profils):
     return out
 
 
-def profil_de(titre, profils, defaut="Autre"):
+def profil_de(titre, profils, defaut="Other"):
     return next((p["name"] for p in profils if any(r.search(titre or "") for r in p["muster"])), defaut)
 
 
@@ -495,13 +495,13 @@ def classifier(offres, cfg, sprache, expressions, themes, profils=None):
         o["profil"] = profil_de(o["titel"], profils or [])
         # niveau affiché dans l'onglet "Offres B2 ou moins" (première règle de niveaux_info qui correspond)
         txt = f"{o['titel']}. {o['text']}" if ok else ""
-        o["niveau"] = next((n for n, motifs in niveaux if any(r.search(txt) for r in motifs)), "non précisé")
+        o["niveau"] = next((n for n, motifs in niveaux if any(r.search(txt) for r in motifs)), "not specified")
 
 
 # =========================================================================== 5. analyse automatique (analyse.json)
 
 def _fr(x):
-    return f"{x:.1f}".replace(".", ",")
+    return f"{x:.1f}"
 
 
 def _phrase(modele, valeurs):
@@ -527,8 +527,8 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     mini = int(P.get("min_offres_fenetre", 30))
     W = lundi(aujourdhui)
     debut_fiable = None if P.get("inclure_semaines_avant_archive") else lundi(debut_archive)
-    titre = _phrase(M.get("titre", "Analyse automatique du {date}"),
-                    {"date": datetime.strptime(aujourdhui, "%Y-%m-%d").strftime("%d.%m.%Y")})
+    titre = _phrase(M.get("titre", "Automatic analysis of {date}"),
+                    {"date": aujourdhui})
 
     par_semaine = {}
     for o in offres:
@@ -547,8 +547,8 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     f0, f1, f2 = fenetre(0), fenetre(1), fenetre(2)
     if f0 is None or f1 is None:
         pret = (debut_fiable or W) + timedelta(weeks=2 * F - 1)
-        return [titre, _phrase(M.get("pas_assez", "Pas encore assez de recul."),
-                               {"date_debut": pret.strftime("%d.%m.%Y"), "semaines": F})]
+        return [titre, _phrase(M.get("pas_assez", "Not enough history yet."),
+                               {"date_debut": pret.isoformat(), "semaines": F})]
 
     zmin = float(P.get("confiance_z", 1.96))
 
@@ -632,7 +632,7 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     phrases.sort(key=lambda x: (-x[0], -x[1]))
     texte = [p for _, _, p in phrases[:int(P.get("max_phrases", 8))]]
     if len(texte) <= 1:     # seulement le leader (ou rien) : marché stable
-        texte.append(_phrase(M.get("rien", "Aucun mouvement notable."), {"semaines": F}))
+        texte.append(_phrase(M.get("rien", "No notable movement."), {"semaines": F}))
     return [titre] + texte
 
 
@@ -646,55 +646,55 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
     """
     offres = [o for o in offres_tous if "domaine" in (o.get("recherches") or ["domaine"])]
     lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
-    lib_moins = "Moins que C1 ou non précisé"
+    lib_moins = "Below C1 or not specified"
     loc = [o for o in offres if o["zone"] == "local"]
     nL, nD = len(loc), len(offres)
     c1L, c1D = sum(o["c1"] for o in loc), sum(o["c1"] for o in offres)
     tab = {}
     note_archive = ("" if debut_archive <= debut else
-                    f" Archive démarrée le {debut_archive} : les offres retirées avant cette date ne sont pas comptées.")
+                    f" Archive started on {debut_archive}: offers removed before that date are not counted.")
 
     # ---------------------------------------------------------------- Résumé
-    r = [["Offres IT de mon domaine exigeant un allemand C1 ou plus"],
-         [f"Offres publiées du {debut} au {aujourdhui} (encore en ligne ou déjà retirées). "
-          f"Mise à jour : {aujourdhui}.{note_archive}"],
+    r = [["IT job offers in my field requiring German at C1 level or higher"],
+         [f"Offers published from {debut} to {aujourdhui} (still online or already removed). "
+          f"Updated: {aujourdhui}.{note_archive}"],
          [],
-         ["", lib_local, "Allemagne"],
-         ["Offres analysées", nL, nD],
-         ["C1 ou plus (nombre d'offres)", c1L, c1D],
-         ["C1 ou plus (%)", pct(c1L, nL), pct(c1D, nD)],
-         [f"{lib_moins} (nombre d'offres)", nL - c1L, nD - c1D],
+         ["", lib_local, "Germany"],
+         ["Offers analysed", nL, nD],
+         ["C1 or higher (number of offers)", c1L, c1D],
+         ["C1 or higher (%)", pct(c1L, nL), pct(c1D, nD)],
+         [f"{lib_moins} (number of offers)", nL - c1L, nD - c1D],
          [f"{lib_moins} (%)", pct(nL - c1L, nL), pct(nD - c1D, nD)],
          [], []]
     h1 = len(r)
-    r.append(["Données du graphique", "C1 ou plus", lib_moins])
+    r.append(["Chart data", "C1 or higher", lib_moins])
     r.append([lib_local, pct(c1L, nL), pct(nL - c1L, nL)])
-    r.append(["Allemagne", pct(c1D, nD), pct(nD - c1D, nD)])
-    tab["Résumé"] = {
+    r.append(["Germany", pct(c1D, nD), pct(nD - c1D, nD)])
+    tab["Summary"] = {
         "values": r, "gras": [0, 3], "gris": (h1, h1 + 2), "col_widths": {0: 330, 1: 150, 2: 120},
-        "charts": [{"type": "COLUMN", "stacked": True, "titre": "Niveau d'allemand exigé (% des offres)",
+        "charts": [{"type": "COLUMN", "stacked": True, "titre": "German level required (% of offers)",
                     "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
-                    "anchor_row": 2, "anchor_col": 4, "y_title": "% des offres"}]}
+                    "anchor_row": 2, "anchor_col": 4, "y_title": "% of offers"}]}
 
     # ---------------------------------------------------------------- Offres C1 / Offres B2 ou moins
     def liste_offres(selection, derniere_col, valeur):
-        rows = [["Zone", "Entreprise", "Titre", "Lieu", "Date de publication", "Lien", derniere_col]]
+        rows = [["Zone", "Company", "Title", "Location", "Publication date", "Link", derniere_col]]
         ordre = (sorted([o for o in selection if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True) +
                  sorted([o for o in selection if o["zone"] != "local"], key=lambda o: o["datum"], reverse=True))
         for o in ordre:
-            lieu = f"{o.get('plz') or ''} {o.get('ort') or ''}".strip() or o.get("region") or "non indiqué"
+            lieu = f"{o.get('plz') or ''} {o.get('ort') or ''}".strip() or o.get("region") or "not stated"
             rows.append([cellule(x) for x in [
-                lib_local if o["zone"] == "local" else "Reste de l'Allemagne",
+                lib_local if o["zone"] == "local" else "Rest of Germany",
                 o["firma"], o["titel"], lieu, o["datum"],
                 LIEN_OFFRE.format(urllib.parse.quote(o["refnr"])), valeur(o)]])
         return {"values": rows, "gras": [0], "freeze": 1,
                 "col_widths": {0: 170, 1: 260, 2: 330, 3: 200, 4: 130, 5: 120, 6: 220}}
 
-    tab["Offres C1"] = liste_offres([o for o in offres if o["c1"]], "Expression(s)",
+    tab["C1 Offers"] = liste_offres([o for o in offres if o["c1"]], "Expression(s)",
                                     lambda o: " / ".join(h["name"] for h in o["hits"]))
     # tout ce qui n'est pas "C1 ou plus" (= ligne "Moins que C1 ou non précisé" du Résumé), y compris sans mention
-    tab["Offres B2 ou moins"] = liste_offres([o for o in offres if not o["c1"]], "Niveau indiqué",
-                                             lambda o: o.get("niveau") or "non précisé")
+    tab["B2 or Lower Offers"] = liste_offres([o for o in offres if not o["c1"]], "Stated level",
+                                             lambda o: o.get("niveau") or "not specified")
 
     # ---------------------------------------------------------------- Tendances (domaine + marché)
     offres = offres_tous
@@ -708,8 +708,8 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
         w = lundi(o["datum"])
         if w:
             semaines.setdefault(w, []).append(o)
-    entete = [f"Offres publiées du {debut} au {aujourdhui} : mes postes + postes voisins (Cloud, DevOps, Platform, "
-              f"SRE...), {nD} offres. Outils modifiables dans themes.json.{note_archive}"]
+    entete = [f"Offers published from {debut} to {aujourdhui}: my roles + neighbouring roles (Cloud, DevOps, Platform, "
+              f"SRE...), {nD} offers. Tools can be edited in themes.json.{note_archive}"]
 
     def classement(noms):
         lignes = []
@@ -717,11 +717,11 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
             a, b = sum(n in o["themes"] for o in loc), sum(n in o["themes"] for o in offres)
             lignes.append([n, pct(a, nL), pct(b, nD), a, b])
         lignes.sort(key=lambda x: x[2], reverse=True)
-        return [["Outil", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"]] + lignes
+        return [["Tool", f"% {lib_local}", "% Germany", f"Offers {lib_local}", "Offers Germany"]] + lignes
 
     # -- onglet de synthèse : analyse automatique + classement global (graphique : top 25)
     top = int(cfg.get("tendance_top_synthese", 25))
-    t = [["Tendances - synthèse : outils les plus demandés et analyse automatique"], entete, []]
+    t = [["Trends - overview: most requested tools and automatic analysis"], entete, []]
     gras = [0]
     if analyse:
         gras.append(len(t))
@@ -731,29 +731,29 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
     h = len(t)
     t += classement([th["name"] for th in themes])
     gras.append(h)
-    tab["Tendances Synthèse"] = {
+    tab["Trends Overview"] = {
         "values": t, "gras": gras, "col_widths": {0: 230},
-        "charts": [{"type": "BAR", "stacked": False, "titre": f"Top {top} des outils demandés (% des offres)",
+        "charts": [{"type": "BAR", "stacked": False, "titre": f"Top {top} requested tools (% of offers)",
                     "header_row": h, "last_row": min(h + top, len(t) - 1), "domain_col": 0, "series_cols": [1, 2],
                     "anchor_row": 2, "anchor_col": 6, "hauteur": 760, "largeur": 700}]}
 
     # -- un onglet par thème : classement de ses outils + un graphique d'évolution par volet
     vol = {g["name"]: g["termes"] for g in (groupes or [])}
     noms_connus = {th["name"] for th in themes}
-    for ong in (onglets or [{"name": "Tendances", "groupes": list(vol)}]):
+    for ong in (onglets or [{"name": "Trends", "groupes": list(vol)}]):
         volets = [(g, [n for n in vol.get(g, []) if n in noms_connus]) for g in ong["groupes"] if vol.get(g)]
         noms = list(dict.fromkeys(n for _, ts in volets for n in ts))      # sans doublon, ordre conservé
         if not noms:
             continue
-        t = [[f"{ong['name']} : part des offres qui mentionnent chaque outil"], entete, []]
+        t = [[f"{ong['name']}: share of offers mentioning each tool"], entete, []]
         h_cl = len(t)
         t += classement(noms)
         fin_cl = len(t) - 1
         t.append([])
-        t.append([f"Évolution - Allemagne : moyenne glissante sur {fenetre} semaines (une semaine n'est affichée que "
-                  f"si sa fenêtre contient au moins {minimum} offres)"])
+        t.append([f"Evolution - Germany: {fenetre}-week rolling average (a week is shown only "
+                  f"if its window contains at least {minimum} offers)"])
         h_sem = len(t)
-        t.append(["Semaine (lundi)"] + noms + ["Offres dans la fenêtre"])
+        t.append(["Week (Monday)"] + noms + ["Offers in window"])
         if semaines:
             w, fin = min(semaines), max(semaines)
             while w <= fin:
@@ -766,40 +766,40 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
                 w += timedelta(weeks=1)
         fin_sem = len(t) - 1
         if fin_sem == h_sem:
-            t.append(["(pas encore assez d'offres pour tracer une évolution)"])
+            t.append(["(not enough offers yet to plot an evolution)"])
         t.append([])
-        t.append(["* semaine antérieure au démarrage de l'archive : incomplète (seules les offres encore en ligne "
-                  "à ce moment-là sont comptées)."])
+        t.append(["* week before the archive started: incomplete (only offers still online at that time "
+                  "are counted)."])
         ncols = max(2 + len(noms), 6)
         col_de = {n: i + 1 for i, n in enumerate(noms)}
-        charts = [{"type": "BAR", "stacked": False, "titre": f"{ong['name']} : outils demandés (% des offres)",
+        charts = [{"type": "BAR", "stacked": False, "titre": f"{ong['name']}: requested tools (% of offers)",
                    "header_row": h_cl, "last_row": fin_cl, "domain_col": 0, "series_cols": [1, 2],
                    "anchor_row": 2, "anchor_col": ncols + 1, "hauteur": 420, "largeur": 640}]
         if fin_sem > h_sem:
             for i, (g, ts) in enumerate(volets):
-                charts.append({"type": "LINE", "stacked": False, "titre": f"{g} - évolution (% des offres)",
+                charts.append({"type": "LINE", "stacked": False, "titre": f"{g} - evolution (% of offers)",
                                "header_row": h_sem, "last_row": fin_sem, "domain_col": 0,
                                "series_cols": [col_de[n] for n in ts],
                                "anchor_row": 25 + (i // 2) * 19, "anchor_col": ncols + 1 + (i % 2) * 7,
-                               "y_title": "% des offres", "largeur": 640, "hauteur": 340})
+                               "y_title": "% of offers", "largeur": 640, "hauteur": 340})
         tab[ong["name"]] = {"values": t, "gras": [0, h_cl, h_sem], "col_widths": {0: 230},
                             "extra_cols": ncols + 16, "charts": charts}
 
     # ---------------------------------------------------------------- Profils (type de poste, d'après le titre)
     if profils:
-        noms = [p["name"] for p in profils] + ["Autre"]
-        pr = [["Profils demandés : part des offres par type de poste (d'après le titre ; règles dans profils.json)"],
-              [f"Offres publiées du {debut} au {aujourdhui} : mes postes + postes voisins, {nD} offres."],
+        noms = [p["name"] for p in profils] + ["Other"]
+        pr = [["Requested profiles: share of offers by job type (based on the title; rules in profils.json)"],
+              [f"Offers published from {debut} to {aujourdhui}: my roles + neighbouring roles, {nD} offers."],
               [],
-              ["Profil", f"% {lib_local}", "% Allemagne", f"Offres {lib_local}", "Offres Allemagne"]]
+              ["Profile", f"% {lib_local}", "% Germany", f"Offers {lib_local}", "Offers Germany"]]
         lignes = []
         for n in noms:
             a, b = sum(o["profil"] == n for o in loc), sum(o["profil"] == n for o in offres)
             lignes.append([n, pct(a, nL), pct(b, nD), a, b])
         lignes.sort(key=lambda x: x[2], reverse=True)
         pr += lignes
-        tab["Profils"] = {"values": pr, "gras": [0, 3], "col_widths": {0: 260},
-                          "charts": [{"type": "BAR", "stacked": False, "titre": "Profils demandés (% des offres)",
+        tab["Profiles"] = {"values": pr, "gras": [0, 3], "col_widths": {0: 260},
+                          "charts": [{"type": "BAR", "stacked": False, "titre": "Requested profiles (% of offers)",
                                       "header_row": 3, "last_row": len(pr) - 1, "domain_col": 0,
                                       "series_cols": [1, 2], "anchor_row": 2, "anchor_col": 6,
                                       "hauteur": 400, "largeur": 640}]}
