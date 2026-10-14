@@ -154,5 +154,54 @@
 
       { "nom": "Homeoffice / Remote / Hybrid", "poids": 3, "mots": ["Homeoffice", "Home-Office", "Remote", "hybrides Arbeiten", "mobiles Arbeiten", "Telearbeit"] }
     ]
+  },
+
+  "francais": {
+    "_aide": [
+      "Offres demandant le FRANÇAIS (langue maternelle du candidat) dans l'IT, PARTOUT en Allemagne.",
+      "'mots_cles' : recherches supplémentaires, nationales, SANS le filtre 'domaine' (ces offres sont",
+      "  souvent classées hors de la catégorie IT par l'Arbeitsagentur).",
+      "'titre_doit_contenir' : une offre trouvée UNIQUEMENT par ces recherches n'est gardée que si son titre",
+      "  contient un de ces mots (évite les postes de service client / vente en français).",
+      "'mots_detection' : expressions qui prouvent que l'offre demande le français. Cherchées dans le titre et",
+      "  le texte de TOUTES les offres (aussi celles des mots-clés habituels). Comme ailleurs dans ce fichier,",
+      "  recherche de texte simple, insensible à la casse. Pas de 'Französisch' seul : il attraperait",
+      "  'französischer Mutterkonzern' ou 'Kunden in Frankreich'.",
+      "RÈGLES pour une offre où le français est détecté :",
+      "  - elle passe le seuil de points AUTOMATIQUEMENT ;",
+      "  - elle n'est JAMAIS écartée pour la distance (toute l'Allemagne) ;",
+      "  - elle est quand même ÉLIMINÉE si elle exige un allemand C1/C2/natif. Seules les expressions",
+      "    d'élimination qui contiennent le mot 'Deutsch' comptent alors : 'Niveau C1' ou 'mindestens C1'",
+      "    seuls viseraient souvent le FRANÇAIS ('Französisch auf Niveau C1') et ne l'éliminent pas.",
+      "POUR AJOUTER / RETIRER : ajoute ou supprime une ligne dans la liste concernée."
+    ],
+    "mots_cles": [
+      "IT Support Französisch",
+      "Systemadministrator Französisch",
+      "IT Administrator Französisch",
+      "Service Desk Französisch",
+      "Helpdesk Französisch",
+      "French speaking IT Support"
+    ],
+    "titre_doit_contenir": [
+      "IT", "EDV", "Support", "Admin", "System", "Helpdesk", "Help Desk", "Service Desk", "Servicedesk",
+      "Netzwerk", "Network", "Infrastruktur", "Infrastructure", "Linux", "Windows", "Client", "Workplace",
+      "Engineer", "Techniker", "Informatik"
+    ],
+    "mots_detection": [
+      "Französischkenntnisse", "Französisch-Kenntnisse", "Kenntnisse in Französisch",
+      "Kenntnisse der französischen Sprache", "französische Sprachkenntnisse",
+      "fließend Französisch", "fließendes Französisch", "Französisch fließend",
+      "verhandlungssicheres Französisch", "verhandlungssicher Französisch", "Französisch verhandlungssicher",
+      "Französisch in Wort und Schrift", "Französisch auf",
+      "Deutsch und Französisch", "Deutsch- und Französisch", "Englisch und Französisch", "Englisch- und Französisch",
+      "Französisch und Englisch", "Französisch und Deutsch", "Französisch- und Englisch", "Französisch- und Deutsch",
+      "Französisch als Muttersprache", "Muttersprache Französisch", "Französisch (Muttersprache",
+      "Französisch C1", "Französisch B2", "Französisch (C1", "Französisch (B2",
+      "Französisch von Vorteil", "Französisch wünschenswert", "Französisch ist ein Plus",
+      "französischsprachig", "frankophon",
+      "French speaking", "French-speaking", "fluent French", "fluent in French", "French language",
+      "proficiency in French", "French skills"
+    ]
   }
 }
