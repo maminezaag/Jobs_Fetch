@@ -1,9 +1,9 @@
 {
   "_hilfe": [
-    "Type de poste déduit du TITRE de l'offre (graphique 'Profils demandés' de l'onglet Tendances).",
+    "Type de poste déduit du TITRE de l'offre (onglet 'Profiles').",
     "Les profils sont testés DANS L'ORDRE : le premier dont une regex apparaît dans le titre l'emporte.",
     "Exemple : 'Cloud Engineer Linux' -> Cloud (Cloud est testé avant Linux / Infrastructure).",
-    "Un titre qui ne correspond à aucun profil est classé 'Autre'.",
+    "Un titre qui ne correspond à aucun profil est classé 'Other'.",
     "POUR AJOUTER un profil : copie une ligne, place-la au bon rang. POUR EN RETIRER un : supprime sa ligne.",
     "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
   ],
@@ -11,10 +11,10 @@
   "profils": [
     { "name": "DevOps / SRE",     "muster": ["devops", "site reliability", "\\bsre\\b"] },
     { "name": "Cloud",            "muster": ["cloud", "\\bazure\\b", "\\baws\\b"] },
-    { "name": "Platform / Conteneurs", "muster": ["platform", "kubernetes", "\\bk8s\\b", "openshift"] },
-    { "name": "VDI / Virtualisation",  "muster": ["\\bvdi\\b", "citrix", "virtuali[sz]", "vmware", "horizon\\b"] },
+    { "name": "Platform / Containers", "muster": ["platform", "kubernetes", "\\bk8s\\b", "openshift"] },
+    { "name": "VDI / Virtualization",  "muster": ["\\bvdi\\b", "citrix", "virtuali[sz]", "vmware", "horizon\\b"] },
     { "name": "Support",          "muster": ["support", "helpdesk", "help desk", "service ?desk", "(1st|2nd|first|second)[\\s-]?level"] },
-    { "name": "Administrateur",   "muster": ["admin"] },
-    { "name": "Ingénieur système / infrastructure", "muster": ["engineer", "ingenieur", "infrastru", "linux"] }
+    { "name": "Administrator",   "muster": ["admin"] },
+    { "name": "Systems / infrastructure engineer", "muster": ["engineer", "ingenieur", "infrastru", "linux"] }
   ]
 }
