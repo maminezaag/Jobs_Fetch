@@ -1,12 +1,12 @@
 {
   "_hilfe": [
-    "Outils suivis dans les onglets 'Tendances ...' (aucun lien avec le niveau d'allemand).",
+    "Outils suivis dans les onglets 'Trends ...' (aucun lien avec le niveau d'allemand).",
     "themes  : chaque outil = 'name' (affiché) + 'muster' (expressions régulières, insensibles à la casse).",
     "          Une offre compte pour un outil si AU MOINS UNE regex apparaît dans le titre ou le texte.",
     "          \\b = limite de mot : \\bhorizon\\b trouve 'Horizon' mais pas 'Horizont'.",
     "groupes : un VOLET = un graphique d'évolution (5 à 7 outils maximum pour rester lisible).",
     "          Un outil peut être dans plusieurs volets (ex. Sophos : Firewall ET Antivirus).",
-    "onglets : quels volets vont dans quel onglet 'Tendances ...' (l'onglet 'Tendances Synthèse' montre tout).",
+    "onglets : quels volets vont dans quel onglet 'Trends ...' (l'onglet 'Trends Overview' montre tout).",
     "POUR AJOUTER un outil : ajoute-le dans 'themes' PUIS dans un volet de 'groupes'. Il s'applique aussi aux",
     "          anciennes offres de l'archive (tout est reclassé à chaque exécution).",
     "ATTENTION : dans du JSON, chaque antislash d'une regex doit être doublé (\\\\b pour \\b)."
@@ -115,31 +115,31 @@
   "groupes": [
     {"name": "Firewall", "termes": ["Fortinet", "Palo Alto", "Sophos", "Securepoint", "Cisco Firewall", "Check Point", "pfSense"]},
     {"name": "Antivirus / Endpoint", "termes": ["Microsoft Defender", "Sophos", "Kaspersky", "CrowdStrike", "Trend Micro", "Bitdefender"]},
-    {"name": "Réseau", "termes": ["Cisco", "HPE Aruba", "Juniper", "LANCOM", "Ubiquiti", "VPN", "SD-WAN"]},
-    {"name": "Virtualisation", "termes": ["VMware", "Hyper-V", "Proxmox", "Nutanix", "KVM"]},
-    {"name": "Bureau à distance / VDI", "termes": ["Citrix", "Omnissa Horizon", "Microsoft RDS", "Azure Virtual Desktop", "Windows 365"]},
-    {"name": "Sauvegarde", "termes": ["Veeam", "Commvault", "Acronis", "Veritas", "Rubrik"]},
-    {"name": "Stockage", "termes": ["NetApp", "Dell EMC", "HPE Storage", "Pure Storage", "Ceph", "TrueNAS"]},
-    {"name": "Cloud public", "termes": ["Azure", "AWS", "Google Cloud"]},
-    {"name": "Cloud souverain", "termes": ["STACKIT", "IONOS", "Open Telekom Cloud", "Hetzner", "OpenStack"]},
-    {"name": "Automatisation", "termes": ["Ansible", "Terraform", "Puppet"]},
-    {"name": "Conteneurs", "termes": ["Docker", "Kubernetes", "OpenShift", "Rancher", "Helm"]},
+    {"name": "Network", "termes": ["Cisco", "HPE Aruba", "Juniper", "LANCOM", "Ubiquiti", "VPN", "SD-WAN"]},
+    {"name": "Virtualization", "termes": ["VMware", "Hyper-V", "Proxmox", "Nutanix", "KVM"]},
+    {"name": "Remote desktop / VDI", "termes": ["Citrix", "Omnissa Horizon", "Microsoft RDS", "Azure Virtual Desktop", "Windows 365"]},
+    {"name": "Backup", "termes": ["Veeam", "Commvault", "Acronis", "Veritas", "Rubrik"]},
+    {"name": "Storage", "termes": ["NetApp", "Dell EMC", "HPE Storage", "Pure Storage", "Ceph", "TrueNAS"]},
+    {"name": "Public cloud", "termes": ["Azure", "AWS", "Google Cloud"]},
+    {"name": "Sovereign cloud", "termes": ["STACKIT", "IONOS", "Open Telekom Cloud", "Hetzner", "OpenStack"]},
+    {"name": "Automation", "termes": ["Ansible", "Terraform", "Puppet"]},
+    {"name": "Containers", "termes": ["Docker", "Kubernetes", "OpenShift", "Rancher", "Helm"]},
     {"name": "CI/CD", "termes": ["GitLab", "Jenkins", "GitHub Actions", "Azure DevOps", "ArgoCD"]},
     {"name": "Linux", "termes": ["Linux", "RHEL / Red Hat", "SUSE / SLES", "Debian", "Ubuntu", "Rocky / Alma"]},
-    {"name": "Microsoft serveur / identité", "termes": ["Active Directory", "Entra ID", "GPO", "Windows Server"]},
-    {"name": "Microsoft poste de travail / M365", "termes": ["Exchange", "Microsoft 365", "Intune", "SCCM / MECM"]},
-    {"name": "Bases de données", "termes": ["PostgreSQL", "MySQL / MariaDB", "MS SQL", "Oracle DB"]},
-    {"name": "Supervision", "termes": ["Checkmk", "Nagios", "Icinga", "Zabbix", "PRTG"]},
-    {"name": "Observabilité / logs", "termes": ["Prometheus", "Grafana", "ELK / Elastic", "Splunk", "Graylog"]},
+    {"name": "Microsoft server / identity", "termes": ["Active Directory", "Entra ID", "GPO", "Windows Server"]},
+    {"name": "Microsoft workplace / M365", "termes": ["Exchange", "Microsoft 365", "Intune", "SCCM / MECM"]},
+    {"name": "Databases", "termes": ["PostgreSQL", "MySQL / MariaDB", "MS SQL", "Oracle DB"]},
+    {"name": "Monitoring", "termes": ["Checkmk", "Nagios", "Icinga", "Zabbix", "PRTG"]},
+    {"name": "Observability / logs", "termes": ["Prometheus", "Grafana", "ELK / Elastic", "Splunk", "Graylog"]},
     {"name": "ITSM / Ticketing", "termes": ["Jira", "OTRS / Znuny", "TOPdesk", "Matrix42", "ServiceNow"]},
     {"name": "Scripting", "termes": ["Bash", "Python", "PowerShell"]}
   ],
 
   "onglets": [
-    {"name": "Tendances Sécurité & Réseau", "groupes": ["Firewall", "Antivirus / Endpoint", "Réseau"]},
-    {"name": "Tendances Infra", "groupes": ["Virtualisation", "Bureau à distance / VDI", "Sauvegarde", "Stockage"]},
-    {"name": "Tendances Cloud & DevOps", "groupes": ["Cloud public", "Cloud souverain", "Automatisation", "Conteneurs", "CI/CD"]},
-    {"name": "Tendances Systèmes", "groupes": ["Linux", "Microsoft serveur / identité", "Microsoft poste de travail / M365", "Bases de données"]},
-    {"name": "Tendances Outils", "groupes": ["Supervision", "Observabilité / logs", "ITSM / Ticketing", "Scripting"]}
+    {"name": "Trends Security & Network", "groupes": ["Firewall", "Antivirus / Endpoint", "Network"]},
+    {"name": "Trends Infrastructure", "groupes": ["Virtualization", "Remote desktop / VDI", "Backup", "Storage"]},
+    {"name": "Trends Cloud & DevOps", "groupes": ["Public cloud", "Sovereign cloud", "Automation", "Containers", "CI/CD"]},
+    {"name": "Trends Systems", "groupes": ["Linux", "Microsoft server / identity", "Microsoft workplace / M365", "Databases"]},
+    {"name": "Trends Tools", "groupes": ["Monitoring", "Observability / logs", "ITSM / Ticketing", "Scripting"]}
   ]
 }
