@@ -45,6 +45,7 @@ scoring:
   seuil_points:
     teilzeit: 5
     praktikum: 3
+    vollzeit: 5
 
 email:
   sujet_prefixe: "[Bochra]"   # pour distinguer ces e-mails de ceux du job IT ("" pour aucun)
