@@ -1,6 +1,6 @@
 {
   "_hilfe": [
-    "Règles de l'ANALYSE AUTOMATIQUE écrite sous les courbes de l'onglet 'Tendances'. Aucune IA : conditions + phrases.",
+    "Règles de l'ANALYSE AUTOMATIQUE écrite en haut de l'onglet 'Trends Overview'. Aucune IA : conditions + phrases.",
     "",
     "COMMENT LE SCRIPT CALCULE",
     "  Il découpe le temps en 3 fenêtres de 'fenetre_semaines' semaines (4 par défaut), en partant de la semaine en cours :",
@@ -42,62 +42,62 @@
   },
 
   "messages": {
-    "titre": "Analyse automatique du {date} (règles du fichier analyse.json)",
-    "pas_assez": "Pas encore assez de recul pour analyser l'évolution du marché : l'analyse démarrera vers le {date_debut}, quand l'archive couvrira assez de semaines complètes.",
-    "rien": "Aucun mouvement notable ces {semaines} dernières semaines : le marché est stable."
+    "titre": "Automatic analysis of {date} (rules from analyse.json)",
+    "pas_assez": "Not enough history yet to analyse market evolution: the analysis will start around {date_debut}, once the archive covers enough complete weeks.",
+    "rien": "No notable movement over the last {semaines} weeks: the market is stable."
   },
 
   "regles": [
     { "nom": "orientation_postes", "type": "orientation", "cible": "profils", "priorite": 101,
-      "phrase": "Les postes {hausse} gagnent du terrain ({h1} % → {h0} % des offres) au détriment des postes {baisse} ({b1} % → {b0} %)." },
+      "phrase": "{hausse} roles are gaining ground ({h1} % → {h0} % of offers) at the expense of {baisse} roles ({b1} % → {b0} %)." },
 
     { "nom": "orientation_marche", "type": "orientation", "cible": "groupes", "priorite": 100,
-      "phrase": "Le marché s'oriente vers {hausse} ({h1} % → {h0} % des offres) tandis que {baisse} recule ({b1} % → {b0} %)." },
+      "phrase": "The market is shifting towards {hausse} ({h1} % → {h0} % of offers) while {baisse} is declining ({b1} % → {b0} %)." },
 
     { "nom": "leader", "type": "leader", "priorite": 90,
-      "phrase": "{terme} reste la compétence la plus demandée ({p0} % des offres)." },
+      "phrase": "{terme} remains the most requested skill ({p0} % of offers)." },
 
     { "nom": "retournement_hausse", "type": "terme", "cible": "termes", "priorite": 80,
       "si": { "precedente": "baisse", "recente": "hausse" },
-      "phrase": "{terme} repart à la hausse ({p1} % → {p0} %) après une période de baisse ({p2} % → {p1} %)." },
+      "phrase": "{terme} is rising again ({p1} % → {p0} %) after a period of decline ({p2} % → {p1} %)." },
 
     { "nom": "retournement_baisse", "type": "terme", "cible": "termes", "priorite": 80,
       "si": { "precedente": "hausse", "recente": "baisse" },
-      "phrase": "{terme} recule à nouveau ({p1} % → {p0} %) après avoir progressé ({p2} % → {p1} %)." },
+      "phrase": "{terme} is declining again ({p1} % → {p0} %) after growing ({p2} % → {p1} %)." },
 
     { "nom": "apparition", "type": "apparition", "cible": "termes", "priorite": 75,
-      "phrase": "{terme} commence à apparaître dans les offres ({p1} % → {p0} %)." },
+      "phrase": "{terme} is starting to appear in job offers ({p1} % → {p0} %)." },
 
     { "nom": "famille_hausse_continue", "type": "terme", "cible": "groupes", "priorite": 72,
       "si": { "precedente": "hausse", "recente": "hausse" },
-      "phrase": "La famille {terme} gagne du terrain de façon continue ({p2} % → {p1} % → {p0} %)." },
+      "phrase": "The {terme} area is steadily gaining ground ({p2} % → {p1} % → {p0} %)." },
 
     { "nom": "famille_baisse_continue", "type": "terme", "cible": "groupes", "priorite": 72,
       "si": { "precedente": "baisse", "recente": "baisse" },
-      "phrase": "La famille {terme} perd du terrain de façon continue ({p2} % → {p1} % → {p0} %)." },
+      "phrase": "The {terme} area is steadily losing ground ({p2} % → {p1} % → {p0} %)." },
 
     { "nom": "profil_hausse", "type": "terme", "cible": "profils", "priorite": 71,
       "si": { "recente": "hausse" },
-      "phrase": "Les offres de type {terme} augmentent ({p1} % → {p0} % des offres)." },
+      "phrase": "{terme} job offers are increasing ({p1} % → {p0} % of offers)." },
 
     { "nom": "profil_baisse", "type": "terme", "cible": "profils", "priorite": 71,
       "si": { "recente": "baisse" },
-      "phrase": "Les offres de type {terme} diminuent ({p1} % → {p0} % des offres)." },
+      "phrase": "{terme} job offers are decreasing ({p1} % → {p0} % of offers)." },
 
     { "nom": "hausse_continue", "type": "terme", "cible": "termes", "priorite": 70,
       "si": { "precedente": "hausse", "recente": "hausse" },
-      "phrase": "{terme} progresse régulièrement ({p2} % → {p1} % → {p0} %)." },
+      "phrase": "{terme} is growing steadily ({p2} % → {p1} % → {p0} %)." },
 
     { "nom": "baisse_continue", "type": "terme", "cible": "termes", "priorite": 70,
       "si": { "precedente": "baisse", "recente": "baisse" },
-      "phrase": "{terme} recule régulièrement ({p2} % → {p1} % → {p0} %)." },
+      "phrase": "{terme} is declining steadily ({p2} % → {p1} % → {p0} %)." },
 
     { "nom": "hausse_recente", "type": "terme", "cible": "termes", "priorite": 50,
       "si": { "recente": "hausse" },
-      "phrase": "{terme} progresse ces {semaines} dernières semaines ({p1} % → {p0} %)." },
+      "phrase": "{terme} has grown over the last {semaines} weeks ({p1} % → {p0} %)." },
 
     { "nom": "baisse_recente", "type": "terme", "cible": "termes", "priorite": 50,
       "si": { "recente": "baisse" },
-      "phrase": "{terme} recule ces {semaines} dernières semaines ({p1} % → {p0} %)." }
+      "phrase": "{terme} has declined over the last {semaines} weeks ({p1} % → {p0} %)." }
   ]
 }
