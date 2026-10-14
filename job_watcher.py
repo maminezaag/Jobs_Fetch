@@ -18,6 +18,13 @@ Chaque NOUVELLE offre est évaluée selon les critères d'élimination et de
 points de criteres.json, vérifiée contre le suivi de candidatures (Google
 Sheet), puis un e-mail récapitulatif est envoyé pour les offres qualifiées.
 
+OFFRES AVEC FRANÇAIS (criteres.json > francais, ajout du 14.10.2026) :
+recherches supplémentaires nationales + détection du français dans le texte de
+TOUTES les offres. Une offre qui demande le français passe le seuil
+automatiquement, n'est jamais écartée pour la distance, mais reste éliminée si
+elle exige un allemand C1/C2/natif. Elle apparaît dans une section à part de
+l'e-mail.
+
 Fichiers utilisés
 ------------------
 - config.yaml    : configuration TECHNIQUE (chemins, e-mail, seuil)
@@ -101,7 +108,9 @@ class JobResult:
     matched_positive: list[str] = field(default_factory=list)
     matched_elimination: list[str] = field(default_factory=list)
     deja_postule: bool = False
-    source: str = "?"  # "locale" / "remote" / "hors_zone", déterminé après evaluate()
+    source: str = "?"  # "locale" / "remote" / "francais" / "hors_zone", déterminé après evaluate()
+    francais: bool = False        # l'offre demande le français (criteres.json > francais.mots_detection)
+    via_francais_seul: bool = False   # trouvée UNIQUEMENT par les recherches "français"
 
     @property
     def url(self) -> str:
@@ -144,6 +153,7 @@ def load_config(path: Path) -> dict[str, Any]:
     cfg["criteres"]["elimination_souple"] = elim.get("mots_souples", [])
     cfg["criteres"]["b2_marqueurs"] = elim.get("b2_marqueurs", [])
     cfg["criteres"]["points_positifs"] = criteres_data.get("points_positifs", {}).get("groupes", [])
+    cfg["criteres"]["francais"] = criteres_data.get("francais", {})
 
     return cfg
 
@@ -239,6 +249,23 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     fusion: dict[str, dict[str, Any]] = {}
     for query in recherche.get("mots_cles", []):
         _run_search(session, query, common_params, fusion)
+
+    # Recherches "français" : nationales, SANS filtre de domaine (berufsfeld). Les offres trouvées
+    # uniquement ici sont marquées pour le filtre de titre (criteres.json > francais.titre_doit_contenir).
+    francais = cfg["criteres"].get("francais", {}) or {}
+    if francais.get("mots_cles"):
+        params_fr = {**common_params, "berufsfeld": None}
+        fusion_fr: dict[str, dict[str, Any]] = {}
+        for query in francais["mots_cles"]:
+            _run_search(session, query, params_fr, fusion_fr)
+        nouvelles_fr = 0
+        for refnr, o in fusion_fr.items():
+            if refnr not in fusion:
+                o["_via_francais_seul"] = True
+                fusion[refnr] = o
+                nouvelles_fr += 1
+        logger.info("Recherches 'français' : %d offres, dont %d non trouvées par les mots-clés habituels",
+                    len(fusion_fr), nouvelles_fr)
 
     logger.info("Total offres uniques trouvées : %d", len(fusion))
 
@@ -340,6 +367,9 @@ def classify_source(job: JobResult, cfg: dict[str, Any]) -> None:
 
     if distance_km is not None and distance_km <= rayon_km:
         job.source = "locale"
+    elif job.francais:
+        # offre avec français : toute l'Allemagne, jamais écartée pour la distance
+        job.source = "francais"
     elif remote_detecte:
         job.source = "remote"
     else:
@@ -366,9 +396,20 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
     crit = cfg["criteres"]
     haystack = f"{job.title}\n{job.description}".lower()
 
+    # --- français (criteres.json > francais)
+    francais = crit.get("francais", {}) or {}
+    mots_fr = [m for m in francais.get("mots_detection", []) if m.lower() in haystack]
+    job.francais = bool(mots_fr)
+
     matched_stricte = [kw for kw in crit.get("elimination_stricte", []) if kw.lower() in haystack]
     matched_souple = [kw for kw in crit.get("elimination_souple", []) if kw.lower() in haystack]
     b2_present = any(m.lower() in haystack for m in crit.get("b2_marqueurs", []))
+
+    if job.francais:
+        # Sur une offre française, 'Niveau C1' / 'mindestens C1' seuls visent souvent le FRANÇAIS :
+        # on n'élimine que sur les expressions qui nomment explicitement l'allemand.
+        matched_stricte = [kw for kw in matched_stricte if "deutsch" in kw.lower()]
+        matched_souple = [kw for kw in matched_souple if "deutsch" in kw.lower()]
 
     if b2_present:
         job.matched_elimination = matched_stricte
@@ -386,6 +427,21 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
             job.matched_positive.append(f"{nom} ({'/'.join(synonymes_trouves)})")
 
     job.score = score
+    if job.francais:
+        job.matched_positive.insert(0, f"Français ({'/'.join(mots_fr[:3])})")
+
+    # Offre trouvée UNIQUEMENT par les recherches "français" : le titre doit être un poste IT
+    if job.via_francais_seul:
+        mots_titre = francais.get("titre_doit_contenir", []) or []
+        if mots_titre and not any(_mot_dans_titre(m, job.title) for m in mots_titre):
+            job.matched_elimination.append("titre hors IT (recherche 'français')")
+
+
+def _mot_dans_titre(mot: str, titre: str) -> bool:
+    """Le mot doit commencer un mot du titre ('Admin' trouve 'Administrator') ; les mots de 3 lettres
+    ou moins doivent être des mots entiers ('IT' trouve 'IT-Support' mais pas 'Mitarbeiter')."""
+    fin = r"\b" if len(mot) <= 3 else ""
+    return re.search(r"(?<![a-zäöüß0-9])" + re.escape(mot) + fin, titre, re.IGNORECASE) is not None
 
 
 # --------------------------------------------------------------------------
@@ -456,16 +512,30 @@ def marquer_doublons(jobs: list[JobResult], entreprises_normalisees: list[str]) 
 # Notification e-mail
 # --------------------------------------------------------------------------
 
+def _lignes_offre(j: JobResult) -> list[str]:
+    avertissement = " ⚠️ eventuell bereits beworben" if j.deja_postule else ""
+    return [
+        f"● {j.title} — {j.employer}{avertissement}",
+        f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}",
+        f"  Score : {j.score} points | Compétences : {', '.join(j.matched_positive) or '-'}",
+        f"  Publié le : {j.published}",
+        f"  Lien : {j.url}",
+        "",
+    ]
+
+
 def build_email_body(jobs: list[JobResult]) -> str:
+    fr = sorted([j for j in jobs if j.francais], key=lambda x: x.score, reverse=True)
+    autres = sorted([j for j in jobs if not j.francais], key=lambda x: x.score, reverse=True)
     lines = [f"{len(jobs)} nouvelle(s) offre(s) correspondant à tes critères :", ""]
-    for j in sorted(jobs, key=lambda x: x.score, reverse=True):
-        avertissement = " ⚠️ eventuell bereits beworben" if j.deja_postule else ""
-        lines.append(f"● {j.title} — {j.employer}{avertissement}")
-        lines.append(f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}")
-        lines.append(f"  Score : {j.score} points | Compétences : {', '.join(j.matched_positive) or '-'}")
-        lines.append(f"  Publié le : {j.published}")
-        lines.append(f"  Lien : {j.url}")
-        lines.append("")
+    if fr:
+        lines += [f"🇫🇷 OFFRES AVEC FRANÇAIS ({len(fr)}) — toute l'Allemagne", "=" * 50, ""]
+        for j in fr:
+            lines += _lignes_offre(j)
+        if autres:
+            lines += [f"AUTRES OFFRES ({len(autres)})", "=" * 50, ""]
+    for j in autres:
+        lines += _lignes_offre(j)
     return "\n".join(lines)
 
 
@@ -486,7 +556,10 @@ def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> None:
         return
 
     recipients = [addr.strip() for addr in to_raw.split(",") if addr.strip()]
+    nb_fr = sum(1 for j in jobs if j.francais)
     subject = f"[Job Watcher] {len(jobs)} nouvelle(s) offre(s) IT à Oldenburg/Bremen"
+    if nb_fr:
+        subject += f" (dont {nb_fr} avec français 🇫🇷)"
     body = build_email_body(jobs)
 
     msg = MIMEMultipart()
@@ -550,6 +623,7 @@ def main() -> None:
                       or (o.get("veroeffentlichungszeitraum") or {}).get("von", ""),
             latitude=loc0.get("breite"),
             longitude=loc0.get("laenge"),
+            via_francais_seul=bool(o.get("_via_francais_seul")),
         )
         job.description = fetch_description(session, job.refnr)
         evaluate(job, cfg)
@@ -560,9 +634,10 @@ def main() -> None:
         time.sleep(REQUEST_DELAY_S)
 
     seuil = int(cfg["criteres"].get("seuil_points", 10))
-    qualifies = [j for j in results if not j.eliminated and j.score >= seuil]
+    # une offre avec français passe le seuil automatiquement (si elle n'est pas éliminée)
+    qualifies = [j for j in results if not j.eliminated and (j.score >= seuil or j.francais)]
     eliminees = [j for j in results if j.eliminated]
-    sous_le_seuil = [j for j in results if not j.eliminated and j.score < seuil]
+    sous_le_seuil = [j for j in results if not j.eliminated and j.score < seuil and not j.francais]
 
     if qualifies:
         entreprises_recentes = load_recent_companies(cfg, session)
@@ -574,7 +649,8 @@ def main() -> None:
     )
     for j in qualifies:
         flag = " [DOUBLON POSSIBLE]" if j.deja_postule else ""
-        logger.info("  ✔ %s — %s (%d pts)%s [%s] %s", j.title, j.employer, j.score, flag, j.source, j.url)
+        fr = " 🇫🇷" if j.francais else ""
+        logger.info("  ✔ %s — %s (%d pts)%s%s [%s] %s", j.title, j.employer, j.score, fr, flag, j.source, j.url)
     for j in eliminees:
         logger.info("  ✘ %s — %s (élim.: %s)", j.title, j.employer, ", ".join(j.matched_elimination))
     for j in sorted(sous_le_seuil, key=lambda x: x.score, reverse=True):
