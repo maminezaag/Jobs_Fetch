@@ -6,7 +6,7 @@ job_watcher_bochra.py
 Surveillance automatisée d'offres d'emploi pour Bochra (chimie / laboratoire).
 
 PROFIL
-  - Teilzeit ou Praktikum uniquement (pas de Vollzeit, pas d'Ausbildung).
+  - Teilzeit, Praktikum ou Vollzeit (pas d'Ausbildung). Pour le Vollzeit, l'expérience exigée est éliminatoire.
   - Dans un rayon de 20 km autour d'Oldenburg (pas de télétravail).
   - Allemand : B1 aujourd'hui, B2 prévu en janvier 2027.
 
@@ -14,7 +14,7 @@ FONCTIONNEMENT (même logique que job_watcher.py, script séparé)
   1. Recherche sur l'API Jobsuche de l'Arbeitsagentur, un mot-clé à la fois.
   2. Pré-filtre : distance GPS, Ausbildung (titre), pertinence chimie/labo.
   3. Lecture du texte complet de chaque nouvelle annonce restante.
-  4. Classification (Teilzeit / Praktikum), éliminations, score par groupes.
+  4. Classification (Teilzeit / Praktikum / Vollzeit), éliminations, score par groupes.
   5. E-mail Gmail avec les offres qualifiées (une seule fois par offre).
   6. État séparé (seen_jobs_bochra.json) : aucune dépendance à Google Sheet.
 
@@ -437,7 +437,7 @@ def evaluate(rec, details, crit, seuils) -> dict:
     elif crit.teilzeit.find(text, negation=True):
         out["type"] = "teilzeit"
     else:
-        return eliminated("ni Teilzeit ni Praktikum (Vollzeit)")
+        out["type"] = "vollzeit"
     typ = out["type"]
 
     # 2. Statut étudiant / élève exigé (même "souhaité")
@@ -512,7 +512,7 @@ def build_email(offers, cfg) -> tuple:
     for o in offers:
         d = f"{o['distance']:.0f} km" if o["distance"] is not None else "distance inconnue"
         lieu = ", ".join(o["lieux"]) if o["lieux"] else "lieu non précisé"
-        type_fr = "Praktikum" if o["type"] == "praktikum" else "Teilzeit"
+        type_fr = {"praktikum": "Praktikum", "teilzeit": "Teilzeit"}.get(o["type"], "Vollzeit")
         comp = "; ".join(f"{nom} (+{pts})" for nom, pts, _ in o["competences"]) or "aucune"
         html_parts.append(
             "<div style=\"border:1px solid #ddd;border-radius:6px;padding:10px 14px;margin:12px 0\">"
