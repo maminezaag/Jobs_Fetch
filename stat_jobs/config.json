@@ -14,6 +14,7 @@
     "archive_dossier: dossier de l'archive (dans stat_jobs/). NE PAS supprimer ce dossier : c'est l'historique.",
     "analyse_datei  : règles de l'analyse automatique écrite sous les courbes (voir l'aide dans analyse.json).",
     "tendance_fenetre_semaines : courbes de l'onglet Tendances lissées sur N semaines (moyenne glissante).",
+    "tendance_top_synthese     : nombre d'outils dans le graphique de l'onglet 'Tendances Synthèse' (le tableau les montre tous).",
     "tendance_min_offres       : une semaine n'est tracée que si sa fenêtre contient au moins N offres (évite les pics absurdes).",
     "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément d'une liste."
   ],
@@ -74,6 +75,7 @@
 
   "tendance_fenetre_semaines": 4,
   "tendance_min_offres": 20,
+  "tendance_top_synthese": 25,
 
   "doublon_aehnlichkeit": 0.85,
   "parallele_anfragen": 3,
