@@ -30,7 +30,7 @@ recherche:
   # Le vrai filtre à 20 km est refait ensuite avec les coordonnées GPS.
   # Mettre wo: "" pour chercher dans toute l'Allemagne.
   wo: "26129"
-  umkreis_api_km: 25
+  umkreis_api_km: 45
   rayon_max_km: 100          # rayon réellement appliqué (à vol d'oiseau)
   point_reference:
     nom: "Oldenburg (centre-ville)"
@@ -43,8 +43,8 @@ recherche:
 scoring:
   # Points minimum pour être notifié, selon le type d'offre.
   seuil_points:
-    teilzeit: 8
-    praktikum: 6
+    teilzeit: 5
+    praktikum: 3
 
 email:
   sujet_prefixe: "[Bochra]"   # pour distinguer ces e-mails de ceux du job IT ("" pour aucun)
