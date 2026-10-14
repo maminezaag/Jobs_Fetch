@@ -85,6 +85,10 @@
     {"name": "Azure DevOps", "muster": ["azure ?devops"]},
     {"name": "ArgoCD", "muster": ["argo ?cd"]},
     {"name": "Linux", "muster": ["\\blinux\\b"]},
+    {"name": "Windows", "muster": ["\\bwindows\\b"]},
+    {"name": "Unix", "muster": ["\\bunix\\b", "\\baix\\b", "solaris", "hp[\\s-]?ux"]},
+    {"name": "IBM i", "muster": ["\\bibm i\\b", "\\bas\\s?/?\\s?400\\b", "\\biseries\\b", "\\bsystem i\\b"]},
+    {"name": "macOS", "muster": ["\\bmac ?os\\b", "\\bjamf\\b"]},
     {"name": "RHEL / Red Hat", "muster": ["\\brhel\\b", "red ?hat"]},
     {"name": "SUSE / SLES", "muster": ["\\bsuse\\b", "\\bsles\\b"]},
     {"name": "Debian", "muster": ["\\bdebian\\b"]},
@@ -125,7 +129,8 @@
     {"name": "Automation", "termes": ["Ansible", "Terraform", "Puppet"]},
     {"name": "Containers", "termes": ["Docker", "Kubernetes", "OpenShift", "Rancher", "Helm"]},
     {"name": "CI/CD", "termes": ["GitLab", "Jenkins", "GitHub Actions", "Azure DevOps", "ArgoCD"]},
-    {"name": "Linux", "termes": ["Linux", "RHEL / Red Hat", "SUSE / SLES", "Debian", "Ubuntu", "Rocky / Alma"]},
+    {"name": "OS environment", "termes": ["Linux", "Windows", "Unix", "IBM i", "macOS"]},
+    {"name": "Linux distributions", "termes": ["RHEL / Red Hat", "SUSE / SLES", "Debian", "Ubuntu", "Rocky / Alma"]},
     {"name": "Microsoft server / identity", "termes": ["Active Directory", "Entra ID", "GPO", "Windows Server"]},
     {"name": "Microsoft workplace / M365", "termes": ["Exchange", "Microsoft 365", "Intune", "SCCM / MECM"]},
     {"name": "Databases", "termes": ["PostgreSQL", "MySQL / MariaDB", "MS SQL", "Oracle DB"]},
@@ -139,7 +144,7 @@
     {"name": "Trends Security & Network", "groupes": ["Firewall", "Antivirus / Endpoint", "Network"]},
     {"name": "Trends Infrastructure", "groupes": ["Virtualization", "Remote desktop / VDI", "Backup", "Storage"]},
     {"name": "Trends Cloud & DevOps", "groupes": ["Public cloud", "Sovereign cloud", "Automation", "Containers", "CI/CD"]},
-    {"name": "Trends Systems", "groupes": ["Linux", "Microsoft server / identity", "Microsoft workplace / M365", "Databases"]},
+    {"name": "Trends Systems", "groupes": ["OS environment", "Linux distributions", "Microsoft server / identity", "Microsoft workplace / M365", "Databases"]},
     {"name": "Trends Tools", "groupes": ["Monitoring", "Observability / logs", "ITSM / Ticketing", "Scripting"]}
   ]
 }
