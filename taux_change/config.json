@@ -17,7 +17,7 @@
   "devise_source": "EUR",
   "devise_cible": "TND",
 
-  "seuil_haut": 3.40,
+  "seuil_haut": 3.32,
   "seuil_bas": 3.30,
   "hysteresis": 0.005,
 
