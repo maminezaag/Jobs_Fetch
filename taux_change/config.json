@@ -1,0 +1,29 @@
+{
+  "_aide": [
+    "Configuration de taux_change.py (alerte e-mail sur le cours EUR -> TND).",
+    "seuil_haut : alerte quand 1 EUR >= cette valeur (l'euro monte : bon moment pour envoyer de l'argent en Tunisie).",
+    "seuil_bas  : alerte quand 1 EUR <= cette valeur (l'euro baisse).",
+    "             Mets null (sans guillemets) pour désactiver un des deux seuils.",
+    "Une seule alerte par franchissement : pas de nouvel e-mail tant que le cours reste au-delà du seuil.",
+    "Le seuil est 'réarmé' quand le cours revient de l'autre côté (marge 'hysteresis' pour éviter les",
+    "alertes en rafale si le cours oscille autour du seuil ; 0.005 = un demi-millime de dinar).",
+    "rapport_hebdo : true = e-mail avec le cours une fois par semaine même sans franchissement",
+    "                (preuve que le script tourne). jour_rapport : 0 = lundi ... 6 = dimanche.",
+    "Les identifiants Gmail viennent des secrets GitHub (GMAIL_ADDRESS, GMAIL_APP_PASSWORD, GMAIL_TO),",
+    "les mêmes que job_watcher. Rien de secret dans ce fichier.",
+    "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément."
+  ],
+
+  "devise_source": "EUR",
+  "devise_cible": "TND",
+
+  "seuil_haut": 3.40,
+  "seuil_bas": 3.30,
+  "hysteresis": 0.005,
+
+  "rapport_hebdo": false,
+  "jour_rapport": 0,
+
+  "fichier_etat": "etat.json",
+  "historique_jours": 90
+}
