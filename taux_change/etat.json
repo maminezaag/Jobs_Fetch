@@ -1,0 +1,17 @@
+{
+ "alerte_haut_envoyee": false,
+ "alerte_bas_envoyee": false,
+ "dernier_rapport": null,
+ "historique": [
+  {
+   "date": "2026-10-17",
+   "taux": 3.363072
+  }
+ ],
+ "derniere_lecture": {
+  "date": "2026-10-17T08:20:43+00:00",
+  "taux": 3.363072,
+  "source": "open.er-api.com",
+  "maj_source": "Sat, 17 Oct 2026 00:02:32 +0000"
+ }
+}
