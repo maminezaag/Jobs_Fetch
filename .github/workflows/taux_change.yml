@@ -1,0 +1,60 @@
+name: taux_change
+
+# Déclenchement :
+#   - chaque jour par crontab.org (repository_dispatch). Corps JSON de la requête POST, EXACTEMENT :
+#       { "event_type": "run-taux-change" }
+#     (job_watcher = "run-job-watcher", stat_jobs = "run-stat-jobs" : aucun ne déclenche les autres)
+#   - à la main : Actions -> taux_change -> Run workflow
+on:
+  repository_dispatch:
+    types: [run-taux-change]
+  workflow_dispatch: {}
+
+# Nécessaire pour commiter taux_change/etat.json (mémoire des alertes déjà envoyées)
+permissions:
+  contents: write
+
+concurrency:
+  group: taux-change
+  cancel-in-progress: false
+
+jobs:
+  taux-change:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install -r taux_change/requirements.txt
+
+      - name: Lire le cours et alerter si besoin
+        env:
+          # mêmes secrets que job_watcher (déjà créés dans le dépôt)
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GMAIL_TO: ${{ secrets.GMAIL_TO }}
+        run: python taux_change/taux_change.py
+
+      # Ne touche QUE taux_change/etat.json
+      - name: Sauvegarder l'état
+        if: success()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add taux_change/etat.json
+          if git diff --staged --quiet; then
+            echo "État inchangé"
+            exit 0
+          fi
+          git commit -m "taux_change : état du $(date -u +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            echo "Push refusé (essai $i/5), nouvelle tentative dans 10 s"
+            sleep 10
+          done
+          exit 1
