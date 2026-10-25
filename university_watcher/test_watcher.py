@@ -300,6 +300,7 @@ class IntegrationHistoryTests(unittest.TestCase):
             cfg=dict(CFG)
             cfg['sources']={'oldenburg':CFG['sources']['oldenburg']}
             cfg['seuil_total']=101
+            cfg['alerte_secondaire']={'active': False, 'seuil_total':55, 'minimum_competences':10}
             (base/'criteres.json').write_text(json.dumps(cfg,ensure_ascii=False))
             (base/'seen_university_jobs.json').write_text('[]')
             collector=Mock()

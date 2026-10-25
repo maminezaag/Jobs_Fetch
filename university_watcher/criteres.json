@@ -55,7 +55,26 @@
         "serveradministration",
         "administration eines rechenservers",
         "administration von servern",
-        "systembetreuung"
+        "systembetreuung",
+        "it administrator",
+        "it-administrator",
+        "it administratorin",
+        "system administrator",
+        "system-administrator",
+        "systems administrator",
+        "linux administrator",
+        "linux-admin",
+        "it system administrator",
+        "it-systemadministrator",
+        "it-systemadministration",
+        "server administrator",
+        "system admin",
+        "it operations",
+        "it operations engineer",
+        "administration und betreuung",
+        "it administration und betreuung",
+        "systemadministrateur",
+        "administrateur systèmes"
       ]
     },
     {
@@ -109,20 +128,41 @@
         "vcenter",
         "proxmox",
         "virtualisierung",
-        "virtualization"
+        "virtualization",
+        "proxmox ve"
+      ],
+      "variantes_points": [
+        {
+          "points": 5,
+          "synonymes": [
+            "proxmox",
+            "proxmox ve"
+          ]
+        }
+      ]
+    },
+    {
+      "nom": "Checkmk / Nagios",
+      "points": 5,
+      "synonymes": [
+        "CheckMK",
+        "Check_MK",
+        "Check MK",
+        "Nagios"
       ]
     },
     {
       "nom": "Monitoring",
-      "points": 4,
+      "points": 3,
       "synonymes": [
-        "checkmk",
-        "check_mk",
         "monitoring",
-        "nagios",
+        "it-monitoring",
+        "system monitoring",
+        "observability",
         "zabbix",
         "prometheus",
-        "grafana"
+        "grafana",
+        "prtg"
       ]
     },
     {
@@ -140,14 +180,19 @@
     },
     {
       "nom": "IT Support",
-      "points": 4,
+      "points": 5,
       "synonymes": [
         "it support",
         "it-support",
         "second level",
         "2nd level",
         "it service",
-        "technical support"
+        "technical support",
+        "IT-Support",
+        "IT Support",
+        "Anwendersupport",
+        "1st Level Support",
+        "2nd Level Support"
       ]
     },
     {
@@ -158,7 +203,17 @@
         "group policy",
         "gruppenrichtlinien",
         "gpo",
-        "entra id"
+        "entra id",
+        "ad-administration"
+      ]
+    },
+    {
+      "nom": "Kaspersky Security Center",
+      "points": 4,
+      "synonymes": [
+        "Kaspersky",
+        "Kaspersky Security Center",
+        "Kaspersky Endpoint Security"
       ]
     },
     {
@@ -166,25 +221,45 @@
       "points": 4,
       "synonymes": [
         "veeam",
-        "backup",
-        "disaster recovery",
-        "datensicherung"
+        "veeam backup",
+        "veeam backup & replication"
+      ],
+      "variantes_points": [
+        {
+          "points": 4,
+          "synonymes": [
+            "datensicherung",
+            "backup",
+            "disaster recovery"
+          ]
+        }
+      ]
+    },
+    {
+      "nom": "Zimbra",
+      "points": 5,
+      "synonymes": [
+        "Zimbra"
       ]
     },
     {
       "nom": "Bash / Shell",
-      "points": 3,
+      "points": 5,
       "synonymes": [
         "bash",
         "shell scripting",
         "shell-skripte",
         "shellskripte",
-        "linux scripting"
+        "linux scripting",
+        "Bash",
+        "Shell-Skript",
+        "Shellskript",
+        "Shell Scripting"
       ]
     },
     {
       "nom": "Ansible",
-      "points": 3,
+      "points": 4,
       "synonymes": [
         "ansible"
       ]
@@ -220,7 +295,11 @@
         "datenbanken",
         "datenbank",
         "databases",
-        "database"
+        "database",
+        "Oracle",
+        "MySQL",
+        "MariaDB",
+        "PostgreSQL"
       ]
     },
     {
@@ -237,6 +316,18 @@
         "docker",
         "containerisierung",
         "docker compose"
+      ]
+    },
+    {
+      "nom": "Sprachen Französisch (professionnel)",
+      "points": 2,
+      "synonymes": [
+        "französischkenntnisse",
+        "französische sprachkenntnisse",
+        "französisch-kenntnisse",
+        "french speaking",
+        "french-speaking",
+        "fluent french"
       ]
     },
     {
@@ -282,12 +373,20 @@
       "nom": "Netzwerke / Firewall",
       "points": 2,
       "synonymes": [
-        "netzwerke",
-        "networking",
-        "firewall",
+        "Networking",
+        "Netzwerktechnik",
+        "Netzwerkadministration",
         "routing",
         "tcp/ip",
         "vpn"
+      ]
+    },
+    {
+      "nom": "Firewalling",
+      "points": 2,
+      "synonymes": [
+        "Firewall",
+        "Firewalling"
       ]
     },
     {
@@ -307,7 +406,41 @@
         "kubernetes",
         "k3s"
       ]
+    },
+    {
+      "nom": "Zertifizierungen (RHCSA/AZ-104/LPIC)",
+      "points": 3,
+      "synonymes": [
+        "RHCSA",
+        "Red Hat Certified System Administrator",
+        "AZ-104",
+        "Azure Administrator Associate",
+        "Azure Administrator",
+        "LPIC-1",
+        "LPIC-2",
+        "LPIC1",
+        "LPIC2",
+        "Linux Professional Institute"
+      ]
     }
   ],
-  "reverifier_apres_jours": 7
+  "reverifier_apres_jours": 7,
+  "bonus_specialite": {
+    "it_administration": 4,
+    "recherche_bpm_iot": 5
+  },
+  "alerte_secondaire": {
+    "active": true,
+    "seuil_total": 55,
+    "minimum_competences": 10
+  },
+  "_aide_v6": [
+    "Seuil principal inchangé: 60 points au total ET 20 points en compétences.",
+    "Alerte secondaire: 55 au total ET 10 en compétences, sans critère éliminatoire.",
+    "IT et recherche: score partagé /55 ; bonus limité si adéquation explicite du poste et spécialité.",
+    "IT Administrator + synonymes et poids Bash/Ansible/Veeam/Zimbra/Kaspersky repris de Jobs_Fetch.",
+    "Les synonymes Linux/RedHat/Ubuntu sont regroupés: 5 pts maximum ; même principe VMware/Proxmox: maximum 5.",
+    "Changer un critère déclenche le re-scoring depuis les fiches déjà mises en cache.",
+    "Le fichier criteres.json du Jobs_Fetch principal n’est pas modifié."
+  ]
 }

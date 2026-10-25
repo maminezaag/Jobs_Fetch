@@ -437,52 +437,119 @@ def points_contrat(texte):
     return min(15, sal + temps), (f"TV-L E{n}" if n else "Rémunération inconnue") + (f", {q}%" if q else "")
 
 
+def branche_offre(titre):
+    """Le type de candidature dépend du POSTE, pas de mots vagues dans le corps."""
+    t = normaliser(titre).casefold()
+    if re.search(r"(?:wissenschaftlich\w*\s+mitarbeiter|research assistant|research fellow|"
+                 r"doctoral|doktorand|promotion\w*stelle|\bphd\b|wissenschaftliche:r|"
+                 r"wissenschaftliche\*r|scientific researcher|postdoc)", t):
+        return "RECHERCHE"
+    return "IT / AUTRE"
+
+
+def points_competence(groupe, texte):
+    """Une compétence est comptée UNE FOIS, même avec plusieurs synonymes.
+
+    Les variantes de plateforme (VMware 4, Proxmox 5) donnent le MAXIMUM,
+    pas l'addition des deux. Même logique pour Veeam et backup générique.
+    """
+    variants = groupe.get('variantes_points', [])
+    points = groupe['points'] if any(occur(texte, w) for w in groupe['synonymes']) else 0
+    for variant in variants:
+        if any(occur(texte, w) for w in variant['synonymes']):
+            points = max(points, variant['points'])
+    return points
+
+
+def bonus_adequation(titre, branche, noms, cfg):
+    """Bonus mesuré, uniquement pour une combinaison spécifique et explicite."""
+    montants = cfg.get('bonus_specialite', {})
+    ts = titre.casefold()
+    if branche == 'RECHERCHE' and {'BPM / BPMN', 'IoT'} <= noms:
+        return montants.get('recherche_bpm_iot', 0), 'BPM + IoT en recherche'
+    cible_admin = re.search(r"(?:system[ -]?admin|it[ -]?admin|linux[ -]?admin|"
+                            r"server[ -]?admin|it[ -]?operations|infrastruktur[ -]?admin)", ts)
+    techniques = {'Linux / Red Hat / Ubuntu / SUSE', 'Bash / Shell', 'Ansible',
+                  'VMware / Proxmox', 'Puppet / Konfigurationsmanagement',
+                  'Checkmk / Nagios', 'Monitoring', 'Docker', 'Terraform',
+                  'Windows Server', 'Active Directory / GPO', 'Zimbra'}
+    if cible_admin and len(techniques & noms) >= 2:
+        return montants.get('it_administration', 0), 'administration IT + stack technique'
+    return 0, ''
+
+
 def noter(o, cfg):
-    texte = normaliser(o.titre + " " + o.texte)
+    texte = normaliser(o.titre + ' ' + o.texte)
     exclusion = exclure(o.titre, o.texte)
-    trouve = [(g["nom"], g["points"]) for g in cfg["competences"] if any(occur(texte, mot) for mot in g["synonymes"])]
-    skills = min(cfg["plafond_competences"], sum(pts for _, pts in trouve))
+    trouve = [(g['nom'], pts) for g in cfg['competences']
+              if (pts := points_competence(g, texte)) > 0]
+    noms = {nom for nom, _ in trouve}
+    branche = branche_offre(o.titre)
+    bonus, justification = bonus_adequation(o.titre, branche, noms, cfg)
+    skills = min(cfg['plafond_competences'], sum(pts for _, pts in trouve) + bonus)
     lieu, typ = geo(o.ville, texte)
     contrat, cond = points_contrat(texte)
     score = skills + lieu + contrat
-    # Noter() fonctionne également sur des offres synthétiques (tests de score).
-    # Le contrôle obligatoire du détail est appliqué dans main() avant e-mail.
-    eligible = not exclusion and typ != "HORS ZONE" and score >= cfg["seuil_total"] and skills >= cfg["minimum_competences"]
+    valide = not exclusion and typ != 'HORS ZONE'
+    primaire = (valide and score >= cfg['seuil_total']
+                and skills >= cfg['minimum_competences'])
+    sec = cfg.get('alerte_secondaire', {})
+    secondaire = (valide and not primaire and sec.get('active', False)
+                  and score >= sec.get('seuil_total', 55)
+                  and skills >= sec.get('minimum_competences', 10))
+    priorite = 'PRIORITAIRE' if primaire else 'A_EXAMINER' if secondaire else 'ECARTEE'
     motifs = []
     if exclusion: motifs.append(exclusion)
-    if typ == "HORS ZONE": motifs.append("hors zone et pas de remote vérifiable")
-    if skills < cfg["minimum_competences"]: motifs.append(f"compétences {skills}/{cfg['minimum_competences']}")
-    if score < cfg["seuil_total"]: motifs.append(f"total {score}/{cfg['seuil_total']}")
-    return {"score": score, "skills": skills, "lieu": lieu, "contrat": contrat, "conditions": cond,
-            "localite": typ, "categorie": classe(o.titre, o.texte), "competences": trouve,
-            "exclusion": exclusion, "eligible": eligible, "motifs": motifs}
+    if typ == 'HORS ZONE': motifs.append('hors zone et pas de remote vérifiable')
+    if not primaire:
+        if skills < cfg['minimum_competences']:
+            motifs.append(f"compétences {skills}/{cfg['minimum_competences']}")
+        if score < cfg['seuil_total']:
+            motifs.append(f"total {score}/{cfg['seuil_total']}")
+    if secondaire: motifs.append('alerte secondaire : vérification humaine recommandée')
+    return {'score':score, 'skills':skills, 'lieu':lieu, 'contrat':contrat,
+            'conditions':cond, 'localite':typ, 'categorie':classe(o.titre,o.texte),
+            'branche':branche, 'bonus_specialite':bonus, 'justification_bonus':justification,
+            'competences':trouve, 'exclusion':exclusion, 'eligible':primaire,
+            'alerte': primaire or secondaire, 'priorite':priorite, 'motifs':motifs}
 
 
 def decision_apres_verification(offre, note):
-    """Une fiche manquante ne doit jamais déclencher un faux positif."""
+    """Aucune alerte si la description individuelle n'a pas été vérifiée."""
     if not offre.detail_verifie:
-        note["eligible"] = False
-        if "fiche complète non vérifiée" not in note["motifs"]:
-            note["motifs"].append("fiche complète non vérifiée")
+        note['eligible'] = False
+        note['alerte'] = False
+        note['priorite'] = 'ECARTEE'
+        if 'fiche complète non vérifiée' not in note['motifs']:
+            note['motifs'].append('fiche complète non vérifiée')
     return note
 
 
 def emailer(resultats, destinataire, adresse, mot_de_passe):
+    """Un SEUL e-mail contenant deux rubriques, sans notifications répétées."""
     msg = EmailMessage()
-    msg["Subject"] = f"University Watcher : {len(resultats)} nouvelle(s) offre(s) pertinente(s)"
-    msg["From"] = adresse
-    msg["To"] = destinataire
-    lines = ["Offres universitaires détectées, classement par score :", ""]
-    for o, note in resultats:
-        lines.extend([f"{o.titre} — {note['score']}/100", f"{o.source} — {o.ville} — {note['localite']} — {note['categorie']}",
-                      f"Compétences {note['skills']}/55 ; lieu {note['lieu']}/30 ; contrat {note['contrat']}/15 ({note['conditions']})",
-                      "Correspondances : " + ", ".join(n for n,_ in note["competences"]),
-                      f"Annonce : {o.url}", ""])
-    msg.set_content("\n".join(lines))
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=25) as smtp:
+    principaux = [(o,n) for o,n in resultats if n['priorite'] == 'PRIORITAIRE']
+    secondaires = [(o,n) for o,n in resultats if n['priorite'] == 'A_EXAMINER']
+    msg['Subject'] = (f"University Watcher : {len(principaux)} prioritaires, "
+                      f"{len(secondaires)} à examiner")
+    msg['From'] = adresse
+    msg['To'] = destinataire
+    lines = ['Résultats universitaires ; les annonces secondaires méritent une vérification humaine.', '']
+    for titre, ensemble in [('PRIORITAIRES (60/100 ET 20/55)', principaux),
+                            ('À EXAMINER (55/100 ET 10/55)', secondaires)]:
+        if not ensemble: continue
+        lines.extend([titre, '-' * len(titre), ''])
+        for o,note in ensemble:
+            lines.extend([f"{o.titre} — {note['score']}/100",
+                          f"{o.source} — {o.ville} — {note['localite']} — {note['categorie']}",
+                          f"Compétences {note['skills']}/55 (bonus {note['bonus_specialite']}) ; "
+                          f"lieu {note['lieu']}/30 ; contrat {note['contrat']}/15 ({note['conditions']})",
+                          'Correspondances : ' + ', '.join(n for n,_ in note['competences']),
+                          f"Annonce : {o.url}", ''])
+    msg.set_content('\n'.join(lines))
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as smtp:
         smtp.login(adresse, mot_de_passe)
         smtp.send_message(msg)
-
 
 
 def empreinte(valeur):
@@ -545,8 +612,9 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({k: cfg[k] for k in ('competences', 'minimum_competences',
-                                            'seuil_total', 'plafond_competences')})
+    regles = empreinte({'algorithme': 'v6', **{k: cfg.get(k) for k in (
+        'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
+        'alerte_secondaire', 'bonus_specialite')}})
     if actualiser:
         if offre.url.split('#')[0] == src['url'].split('#')[0]:
             offre.detail_erreur = 'Le lien renvoie à la liste des annonces'
@@ -628,27 +696,29 @@ def main():
             raison = '; '.join(note['motifs']) if note['motifs'] else 'conditions remplies'
             log.info('%3d points (skills %2d) %s — %s — %s — %s [%s]',
                      note['score'], note['skills'], offre.source,
-                     'QUALIFIEE' if note['eligible'] else 'ECARTEE', raison,
+                     note['priorite'], raison,
                      offre.titre[:110], situation)
-            if note['eligible'] and identifiant not in seen:
+            if note['alerte'] and identifiant not in seen:
                 qualifiees.append((offre, note))
         except Exception as exc:
             log.error('Analyse impossible pour %s : %s', offre.url[:130], exc)
             erreurs.append(f'fiche {offre.source}: {exc}')
 
-    qualifiees.sort(key=lambda x: x[1]['score'], reverse=True)
+    qualifiees.sort(key=lambda x: (x[1]['priorite'] == 'PRIORITAIRE', x[1]['score'], x[1]['skills']), reverse=True)
     nombre = min(len(qualifiees), cfg['max_offres_email'])
     log.info('CACHE: %d réutilisées, %d analyses téléchargées, %d re-notées sur critères modifiés',
              stats['cache réutilisé'], stats['analyse du détail'],
              stats['nouveaux critères : re-scoring du cache'])
-    log.info('%d offres qualifiées non notifiées, %d pour e-mail ; %d source(s)/fiche(s) en échec ; %d fiche(s) incomplète(s)',
-             len(qualifiees), nombre, len(erreurs), len(incompletes))
+    log.info('%d offres à notifier (%d prioritaires, %d secondaires), %d dans e-mail ; %d source(s)/fiche(s) en échec ; %d fiche(s) incomplète(s)',
+             len(qualifiees), sum(n['priorite']=='PRIORITAIRE' for _,n in qualifiees),
+             sum(n['priorite']=='A_EXAMINER' for _,n in qualifiees),
+             nombre, len(erreurs), len(incompletes))
     if incompletes:
         log.warning('Attention: %d fiches sans texte complet. Vérifier DETAIL NON VERIFIE.', len(incompletes))
 
     if args.dry_run:
         for offre, note in qualifiees[:nombre]:
-            print(f"{note['score']:>3}/100 [{offre.source}] {offre.titre}: {offre.url}")
+            print(f"{note['priorite']} {note['score']:>3}/100 [{offre.source}] {offre.titre}: {offre.url}")
         if erreurs:
             return 2
         return 0
