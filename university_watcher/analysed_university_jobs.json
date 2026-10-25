@@ -7,23 +7,28 @@
       "detail_verifie": true,
       "empreinte_detail": "a48bcb3d71d12f053046d7eef6d4fe2e41f86087e0868f8e00a0477bb8041637",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E9, 100%",
         "contrat": 9,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 39/60"
         ],
+        "priorite": "ECARTEE",
         "score": 39,
         "skills": 0
       },
       "signature_liste": "c6258c8754767b2b9fef3f9824db9ef84a3ad848a723957fd6b2795f9515941c",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Sachbearbeitung im Bereich Berufungen der Fakultät VI",
       "url": "https://uol.de/job1309",
@@ -36,23 +41,28 @@
       "detail_verifie": true,
       "empreinte_detail": "4a70ac7ebaa00670c84eef83e5773b5a69544b303dfdf14353bd607e64530f85",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 50%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 41/60"
         ],
+        "priorite": "ECARTEE",
         "score": 41,
         "skills": 0
       },
       "signature_liste": "80b463b1820c10f1a1069dbe464e26403f30f8a432b30e383552b21c52bb1879",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Lehrkraft für besondere Aufgaben",
       "url": "https://uol.de/job1327",
@@ -65,6 +75,9 @@
       "detail_verifie": true,
       "empreinte_detail": "9d1ed6914ad783739833616e90f8602c424622a7b556df84739ff3b95606f481",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -80,17 +93,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 7/20",
           "total 50/60"
         ],
+        "priorite": "ECARTEE",
         "score": 50,
         "skills": 7
       },
       "signature_liste": "e3e76445a4aa057f76c24b3e07e328db893d8ea1b6bcb3cc446ef063479a1b8c",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Geschäftsführer:in (w/m/d) des Career Centers Dezernat 6 - Studentische Angelegenheiten Entgelt- / Besoldungsgruppe E 13 - Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4546?cHash=07d5b57d43f72cbd485c1dfcbdf28e28",
@@ -103,23 +118,28 @@
       "detail_verifie": true,
       "empreinte_detail": "bbe51a18be90df075d436fc0e5a04cea3f93a9f2354840236c187f8ca0667deb",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E11, 70%",
         "contrat": 7,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 37/60"
         ],
+        "priorite": "ECARTEE",
         "score": 37,
         "skills": 0
       },
       "signature_liste": "e7200b006deef3186f68570f325dafa16c75ecc778e32d462d61aa8b96577112",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Mitarbeiter*in Prüfungskoordination für den Studiengang Humanmedizin",
       "url": "https://uol.de/job1321",
@@ -132,12 +152,16 @@
       "detail_verifie": true,
       "empreinte_detail": "5835716517374003dca7b90adfd48dc100c8919cdf0f54f2f3447adb798b000e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13",
         "contrat": 15,
         "eligible": false,
         "exclusion": "doctorat déjà obtenu exigé",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -145,11 +169,12 @@
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "a519b17082f8730ce4d7ab7642dacf13e2862fe02aa13bee0d9d05ba9a6ec462",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Lektor:in (w/m/d) für das Arbeitsgebiet „Schulsport unter sportdidaktischer Perspektive“ Fachbereich 11 - Human- und Gesundheitswissenschaften Entgelt- / Besoldungsgruppe E 13/14 -…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4549?cHash=59e4f44c2f60b287879110a25249b240",
@@ -162,23 +187,28 @@
       "detail_verifie": true,
       "empreinte_detail": "c97264a6af1c5b22a59a4bcba81a1c10228f2ef15deee85e9216dded547318e4",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 50%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 39/60"
         ],
+        "priorite": "ECARTEE",
         "score": 39,
         "skills": 0
       },
       "signature_liste": "5e700a7d8d5b1cc4f9cf399c7b6a4f8329fb54570c27f29c0ca9f21d76c3f454",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Wissenschaftliche:r Mitarbeiter:in (Doktorand:in) (w/m/d) Fachbereich 7 - Wirtschaftswissenschaft Entgelt- / Besoldungsgruppe E 13 - Teilzeit 50%",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4554?cHash=2d6dcce0a35af40d0c79e31945d87f7c",
@@ -191,23 +221,28 @@
       "detail_verifie": true,
       "empreinte_detail": "92f80f9c1a264938fb5971dfa26777c1dbb3b5ac0c3b32faf6af3bf23bc06102",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E9, 60%",
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 35/60"
         ],
+        "priorite": "ECARTEE",
         "score": 35,
         "skills": 0
       },
       "signature_liste": "a485fb91a5ad3b783f27c52eaf42ca86272f5d54e3ef39cd56efb07ec9ff936f",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Technische Assistenz in der Universitätsklinik für Anästhesiologie, Intensivmedizin, Notfallmedizin und Schmerztherapie",
       "url": "https://uol.de/job1323",
@@ -220,23 +255,28 @@
       "detail_verifie": true,
       "empreinte_detail": "11b52ea94b667246728e1f95c2cc10cf83ec1b00d6164229f30b597759c2b316",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 65%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 41/60"
         ],
+        "priorite": "ECARTEE",
         "score": 41,
         "skills": 0
       },
       "signature_liste": "621cad749c8c083d4d03c06d4f7c1164b6091377dad1849aab2f3348946f27e9",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Doctoral Researcher in Microalgal Systems Biology",
       "url": "https://uol.de/job1311en",
@@ -249,23 +289,28 @@
       "detail_verifie": true,
       "empreinte_detail": "9d3431ddff1931534f2a9bb9eda814668353da81b5a1929ee6bad267ed8edece",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 65%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 41/60"
         ],
+        "priorite": "ECARTEE",
         "score": 41,
         "skills": 0
       },
       "signature_liste": "4644afa98f7834cca75275e0410b2248cf09350995861162ec65402c1729a213",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in Religionspädagogik",
       "url": "https://uol.de/job1308",
@@ -278,6 +323,9 @@
       "detail_verifie": true,
       "empreinte_detail": "8074ee08c881cd8ea7c58fb5f3cc612f38264572a684f8b671937df336d3677e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -293,17 +341,19 @@
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 6/20",
           "total 45/60"
         ],
+        "priorite": "ECARTEE",
         "score": 45,
         "skills": 6
       },
       "signature_liste": "60b2a76591f783404c4eab2e12b8e2bcadbff652ecfcfc1bae7af3784128b7f0",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Technische:r Angestellte:r (w/m/d) für die geowissenschaftliche Probennahme und Datenerhebung im Bereich „Meeresrobotik“ MARUM – Zentrum für Marine Umweltwissenschaften Entgelt- / …",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4552?cHash=629ae4f67aca30d5accd80ce6d7193af",
@@ -316,23 +366,28 @@
       "detail_verifie": true,
       "empreinte_detail": "3cb8b6a3858fdd38c08b728ebd4ef78337d8f87300157605aabf0285ca6cab8e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 45/60"
         ],
+        "priorite": "ECARTEE",
         "score": 45,
         "skills": 0
       },
       "signature_liste": "05c1fcc014cb07fd53d899ef3022c2454f8ef33e297320aaa43ac3a97bc905da",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Volljurist*in im Referat Recht und Gremien",
       "url": "https://uol.de/job1331",
@@ -345,6 +400,9 @@
       "detail_verifie": true,
       "empreinte_detail": "a0f4c01fc56cba316edb24ecabd9a671d90bf414b130e32165387cdc4fb2c970",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -360,17 +418,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 7/20",
           "total 50/60"
         ],
+        "priorite": "ECARTEE",
         "score": 50,
         "skills": 7
       },
       "signature_liste": "4c0268b6b06747ce04445c6cb765d18a3dea8528d278a00642be269ffdece081",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Dezernatsleiter:in (w/m/d) im Dezernat 3 (Haushalt und Finanzen) Dezernat 3 - Haushalt und Finanzen Entgelt- / Besoldungsgruppe E 15, A 15 - Vollzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4555?cHash=edbb33c8de89ef35d9e28e6a455e7e65",
@@ -383,6 +443,9 @@
       "detail_verifie": true,
       "empreinte_detail": "ac27d1ccf45401a4f4396ec808d93e51c0c228daec3b69dfacc65fb867579892",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [
           [
@@ -394,6 +457,7 @@
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -401,11 +465,12 @@
           "compétences 3/20",
           "total 31/60"
         ],
+        "priorite": "ECARTEE",
         "score": 31,
         "skills": 3
       },
       "signature_liste": "878a7db9fee746b5a0a1126341f46c9dc51bafffb8b5f0265b0926c17685583f",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Fachangestellten für Medien- und Informationsdienste, Fachrichtung Bibliothek (w/m/d) zum 01.09.2027 [PDF-Dokument] Staats- und Universitätsbibliothek Voll- oder…",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_FaMI_2027.pdf",
@@ -418,12 +483,16 @@
       "detail_verifie": true,
       "empreinte_detail": "ffb5475d391e416961a2000b2155db5ee4ad86b67a64a45f1e35b6f24d5d6928",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -431,11 +500,12 @@
           "compétences 0/20",
           "total 28/60"
         ],
+        "priorite": "ECARTEE",
         "score": 28,
         "skills": 0
       },
       "signature_liste": "50994bc64d46d640efdd87e36cf6a5ee9381ee377245eee210a5549b35cede66",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Elektroniker:in für Betriebstechnik (w/m/d) zum 01.09.2027 [PDF-Dokument] Dezernat 4 Technischer Betrieb/Bauangelegenheiten Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_Betriebselektronik_2027.pdf",
@@ -448,23 +518,28 @@
       "detail_verifie": true,
       "empreinte_detail": "e11bfca8cf6615e758693857eadb83fe811c340ca51b105a2a68891dfb1e4858",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 65%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 41/60"
         ],
+        "priorite": "ECARTEE",
         "score": 41,
         "skills": 0
       },
       "signature_liste": "111da1498db4a7505c8ebe01c911bd06bfac9b9de10d89965b196f2ec60d3a6d",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in, Doktorand*in in der Universitätsklinik für Augenheilkunde",
       "url": "https://uol.de/job1303",
@@ -477,6 +552,9 @@
       "detail_verifie": true,
       "empreinte_detail": "7d054f751ab150fae9f2c65cec06de31d6900f564b9c6158164fbd7024555b43",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -488,17 +566,19 @@
         "contrat": 9,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 40/60"
         ],
+        "priorite": "ECARTEE",
         "score": 40,
         "skills": 3
       },
       "signature_liste": "1d70542cd9f6959e8a47e04e84d1fc893d8d417f7cfa9cc8df0adf95ba53ed97",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Verwaltungsangestellte:r (w/m/d) bzw. Amtsinspektor:in (w/m/d) im Personaldezernat Dezernat 2 - Personalangelegenheiten Entgelt- / Besoldungsgruppe E 9a, A 9 - Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4539?cHash=7422c0f4ff6ec00c8fb698dd4254c709",
@@ -511,23 +591,28 @@
       "detail_verifie": true,
       "empreinte_detail": "ff18fbde9ef35e18316f455d484c300d64246c307e3e3b8e35ebdcb5aff66a06",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 45/60"
         ],
+        "priorite": "ECARTEE",
         "score": 45,
         "skills": 0
       },
       "signature_liste": "42334b51688b870a2ddfd2429984bade634e7a57ebb5b5f19ad9a32272aeec19",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in in der Abteilung Safety-Security-Interaction",
       "url": "https://uol.de/job1334",
@@ -540,12 +625,16 @@
       "detail_verifie": true,
       "empreinte_detail": "16957be5cb51ebd5e1c4b9b5e1e7f8127129abb351f7549d18e11df942195838",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 75%",
         "contrat": 13,
         "eligible": false,
         "exclusion": "doctorat déjà obtenu exigé",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
@@ -553,11 +642,12 @@
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "caeaef017c3d6f63d3f77815a82af74e32e29224f77acaa1565de5668cb3c72d",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in Slavistische Literaturwissenschaft",
       "url": "https://uol.de/job1320",
@@ -570,12 +660,16 @@
       "detail_verifie": true,
       "empreinte_detail": "0f0c4b28a43245722297f7ab4db5557261753773f85461bb12d72d5660bd4b2d",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -583,11 +677,12 @@
           "compétences 0/20",
           "total 28/60"
         ],
+        "priorite": "ECARTEE",
         "score": 28,
         "skills": 0
       },
       "signature_liste": "86daddf5561944d55af5d9f6d14e0e06dfc0da99812a86f8dd190432c77549aa",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Tischler:in (w/m/d) zum 01.09.2027 [PDF-Dokument] Dezernat 4 Technischer Betrieb/Bauangelegenheiten Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_Tischlerin_2027.pdf",
@@ -600,6 +695,9 @@
       "detail_verifie": true,
       "empreinte_detail": "ff086577cb0d6d027675ec9dd1bace8dfb58a50e47c4e2345119709a9aa6ff38",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [
           [
@@ -611,17 +709,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 48/60"
         ],
+        "priorite": "ECARTEE",
         "score": 48,
         "skills": 3
       },
       "signature_liste": "c34af0f64320cd4a77617a4d3f6a9873f6490dfa60bb12da6dbbb026d32a449c",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Beschäftigte*r im Verwaltungsdienst, Institutionelle Erasmus+ Koordination und Regionalkoordination Europa",
       "url": "https://uol.de/job1329",
@@ -634,6 +734,9 @@
       "detail_verifie": true,
       "empreinte_detail": "28450398e42e147a09bf63744307c185f27be109bf086f65cf38dedcfb39c9ba",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -645,6 +748,7 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "doctorat déjà obtenu exigé",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -652,11 +756,12 @@
           "compétences 3/20",
           "total 46/60"
         ],
+        "priorite": "ECARTEE",
         "score": 46,
         "skills": 3
       },
       "signature_liste": "df76ef38e6d0d64c3997a9830d3cf0ba4fe59f6e667979bfa4bbc8df2ce11e0e",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Researcher mit Tenure-Track zum Senior Researcher (w/m/d) Fachbereich 10 - Sprach- und Literaturwissenschaften Entgelt- / Besoldungsgruppe E14/15 - Vollzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4553?cHash=891e273f4b927f3972c4c7864456146b",
@@ -669,6 +774,9 @@
       "detail_verifie": true,
       "empreinte_detail": "c7665236e2e6ca40cf4200f8540ee179a625f03e3cb6a1b64a429fb7a41aaf53",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -680,17 +788,19 @@
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 36/60"
         ],
+        "priorite": "ECARTEE",
         "score": 36,
         "skills": 3
       },
       "signature_liste": "3722742c58a996487f5b4319b8e185c4d83ee3499b73a88b543317ffef16ca85",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Verwaltungsangestellte:r (w/m/d) bzw. Verwaltungssekretär:in (w/m/d) Dezernat 4 - Gebäudemanagement Entgelt- / Besoldungsgruppe E 6 - Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4544?cHash=20a4b1d5bc1995cc79dd0806048f8f96",
@@ -703,23 +813,28 @@
       "detail_verifie": true,
       "empreinte_detail": "c778664ea81af5125eb425fdd723cdf15c83918e24a54e06eb11d660c9eb880f",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E11, 100%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 25,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 36/60"
         ],
+        "priorite": "ECARTEE",
         "score": 36,
         "skills": 0
       },
       "signature_liste": "b72e5906d23533d350447c103509a000f89483b2c31340af5b3b34049ada1e7d",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "jade",
       "titre": "Startup Management (m/w/d), E 11 TV-L, 100 % befristet bis 31.12.2027",
       "url": "https://www.jade-hs.de/assets/einrichtungen/karriere-hochschulentwicklung/stellenanzeigen/F_T_0526_extern.pdf",
@@ -732,23 +847,28 @@
       "detail_verifie": true,
       "empreinte_detail": "60ee6fa15d9863926e577036cd9b45d6ed10e6330054ef2a96049bdb38080e11",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "TV-L E6, 50%",
         "contrat": 1,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 31/60"
         ],
+        "priorite": "ECARTEE",
         "score": 31,
         "skills": 0
       },
       "signature_liste": "bffb4995ae8d1ab189ab83e69f433de933cca177bcda5028048a8fe6df5c05a6",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Mitarbeiter*in im Verwaltungsdienst",
       "url": "https://uol.de/job1324",
@@ -761,6 +881,9 @@
       "detail_verifie": true,
       "empreinte_detail": "9b6f849060876b8f24b74d7484059dd981a1ddbec0bb35f008da875ffc74e14e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -772,17 +895,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 46/60"
         ],
+        "priorite": "ECARTEE",
         "score": 46,
         "skills": 3
       },
       "signature_liste": "94fb687631a087acda917811b03d329d71f8e00220ed9fb91749353a262f413f",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Psychologische:r Psychotherapeut:in (w/m/d) des Kinder- und Jugendalters in der Psychotherapeutischen Universitätsambulanz über die Lebensspanne (PULS) Fachbereich 11 - Human- und …",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4499?cHash=f66293ee2fbf9ae0042d9128299b1f66",
@@ -795,12 +920,16 @@
       "detail_verifie": true,
       "empreinte_detail": "6d9801497637f8a3419dc480e82de54319a9425bc28b5499f259857ca1b52cb5",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E14, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "doctorat déjà obtenu exigé",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -808,11 +937,12 @@
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "fc4536268ec6872f236e32126318111efda3aedb904f0253665afda720d10e91",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Researcher mit Tenure-Track zum Senior Researcher (w/m/d) für das Arbeitsgebiet Psychometrie und Individuelle Unterschiede Fachbereich 11 - Human- und Gesundheitswissenschaften Ent…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4528?cHash=dcf205a26634abeb8304bcd5e3156bd8",
@@ -825,23 +955,28 @@
       "detail_verifie": true,
       "empreinte_detail": "0aeb4a32fb843090fd1079374a23f9dfe8f898525fe4bf3b938eae7343c37a40",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "TV-L E13, 75%",
         "contrat": 13,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "5e3d4356af8995780d8717b5d664e852a8b7741e9d9d5fd5b7cfd687731542c4",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Doctoral candidate in paleoceanography / isotope geochemistry",
       "url": "https://uol.de/job1310en",
@@ -854,23 +989,28 @@
       "detail_verifie": true,
       "empreinte_detail": "439da4fbb080a5405a101787e7261ca1fa5d8a94056a96c89574c3409db24e3e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "TV-L E3",
         "contrat": 0,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 30/60"
         ],
+        "priorite": "ECARTEE",
         "score": 30,
         "skills": 0
       },
       "signature_liste": "ac1feb727e1a6d44ed8f79a2c6145e6845dad5652d5e52eb869a17f761a03d59",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Mitarbeiter*in im Verwaltungsdienst (Hochschulsport)",
       "url": "https://uol.de/job1295",
@@ -883,28 +1023,28 @@
       "detail_verifie": true,
       "empreinte_detail": "0abc10bffd3950b3241b53755847ad4838ded4654d0c4bc32d6cf45bda708196",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
-        "competences": [
-          [
-            "Netzwerke / Firewall",
-            2
-          ]
-        ],
+        "competences": [],
         "conditions": "TV-L E13, 60%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
-          "compétences 2/20",
-          "total 43/60"
+          "compétences 0/20",
+          "total 41/60"
         ],
-        "score": 43,
-        "skills": 2
+        "priorite": "ECARTEE",
+        "score": 41,
+        "skills": 0
       },
       "signature_liste": "05447f873e7d810524d2e5e01e23183fc2f680d7519080a14a7a0c93cda46aaa",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in Niederländische oder Deutsche Fachdidaktik (Oldenburg) / Promovendus CLCG (Groningen)",
       "url": "https://uol.de/job1313",
@@ -917,6 +1057,9 @@
       "detail_verifie": true,
       "empreinte_detail": "3dcaedd62f82ef5b60ee750dd119961ddbceff00370136f8a4241ff70a9bb3d5",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [
           [
@@ -928,6 +1071,7 @@
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -935,11 +1079,12 @@
           "compétences 4/20",
           "total 32/60"
         ],
+        "priorite": "ECARTEE",
         "score": 32,
         "skills": 4
       },
       "signature_liste": "00efe3c9e59255d4716ea651598cff3c1735f36f3695dad080928a7ba1149638",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Fachinformatiker:in Anwendungsentwicklung (w/m/d) zum 01.09.2027 [PDF-Dokument] Zentrum für angewandte Raumfahrttechnologie und Mikrogravitation (ZARM) Voll- ode…",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/2_UHB_Ausbildung_IT_Anwendung_2027.pdf",
@@ -952,12 +1097,16 @@
       "detail_verifie": true,
       "empreinte_detail": "446b2913f640a40f437c1832922859a5306404976d63fe64a9d7759130d25d0c",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -965,11 +1114,12 @@
           "compétences 0/20",
           "total 28/60"
         ],
+        "priorite": "ECARTEE",
         "score": 28,
         "skills": 0
       },
       "signature_liste": "d88cd1df1de5ca657fe832f660064d0b92e310e9def7d65af1b9802fa28fd3a1",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Biologielaborant:in (w/m/d) zum 01.09.2027 [PDF-Dokument] Fachbereich 2 - Biologie / Chemie Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_Biologielaborantin_2027.pdf",
@@ -982,6 +1132,9 @@
       "detail_verifie": true,
       "empreinte_detail": "350587b7eb98fd5c8e92a2c8d1a91f2d3db2c290596573a57e6b1c1b67d484ce",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1009,17 +1162,19 @@
         "contrat": 11,
         "eligible": false,
         "exclusion": "allemand C1/C2 requis",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "allemand C1/C2 requis",
           "total 59/60"
         ],
+        "priorite": "ECARTEE",
         "score": 59,
         "skills": 20
       },
       "signature_liste": "3e7a33711c41e1876221ff5cb6b7d10a8a60314a75ea98630ea371751c028b96",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Informatiker:in (w/m/d) Fachbereich 11 - Human- und Gesundheitswissenschaften Entgelt- / Besoldungsgruppe E 13 - Teilzeit 50%",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4543?cHash=0e0460b4a16e4483712467cfbbf69d17",
@@ -1032,6 +1187,9 @@
       "detail_verifie": true,
       "empreinte_detail": "0ec9ef59f2f0b5b3f14ed5d7254ca673b3200adeb31e2ba9e562eb0069177baf",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1043,17 +1201,19 @@
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 36/60"
         ],
+        "priorite": "ECARTEE",
         "score": 36,
         "skills": 3
       },
       "signature_liste": "2084b1d1e715396409b4f3cb511c040c564b408b121552d63a4b4243ebb8ed7f",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Tischler:in (w/m/d) mit dem Schwerpunkt Instandhaltung Dezernat 4 Technischer Betrieb/Bauangelegenheiten Entgelt- / Besoldungsgruppe E 7 - Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4556?cHash=d5fc02f807578b7788ccbbf9255cfc2a",
@@ -1066,6 +1226,9 @@
       "detail_verifie": true,
       "empreinte_detail": "75bff8a5f7cde65a83039247cf5d2e67916881bcb662e83668961e4e06b5317e",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [
           [
@@ -1077,17 +1240,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 48/60"
         ],
+        "priorite": "ECARTEE",
         "score": 48,
         "skills": 3
       },
       "signature_liste": "8cf8b935486d0ab61c6f4015f1edbd0360e84dd200761023de1c10bf81714367",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Doctoral Researcher in Interactive and Immersive Simulation of Animal Navigation in the Quantum Biology and Computational Physics Group",
       "url": "https://uol.de/job1326en",
@@ -1100,23 +1265,28 @@
       "detail_verifie": true,
       "empreinte_detail": "15fc7b913a8e0184a544c257ada54695e2e7c7909dcb5f0601d4b1d76ea6e6ab",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "TV-L E13, 75%",
         "contrat": 13,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "df58f348541503e87dd3051efb6b79e13988c1ff3f4501fe48649f7c16ec720d",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Volljurist*in im Referat Recht und Gremien",
       "url": "https://uol.de/job1328",
@@ -1129,6 +1299,9 @@
       "detail_verifie": true,
       "empreinte_detail": "7015506c79275a00ca7a7a4237f1caadec5a26632a27f0a0e0572be0adbd29ad",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [
           [
@@ -1140,17 +1313,19 @@
         "contrat": 9,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 40/60"
         ],
+        "priorite": "ECARTEE",
         "score": 40,
         "skills": 3
       },
       "signature_liste": "652c1a0556d87e5c192fda24a2e10fcd6c82369bf5fb23f1ea39809e3b829495",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Verwaltungsangestellte:r (w/m/d) bzw. Verwaltungshauptsekretär:in (w/m/d) Fachbereich 4 - Produktionstechnik - Maschinenbau und Verfahrenstechnik Entgelt- / Besoldungsgruppe E 9a, …",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4542?cHash=de71d1b70933d9c821de8fa07cb14a07",
@@ -1163,23 +1338,28 @@
       "detail_verifie": true,
       "empreinte_detail": "384a29aadbf66f71d282c675413992d48ce48c4e1e5a2519ef568ce06c880ae0",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 50%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 39/60"
         ],
+        "priorite": "ECARTEE",
         "score": 39,
         "skills": 0
       },
       "signature_liste": "478b27565ce33e545f63891a415514076bc9affabe062fa2bd6000ee777d2dcd",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Wissenschaftliche:r Mitarbeiter:in (Doktorand:in) (w/m/d) n der Arbeitsgruppe „Bürgerliches Recht, Internationales und Europäisches Privatrecht, Zivilverfahrensrecht und Rechtsverg…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4541?cHash=982bea68c5955862d35fd234d1a7325c",
@@ -1192,23 +1372,28 @@
       "detail_verifie": true,
       "empreinte_detail": "91ff2c89d5c24280470d16f6dbeb37e8ca3c6a3bb7592d2f9ebf8a9cd32fc903",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 33/60"
         ],
+        "priorite": "ECARTEE",
         "score": 33,
         "skills": 0
       },
       "signature_liste": "cfecabbc7a5df3c58f94625dc16891da81b0d8dd79c76bbd991a95bee75985d8",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Rektor:in (w/m/d) an der Universität Bremen Rektorat Entgelt- / Besoldungsgruppe W 3 - Vollzeit",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4551?cHash=3c0468055b52a4e51bffea62dcd75971",
@@ -1221,6 +1406,9 @@
       "detail_verifie": true,
       "empreinte_detail": "1b2644cfd55aefac7a06ce0f299b252f6997c6d0889b055dbff218801269ba83",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1232,17 +1420,19 @@
         "contrat": 13,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 3/20",
           "total 44/60"
         ],
+        "priorite": "ECARTEE",
         "score": 44,
         "skills": 3
       },
       "signature_liste": "e727051bc2234a9b2e7bfcaa901490d959cd4285fc1c047d5cefa4e3d0baf573",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Psychologische:r Psychotherapeut:in (w/m/d) des Erwachsenenalters in der Psychotherapeutischen Universitätsambulanz über die Lebensspanne (PULS) Fachbereich 11 - Human- und Gesundh…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4537?cHash=249ddf072a5e0ea05d2d961f0d24cf9f",
@@ -1255,6 +1445,9 @@
       "detail_verifie": true,
       "empreinte_detail": "b7fd6cdb38ca7276973e88f969ab5fc287965dd69e6ed7873386ccb72a8b5d30",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1266,6 +1459,7 @@
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -1273,11 +1467,12 @@
           "compétences 4/20",
           "total 32/60"
         ],
+        "priorite": "ECARTEE",
         "score": 32,
         "skills": 4
       },
       "signature_liste": "dfb5769417b8b7cb8347f3bc34915964d89748591e333afe10470aaa81919ee6",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Fachinformatiker:in Systemintegration (w/m/d) zum 01.09.2027 [PDF-Dokument] Fachbereich 3 - Mathematik/Informatik Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/2_UHB_Ausbildung_IT_System_2027.pdf",
@@ -1290,12 +1485,16 @@
       "detail_verifie": true,
       "empreinte_detail": "92808e144400d61bfff1310e122b47a49576d85b1b15f67576fde7762caed516",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Emploi informatique / autre",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -1303,11 +1502,12 @@
           "compétences 0/20",
           "total 28/60"
         ],
+        "priorite": "ECARTEE",
         "score": 28,
         "skills": 0
       },
       "signature_liste": "2cc2c2dad3b519490ef70d50495835fb9cbeba835a07253c294d04ce411e9c40",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Anlagenmechaniker:in für Sanitär-, Heizungs- und Klimatechnik (w/m/d) zum 01.09.2027 [PDF-Dokument] Dezernat 4 Technischer Betrieb/Bauangelegenheiten Voll- oder …",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_Anlagenmechanikerin_2027.pdf",
@@ -1320,23 +1520,28 @@
       "detail_verifie": true,
       "empreinte_detail": "e5267f0e1ffbcd723c4ae1a1e86af8dd5375c7c9d56ae64aa93648468607ae92",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 45/60"
         ],
+        "priorite": "ECARTEE",
         "score": 45,
         "skills": 0
       },
       "signature_liste": "44913c189faae171068a0d697f8e156b29197cc1a961683be02f9497aedcde0b",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Postdoctoral Researcher in Microalgal Systems Biology",
       "url": "https://uol.de/job1312en",
@@ -1349,23 +1554,28 @@
       "detail_verifie": true,
       "empreinte_detail": "8e5e50649ec4d648da42d910b15312cd777e88662477e5bb871b41c1a80f43d8",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E14, 75%",
         "contrat": 13,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "31f82d7673329701f25173a4d440af99904d9258dd8fb1844051016cbeedc1fc",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Leitung der Geschäftsstelle der Medizinischen Ethikkommission der Fakultät VI - Medizin und Gesundheitswissenschaften",
       "url": "https://uol.de/job1302",
@@ -1378,28 +1588,33 @@
       "detail_verifie": true,
       "empreinte_detail": "f842e69ffbe7da035fe5528c8295a7c60cd4606d96a85f0baa289e5450da36cc",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
             "Monitoring",
-            4
+            3
           ]
         ],
         "conditions": "TV-L E13, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
-          "compétences 4/20",
-          "total 49/60"
+          "compétences 3/20",
+          "total 48/60"
         ],
-        "score": 49,
-        "skills": 4
+        "priorite": "ECARTEE",
+        "score": 48,
+        "skills": 3
       },
       "signature_liste": "0d5801293f3e829a45707f30704536fae35e254465d38f8198c1c661d3e0a3f6",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Fachreferent*in für das Fachgebiet Medizin und weitere naturwissenschaftliche Fachgebiete sowie Open Access Publikationsberatung und Publikationsmonitoring",
       "url": "https://uol.de/job1319",
@@ -1412,23 +1627,28 @@
       "detail_verifie": true,
       "empreinte_detail": "c25136aa5fa37ecc9b3296f0ea6c546ebfb321a544ad99602968af2836d0c469",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [],
         "conditions": "TV-L E13, 50%",
         "contrat": 11,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 41/60"
         ],
+        "priorite": "ECARTEE",
         "score": 41,
         "skills": 0
       },
       "signature_liste": "c56c28e1f8b3eaeea9f85918a550efe7ff169a7d09542767d7ceb3c06eccea95",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in (Doktorand*in) im Bereich Sprachdidaktik Deutsch",
       "url": "https://uol.de/job1231",
@@ -1441,23 +1661,28 @@
       "detail_verifie": true,
       "empreinte_detail": "b2a65596a615bb4265240407401b1bdf9d2b2a25100ab76535f3af0a3cf8c3ee",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E6, 100%",
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 35/60"
         ],
+        "priorite": "ECARTEE",
         "score": 35,
         "skills": 0
       },
       "signature_liste": "a652a9482250ed57868384be5a7f2b3971e1ee17a9f4af53974c7acd3d2f2cca",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Mitarbeiter*in im Verwaltungsdienst für das Sekretariat mit Schwerpunkt Forschung und Lehre in den Bereichen AINS und Palliativmedizin, Departmentrat Humanmedizin und Core Facility Biobank",
       "url": "https://uol.de/job1330",
@@ -1470,11 +1695,14 @@
       "detail_verifie": true,
       "empreinte_detail": "c8eaa93027bccdd1048c52a2cd36335f1da6665cb00e2e9d83ac6081686f0c03",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
             "Monitoring",
-            4
+            3
           ],
           [
             "Netzwerke / Firewall",
@@ -1485,17 +1713,19 @@
         "contrat": 7,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
-          "compétences 6/20",
-          "total 43/60"
+          "compétences 5/20",
+          "total 42/60"
         ],
-        "score": 43,
-        "skills": 6
+        "priorite": "ECARTEE",
+        "score": 42,
+        "skills": 5
       },
       "signature_liste": "3f7bcf6b1080d98fcd642d893643e844a1e19f069eee1197a3894a1b1247059a",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Administrative Sachbearbeitung für den Internationalisierungsbereich",
       "url": "https://uol.de/job1322",
@@ -1508,6 +1738,9 @@
       "detail_verifie": true,
       "empreinte_detail": "fe573af04f768a1300188a8e984bb1f8bdf7be0396057b7e3f022c57cfabb196",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Doctorat rémunéré (à confirmer dans l'annonce)",
         "competences": [
           [
@@ -1519,17 +1752,19 @@
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
           "compétences 2/20",
           "total 47/60"
         ],
+        "priorite": "ECARTEE",
         "score": 47,
         "skills": 2
       },
       "signature_liste": "eda03f1585a0417a5b226ac2977925300a1e7e1ab34a3138710a9fb1b4d05b3e",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Wissenschaftliche*r Mitarbeiter*in / Promotionsstelle in der Forschungsgruppe Trustworthy AI",
       "url": "https://uol.de/job1332",
@@ -1542,12 +1777,16 @@
       "detail_verifie": true,
       "empreinte_detail": "fd338eb9965d0b6de510d93625cbdcb5e0db0c809b2fbbeabd8c5da3013c61dd",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "Rémunération inconnue",
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -1555,11 +1794,12 @@
           "compétences 0/20",
           "total 28/60"
         ],
+        "priorite": "ECARTEE",
         "score": 28,
         "skills": 0
       },
       "signature_liste": "b8c2b4fb0ce386384dcd4f78be885856b90a62f1c44bb9fb9f36c9cd98685ab0",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Chemielaborant:in (w/m/d) zum 01.09.2027 [PDF-Dokument] Fachbereich 2 - Biologie / Chemie Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/UHB_Ausbildung_Chemielaborantin_2027.pdf",
@@ -1572,28 +1812,33 @@
       "detail_verifie": true,
       "empreinte_detail": "b42a70d3717fa7479ae4f2dd041db5f1301cdf797e29403faf7f0cc6180dbfbc",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
             "Monitoring",
-            4
+            3
           ]
         ],
         "conditions": "Rémunération inconnue, 100%",
         "contrat": 5,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
         "motifs": [
-          "compétences 4/20",
-          "total 39/60"
+          "compétences 3/20",
+          "total 38/60"
         ],
-        "score": 39,
-        "skills": 4
+        "priorite": "ECARTEE",
+        "score": 38,
+        "skills": 3
       },
       "signature_liste": "fdf514df6ea5e8dd991000f8bab934bf7f8ee26f8764ef67d95eb1f353216147",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Volontär*in in der Stabsstelle Presse & Kommunikation",
       "url": "https://uol.de/job1264",
@@ -1606,23 +1851,28 @@
       "detail_verifie": true,
       "empreinte_detail": "1aa9efcfa825de28854869ca3546552098a30afff81fab0a578212c495e08374",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E13, 100%",
         "contrat": 15,
         "eligible": false,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "7ce489feb19de282d9f752bf69b6997db502e69713adfdddb9058bcbd18eaea2",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Wissenschaftliche:r Mitarbeiter:in (w/m/d) auf dem Gebiet der Meeresgeochemie für das internationale Ozeanbohrprogramm (IODP³ / ECORD) MARUM – Zentrum für Marine Umweltwissenschaft…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4533?cHash=31775d47f6183b772d840d3b41cd6a27",
@@ -1635,6 +1885,9 @@
       "detail_verifie": true,
       "empreinte_detail": "80d0237467395f2b482ab75deecfeb59f9cb248f25e9e66bb9a3058638c8da4a",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1650,6 +1903,7 @@
         "contrat": 0,
         "eligible": false,
         "exclusion": "formation/stage/emploi étudiant",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -1657,11 +1911,12 @@
           "compétences 9/20",
           "total 37/60"
         ],
+        "priorite": "ECARTEE",
         "score": 37,
         "skills": 9
       },
       "signature_liste": "9242ae4abb3dd4583732636b6a8e28f39dfe286c9ece5d558760e2c38dd36841",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Ausbildung zur/zum Fachinformatiker:in Digitale Vernetzung (w/m/d) zum 01.09.2027 [PDF-Dokument] Fachbereich 3 - Mathematik/Informatik Voll- oder Teilzeit",
       "url": "https://www.uni-bremen.de/fileadmin/user_upload/universitaet/OffeneStellen/Ausbildung_2027/2_UHB_Ausbildung_FI_Digitale_Vernetzung_2027.pdf",
@@ -1674,12 +1929,16 @@
       "detail_verifie": true,
       "empreinte_detail": "611080340c3aa20b40c3c30bc1f45d48e7ada10dabf6b198720d9877cba4b740",
       "note": {
+        "alerte": false,
+        "bonus_specialite": 0,
+        "branche": "IT / AUTRE",
         "categorie": "Recherche scientifique",
         "competences": [],
         "conditions": "TV-L E14",
         "contrat": 15,
         "eligible": false,
         "exclusion": "doctorat déjà obtenu exigé",
+        "justification_bonus": "",
         "lieu": 28,
         "localite": "LOCAL",
         "motifs": [
@@ -1687,11 +1946,12 @@
           "compétences 0/20",
           "total 43/60"
         ],
+        "priorite": "ECARTEE",
         "score": 43,
         "skills": 0
       },
       "signature_liste": "f8367b2a13ec2a99d845fde3e91dea764bcdf98512c3449e743e42e21e06dc09",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "bremen",
       "titre": "Lecturer (w/m/d) mit Tenure-Track zum Senior Lecturer für das Arbeitsgebiet „Sportpädagogik und Sportdidaktik für den Elementar- und Primarbereich“ Fachbereich 11 - Human- und Gesu…",
       "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen/job/4548?cHash=ddf70c48e06980ab2800530f20722b22",
@@ -1704,6 +1964,9 @@
       "detail_verifie": true,
       "empreinte_detail": "6be837b30690970b419e83bcc9e2044c9e73e037c719c5dc372c0cfc2a26b70a",
       "note": {
+        "alerte": true,
+        "bonus_specialite": 0,
+        "branche": "RECHERCHE",
         "categorie": "Recherche scientifique",
         "competences": [
           [
@@ -1716,7 +1979,7 @@
           ],
           [
             "Bash / Shell",
-            3
+            5
           ],
           [
             "Python",
@@ -1729,19 +1992,18 @@
         ],
         "conditions": "TV-L E13, 50%",
         "contrat": 11,
-        "eligible": false,
+        "eligible": true,
         "exclusion": "",
+        "justification_bonus": "",
         "lieu": 30,
         "localite": "LOCAL",
-        "motifs": [
-          "compétences 18/20",
-          "total 59/60"
-        ],
-        "score": 59,
-        "skills": 18
+        "motifs": [],
+        "priorite": "PRIORITAIRE",
+        "score": 61,
+        "skills": 20
       },
       "signature_liste": "a1f993d6e19e92a3b709dc49115313c2def3b8f3293946415575dfaa8dc50204",
-      "signature_regles": "b28a0e26dd427745a25f10d771596f167ca2007e06f6f25c55ea70ca6a112202",
+      "signature_regles": "7837d7e3c368ba5e85dc1fa12c47e0c7d47e681921ac14027f6db4e3f34390ba",
       "source": "oldenburg",
       "titre": "Research Assistant in the Quantum Biology and Computational Physics Group",
       "url": "https://uol.de/job1325en",
