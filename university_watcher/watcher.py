@@ -29,6 +29,7 @@ import xml.etree.ElementTree as ET
 
 import requests
 from bs4 import BeautifulSoup
+from adequation import evaluer_adequation
 
 BASE = Path(__file__).resolve().parent
 HEADERS = {"User-Agent": "UniversityJobWatcher/1.0 (personal job alerts; public pages; 1 request per 1.5s)"}
@@ -481,6 +482,7 @@ def bonus_adequation(titre, branche, noms, cfg):
 def noter(o, cfg):
     texte = normaliser(o.titre + ' ' + o.texte)
     exclusion = exclure(o.titre, o.texte)
+    adequation = evaluer_adequation(o.titre, o.texte, cfg.get('adequation_v7', {}))
     trouve = [(g['nom'], pts) for g in cfg['competences']
               if (pts := points_competence(g, texte)) > 0]
     noms = {nom for nom, _ in trouve}
@@ -498,8 +500,23 @@ def noter(o, cfg):
                   and score >= sec.get('seuil_total', 55)
                   and skills >= sec.get('minimum_competences', 10))
     priorite = 'PRIORITAIRE' if primaire else 'A_EXAMINER' if secondaire else 'ECARTEE'
+    # Le score technique reste lisible mais n'est plus suffisant à lui seul.
+    # Hors profil => pas d'alerte. Incertain => revue humaine, jamais «prioritaire».
+    if adequation['action'] == 'HORS_PROFIL':
+        primaire = secondaire = False
+        priorite = 'ECARTEE'
+    elif adequation['action'] == 'EXAMEN' and primaire:
+        primaire = False
+        secondaire = True
+        priorite = 'A_EXAMINER'
     motifs = []
     if exclusion: motifs.append(exclusion)
+    if adequation['action'] == 'HORS_PROFIL':
+        motifs.append('hors spécialité : ' + adequation['specialite'] +
+                      ' (missions : ' + ', '.join(adequation['missions_specialisees'][:3]) +
+                      ' ; prérequis : ' + ', '.join(adequation['exigences_specialisees'][:3]) + ')')
+    if adequation['action'] == 'EXAMEN':
+        motifs.append('adéquation à vérifier : ' + adequation['motif'])
     if typ == 'HORS ZONE': motifs.append('hors zone et pas de remote vérifiable')
     if not primaire:
         if skills < cfg['minimum_competences']:
@@ -510,7 +527,7 @@ def noter(o, cfg):
     return {'score':score, 'skills':skills, 'lieu':lieu, 'contrat':contrat,
             'conditions':cond, 'localite':typ, 'categorie':classe(o.titre,o.texte),
             'branche':branche, 'bonus_specialite':bonus, 'justification_bonus':justification,
-            'competences':trouve, 'exclusion':exclusion, 'eligible':primaire,
+            'competences':trouve, 'exclusion':exclusion, 'adequation':adequation, 'eligible':primaire,
             'alerte': primaire or secondaire, 'priorite':priorite, 'motifs':motifs}
 
 
@@ -545,6 +562,13 @@ def emailer(resultats, destinataire, adresse, mot_de_passe):
                           f"Compétences {note['skills']}/55 (bonus {note['bonus_specialite']}) ; "
                           f"lieu {note['lieu']}/30 ; contrat {note['contrat']}/15 ({note['conditions']})",
                           'Correspondances : ' + ', '.join(n for n,_ in note['competences']),
+                          'Métier principal : ' + note.get('adequation', {}).get('domaine', 'NON_CLASSE'),
+                          'Preuves missions : ' + (', '.join((note.get('adequation', {}).get('missions_it', []) +
+                            note.get('adequation', {}).get('missions_bpm_iot', []) +
+                            note.get('adequation', {}).get('missions_specialisees', []))[:5]) or 'à confirmer'),
+                          'Prérequis spécialisés à vérifier : ' +
+                            (', '.join(note.get('adequation', {}).get('exigences_specialisees', [])[:5]) or 'aucun signalé'),
+                          'Vérification : ' + note.get('adequation', {}).get('motif', ''),
                           f"Annonce : {o.url}", ''])
     msg.set_content('\n'.join(lines))
     with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as smtp:
@@ -612,9 +636,9 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({'algorithme': 'v6', **{k: cfg.get(k) for k in (
+    regles = empreinte({'algorithme': 'v7', **{k: cfg.get(k) for k in (
         'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
-        'alerte_secondaire', 'bonus_specialite')}})
+        'alerte_secondaire', 'bonus_specialite', 'adequation_v7')}})
     if actualiser:
         if offre.url.split('#')[0] == src['url'].split('#')[0]:
             offre.detail_erreur = 'Le lien renvoie à la liste des annonces'
@@ -694,10 +718,15 @@ def main():
             if not offre.detail_verifie:
                 incompletes.append(offre)
             raison = '; '.join(note['motifs']) if note['motifs'] else 'conditions remplies'
-            log.info('%3d points (skills %2d) %s — %s — %s — %s [%s]',
+            log.info('%3d points (skills %2d) %s — %s — %s — %s [%s] ; DOMAINE=%s ; PREUVES=%s ; EXIGENCES=%s',
                      note['score'], note['skills'], offre.source,
                      note['priorite'], raison,
-                     offre.titre[:110], situation)
+                     offre.titre[:110], situation,
+                     note.get('adequation', {}).get('domaine','NON_CLASSE'),
+                     ','.join((note.get('adequation', {}).get('missions_it', []) +
+                               note.get('adequation', {}).get('missions_bpm_iot', []) +
+                               note.get('adequation', {}).get('missions_specialisees', []))[:4]),
+                     ','.join(note.get('adequation', {}).get('exigences_specialisees', [])[:4]))
             if note['alerte'] and identifiant not in seen:
                 qualifiees.append((offre, note))
         except Exception as exc:

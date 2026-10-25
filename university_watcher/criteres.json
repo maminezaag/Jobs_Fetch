@@ -127,8 +127,6 @@
         "esxi",
         "vcenter",
         "proxmox",
-        "virtualisierung",
-        "virtualization",
         "proxmox ve"
       ],
       "variantes_points": [
@@ -442,5 +440,141 @@
     "Les synonymes Linux/RedHat/Ubuntu sont regroupés: 5 pts maximum ; même principe VMware/Proxmox: maximum 5.",
     "Changer un critère déclenche le re-scoring depuis les fiches déjà mises en cache.",
     "Le fichier criteres.json du Jobs_Fetch principal n’est pas modifié."
+  ],
+  "adequation_v7": {
+    "_aide": [
+      "Les expressions suivantes servent à identifier le MÉTIER demandé à partir des MISSIONS et QUALIFICATIONS OBLIGATOIRES.",
+      "Ne pas prendre le seul nom du laboratoire comme preuve de spécialisation.",
+      "Une recherche hors spécialité n’est écartée qu’avec >=2 marqueurs de mission ET >=2 exigences obligatoires, sans cœur de métier IT/BPM.",
+      "Lorsque missions/exigences ne sont pas clairement isolées, signaler À EXAMINER au lieu d’écarter.",
+      "Corrigé: «virtualisation» générique ne déclenche plus les points spécifiques VMware/Proxmox."
+    ],
+    "missions_it": [
+      "administration of linux servers",
+      "administering linux servers",
+      "administration of servers",
+      "administration von servern",
+      "serveradministration",
+      "server administration",
+      "administration eines rechenservers",
+      "betrieb von servern",
+      "betrieb der it-infrastruktur",
+      "it-infrastruktur betreuen",
+      "administration der it-infrastruktur",
+      "administration der systeme",
+      "system administration",
+      "systemadministration",
+      "linux system administration",
+      "manage linux servers",
+      "manage and maintain linux",
+      "linux infrastructure",
+      "maintain linux servers",
+      "server infrastructure",
+      "deploy and maintain",
+      "infrastructure automation",
+      "automatisierung der infrastruktur",
+      "monitoring der it-infrastruktur",
+      "it operations",
+      "it-support",
+      "it support",
+      "linux cluster administration",
+      "hpc cluster administration",
+      "betrieb von linux-clustern",
+      "clusteradministration",
+      "operate linux clusters"
+    ],
+    "missions_bpm_iot": [
+      "bpmn",
+      "business process management",
+      "geschäftsprozessmanagement",
+      "business process modeling",
+      "modellierung von geschäftsprozessen",
+      "workflow automation",
+      "workflow-automatisierung",
+      "prozessautomatisierung",
+      "process automation",
+      "prozessdigitalisierung",
+      "internet of things",
+      "iot",
+      "iot-sensoren",
+      "sensor networks",
+      "information systems research",
+      "informationssystemforschung"
+    ],
+    "domaines_scientifiques_eloignes": [
+      {
+        "nom": "Physique quantique / biophysique computationnelle",
+        "missions": [
+          "quantum effects",
+          "quantum mechanics",
+          "quantum biology",
+          "numerical simulations",
+          "molecular simulations",
+          "quantum chemistry",
+          "computational biophysical",
+          "molecular dynamics",
+          "quantum sensing",
+          "spin dynamics",
+          "simulation quantique",
+          "simulation moléculaire"
+        ],
+        "exigences_obligatoires": [
+          "molecular dynamics",
+          "quantum chemical",
+          "quantum chemistry",
+          "spin dynamics",
+          "many-body systems",
+          "hpc",
+          "high-performance computing",
+          "gaussian",
+          "gromacs",
+          "namd",
+          "octopus",
+          "protein sequence",
+          "computational biophysics",
+          "molecular mechanics"
+        ]
+      },
+      {
+        "nom": "Géochimie / paléocéanographie",
+        "missions": [
+          "isotope geochemistry",
+          "paleoceanography",
+          "palaeoceanography",
+          "geochemical analyses",
+          "marine geochemistry"
+        ],
+        "exigences_obligatoires": [
+          "mass spectrometry",
+          "isotope geochemistry",
+          "geochemical analysis",
+          "paleoceanography",
+          "palaeoceanography"
+        ]
+      },
+      {
+        "nom": "Biologie moléculaire expérimentale",
+        "missions": [
+          "microalgal systems biology",
+          "molecular biology experiments",
+          "protein crystallography",
+          "cell culture experiments"
+        ],
+        "exigences_obligatoires": [
+          "molecular biology",
+          "wet lab",
+          "cell culture",
+          "protein purification",
+          "gene sequencing"
+        ]
+      }
+    ]
+  },
+  "_aide_v7": [
+    "V7 ajoute un contrôle transparent du domaine principal avant l’e-mail.",
+    "Une offre hors expertise exige simultanément des tâches spécialisées et des prérequis spécialisés (au moins 2+2).",
+    "Les annonces ambiguës sont À EXAMINER; les bons emplois IT en laboratoire de physique ne sont pas pénalisés.",
+    "Le seuil 60/20 et l’alerte secondaire 55/10 ne changent pas.",
+    "Changement de règles = nouveau scoring sur cache V5/V6 sans téléchargement immédiat."
   ]
 }
