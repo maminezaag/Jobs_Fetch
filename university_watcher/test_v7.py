@@ -117,7 +117,7 @@ class AnalyseMetierV7(unittest.TestCase):
     def test_no_sections_it_administrator_not_automatically_rejected(self):
         a=evaluer_adequation('IT Administrator Linux Ansible',
             'IT support, Linux, Ansible, Bash. TV-L E13 Vollzeit',CFG['adequation_v7'])
-        self.assertEqual(a['action'],'OK')
+        self.assertEqual(a['action'],'EXAMEN')
 
     def test_separate_required_from_desirable(self):
         parts=extraire_parties('Your tasks Linux server administration. Your profile Required qualifications: '

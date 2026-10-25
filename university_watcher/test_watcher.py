@@ -68,7 +68,7 @@ class ScoringTests(unittest.TestCase):
     def test_no_email_without_complete_description(self):
         offer = Offre("oldenburg", "IT-Systemadministrator Linux Puppet VMware Docker",
                       "https://uol.de/jobs/test", "Oldenburg",
-                      "Backup, Checkmk, IoT, BPM, 100%, EG 13 TV-L")
+                      "Backup, Checkmk, IoT, BPM, 100%, EG 13 TV-L. Your tasks: maintain Linux servers.")
         result = noter(offer, CFG)
         self.assertTrue(result["eligible"])
         decision_apres_verification(offer, result)
@@ -84,7 +84,7 @@ class ScoringTests(unittest.TestCase):
 
     def test_science_relevance_and_email(self):
         offer = Offre("bremen", "Wissenschaftliche:r Mitarbeiter:in IoT und BPM", "https://uni-bremen.de/job1", "Bremen",
-                      "BPMN, Informationssysteme, Linux, Prozessautomatisierung, MySQL. E13 TV-L, 75%. Deutsch B2 ausreichend")
+                      "BPMN, Informationssysteme, Linux, Prozessautomatisierung, MySQL. E13 TV-L, 75%. Deutsch B2 ausreichend. Your tasks: design BPMN workflows.")
         n = noter(offer, CFG)
         self.assertTrue(n["eligible"])
         self.assertGreaterEqual(n["score"],60)
@@ -178,7 +178,7 @@ class HistoryV5Tests(unittest.TestCase):
         self.today = date(2026, 10, 25)
         self.offre = Offre("oldenburg", "IT-Systemadministrator Linux", "https://uol.de/jobs/it1", "Oldenburg", "IoT")
         self.c = Mock()
-        self.c.page_text.return_value = "Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend"
+        self.c.page_text.return_value = "Your tasks: maintain Linux servers. Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend"
 
     def premiere_analyse(self):
         note, entry, status = analyser_une_offre(self.offre, self.c, self.src, None, CFG, self.today)
@@ -231,7 +231,7 @@ class HistoryV5Tests(unittest.TestCase):
         _, entry, _ = analyser_une_offre(self.offre, self.c, self.src, None, CFG, self.today)
         self.assertFalse(entry["detail_verifie"])
         self.c.page_text.side_effect = None
-        self.c.page_text.return_value = "Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit"
+        self.c.page_text.return_value = "Your tasks: maintain Linux servers. Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit"
         second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT")
         note, refreshed, _ = analyser_une_offre(second, self.c, self.src, entry, CFG, self.today+timedelta(days=1))
         self.assertEqual(self.c.page_text.call_count, 2)
@@ -278,7 +278,7 @@ class IntegrationHistoryTests(unittest.TestCase):
             def collect(*args):
                 return [Offre('oldenburg','IT-Systemadministrator Linux', 'https://uol.de/jobs/it1','Oldenburg','IoT')]
             collector.collect.side_effect = collect
-            collector.page_text.return_value = 'Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
+            collector.page_text.return_value = 'Your tasks: maintain Linux servers. Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
             with (patch.object(watcher,'BASE',base), patch.object(watcher,'Collecteur',return_value=collector),
                   patch.object(watcher,'emailer') as send,
                   patch.dict(os.environ, {'GMAIL_ADDRESS':'test@example.com',
@@ -305,7 +305,7 @@ class IntegrationHistoryTests(unittest.TestCase):
             (base/'seen_university_jobs.json').write_text('[]')
             collector=Mock()
             collector.collect.side_effect=lambda *args: [Offre('oldenburg','IT-Systemadministrator Linux','https://uol.de/jobs/it1','Oldenburg','IoT')]
-            collector.page_text.return_value='Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
+            collector.page_text.return_value='Your tasks: maintain Linux servers. Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
             with (patch.object(watcher,'BASE',base), patch.object(watcher,'Collecteur',return_value=collector),
                   patch.object(watcher,'emailer') as send,
                   patch.dict(os.environ, {'GMAIL_ADDRESS':'test@example.com', 'GMAIL_APP_PASSWORD':'fake', 'GMAIL_TO':'dest@example.com'}),

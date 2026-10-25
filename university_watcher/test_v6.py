@@ -18,7 +18,7 @@ class V6ScoringTests(unittest.TestCase):
 
     def test_it_administrator_and_jobs_fetch_weights(self):
         n=noter(self.offer('IT Administrator Linux VMware Ansible Bash',
-                           'TV-L E13, 100%'),CFG)
+                           'TV-L E13, 100%. Your tasks: maintain Linux servers.'),CFG)
         self.assertTrue(n['eligible'])
         self.assertEqual(n['priorite'],'PRIORITAIRE')
         self.assertEqual(n['skills'],27)
@@ -49,7 +49,7 @@ class V6ScoringTests(unittest.TestCase):
 
     def test_research_bpm_iot_bonus(self):
         n=noter(self.offer('Wissenschaftlicher Mitarbeiter Promotionsstelle BPMN IoT',
-                         'BPM, IoT, Python, Workflow Automation, TV-L E13 100%'),CFG)
+                         'BPM, IoT, Python, Workflow Automation, TV-L E13 100%. Your tasks: design BPMN workflows.'),CFG)
         self.assertEqual(n['branche'],'RECHERCHE')
         self.assertEqual(n['bonus_specialite'],5)
         self.assertTrue(n['eligible'])
@@ -119,7 +119,7 @@ class V6ScoringTests(unittest.TestCase):
         self.assertNotEqual(first['skills'],second['skills'])
 
     def test_secondary_email_contains_two_sections(self):
-        a=self.offer('IT Administrator Linux VMware Ansible Bash','TV-L E13 100%')
+        a=self.offer('IT Administrator Linux VMware Ansible Bash','TV-L E13 100%. Your tasks: maintain Linux servers.')
         b=self.offer('IT-Systemadministrator Linux VMware','TV-L E13 100%')
         notes=[(a,noter(a,CFG)),(b,noter(b,CFG))]
         smtp=Mock()

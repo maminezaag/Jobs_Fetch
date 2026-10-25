@@ -139,9 +139,13 @@ def evaluer_adequation(titre: str, texte: str, regles: dict) -> dict:
         raison = 'exigences scientifiques spécifiques à examiner manuellement'
     elif it_central or titre_it:
         statut = 'ADMINISTRATION_IT' if it_central else 'IT_PRESUMEE'
+        if not it_central:
+            verdict = 'EXAMEN'  # Un titre seul n'établit pas la spécialité du poste.
         raison = 'missions IT' if it_central else 'titre IT ; missions non concluantes'
     elif cible_central or titre_bpm:
         statut = 'RECHERCHE_BPM_IOT' if cible_central else 'RECHERCHE_CIBLE_PRESUMEE'
+        if not cible_central:
+            verdict = 'EXAMEN'  # Un titre seul n'établit pas le métier scientifique principal.
         raison = 'missions BPM/IoT' if cible_central else 'sujet BPM/IoT ; missions non concluantes'
     else:
         # Un domaine inconnu n'est pas une preuve de compatibilité :
