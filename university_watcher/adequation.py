@@ -144,7 +144,11 @@ def evaluer_adequation(titre: str, texte: str, regles: dict) -> dict:
         statut = 'RECHERCHE_BPM_IOT' if cible_central else 'RECHERCHE_CIBLE_PRESUMEE'
         raison = 'missions BPM/IoT' if cible_central else 'sujet BPM/IoT ; missions non concluantes'
     else:
-        raison = 'pas assez d’indices convergents pour identifier la spécialité'
+        # Un domaine inconnu n'est pas une preuve de compatibilité :
+        # suffisamment de mots techniques peuvent être trouvés dans une spécialité éloignée.
+        # Toujours permettre l'examen humain lorsque les seuils le justifient.
+        verdict = 'EXAMEN'
+        raison = 'domaine principal non identifié ; vérification humaine nécessaire'
     # Même si les rubriques sont absentes, un titre de spécialisation clairement
     # éloignée ne doit pas générer une alerte PRIORITAIRE par simple comptage IT.
     titre_specialise = any(

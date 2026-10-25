@@ -636,7 +636,7 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({'algorithme': 'v7', **{k: cfg.get(k) for k in (
+    regles = empreinte({'algorithme': 'v7.1', **{k: cfg.get(k) for k in (
         'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
         'alerte_secondaire', 'bonus_specialite', 'adequation_v7')}})
     if actualiser:
