@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from pathlib import Path
 import unittest
 from unittest.mock import Mock
-from watcher import Offre, Collecteur, exclure, geo, noter, points_contrat
+from watcher import Offre, Collecteur, exclure, geo, noter, points_contrat, decision_apres_verification
 
 CFG = json.loads((Path(__file__).parent / "criteres.json").read_text(encoding="utf-8"))
 
@@ -36,6 +36,45 @@ class ScoringTests(unittest.TestCase):
         self.assertFalse(exclure("Admin", "Englisch C1 erforderlich, Deutsch B2 ausreichend"))
         self.assertTrue(exclure("Admin", "Verhandlungssichere Deutschkenntnisse. Englisch B2 erforderlich"))
 
+    def test_c1_language_requirement_real_bremen_formulation(self):
+        # L'expression exacte observée dans une fiche publique de Brême.
+        t = "Sichere Beherrschung der deutschen Sprache in Wort und Schrift (mind. CEF-Level C1)"
+        self.assertEqual(exclure("Informatiker:in", t), "allemand C1/C2 requis")
+
+    def test_english_c1_does_not_reject_german_b2(self):
+        self.assertFalse(exclure("IT Admin", "Englisch (mind. CEF-Level C1); Deutsch B2 ausreichend"))
+
+    def test_optional_c1_not_rejected(self):
+        self.assertFalse(exclure("Sysadmin", "Deutsch C1 wünschenswert, B2 ausreichend"))
+
+    def test_real_bremen_job_is_excluded_even_if_good_technical_score(self):
+        texte = ("EG 13 TV-L Teilzeit 50%. Administration eines Rechenservers; "
+                 "Datensicherung und Backup, Linux, Python, Datenbanken; "
+                 "Sichere Beherrschung der deutschen Sprache in Wort und Schrift (mind. CEF-Level C1)")
+        offer = Offre("bremen", "Informatiker:in", "https://uni-bremen.de/job/4543", "Bremen", texte)
+        n = noter(offer, CFG)
+        self.assertGreaterEqual(n["skills"], 20)
+        self.assertFalse(n["eligible"])
+        self.assertEqual(n["exclusion"], "allemand C1/C2 requis")
+
+    def test_contract_50pct_not_misread_vollzeit_salary_comparison(self):
+        contract = ("EG 13 TV-L, Teilzeit 50%. "
+                    "Jahresbruttogehalt für eine Vollzeitstelle 57.112 Euro")
+        self.assertEqual(points_contrat(contract), (11, "TV-L E13, 50%"))
+
+    def test_no_email_without_complete_description(self):
+        offer = Offre("oldenburg", "IT-Systemadministrator Linux Puppet VMware Docker",
+                      "https://uol.de/jobs/test", "Oldenburg",
+                      "Backup, Checkmk, IoT, BPM, 100%, EG 13 TV-L")
+        result = noter(offer, CFG)
+        self.assertTrue(result["eligible"])
+        decision_apres_verification(offer, result)
+        self.assertFalse(result["eligible"])
+        self.assertIn("fiche complète non vérifiée", result["motifs"])
+        offer.detail_verifie = True
+        result2 = decision_apres_verification(offer, noter(offer, CFG))
+        self.assertTrue(result2["eligible"])
+
     def test_contract(self):
         self.assertEqual(points_contrat("TV-L E13 75%")[0], 13)
         self.assertEqual(points_contrat("TV-L E13 Vollzeit")[0], 15)
@@ -58,6 +97,23 @@ class ScoringTests(unittest.TestCase):
 class ParsersTests(unittest.TestCase):
     def setUp(self):
         self.c = Collecteur(CFG)
+
+    def test_individual_detail_in_main_excludes_navigation(self):
+        html = ("<html><nav>Linux VMware Puppet</nav><main><h1>Informatiker:in</h1>"
+                "<h2>Stellenbeschreibung</h2><p>" + "Aufgaben für Softwareentwicklung und Datensicherung. " * 5
+                + "Deutsch mindestens C1 ist eine zwingende Voraussetzung.</p></main></html>")
+        self.c.get = Mock(return_value=Mock(text=html, headers={"Content-Type": "text/html"},
+                                            url="https://www.uni-bremen.de/job/4543",content=html.encode()))
+        detail = self.c.page_text("https://www.uni-bremen.de/job/4543")
+        self.assertIn("Deutsch mindestens C1", detail)
+        self.assertNotIn("VMware Puppet", detail)
+
+    def test_missing_details_raise_clear_error(self):
+        html = "<html><main>Seite nicht gefunden.</main></html>"
+        self.c.get = Mock(return_value=Mock(text=html, headers={"Content-Type": "text/html"},
+                                            url="https://www.uni-bremen.de/job/4543",content=html.encode()))
+        with self.assertRaisesRegex(RuntimeError, "Description individuelle"):
+            self.c.page_text("https://www.uni-bremen.de/job/4543")
 
     def test_rss(self):
         xml = b'<rss><channel><item><title>Wissenschaftliche Mitarbeiterin BPM</title><link>https://uol.de/job123</link><description>IoT</description></item></channel></rss>'

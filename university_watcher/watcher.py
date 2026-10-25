@@ -42,6 +42,9 @@ class Offre:
     url: str
     ville: str
     texte: str = ""
+    # Vérification positive après lecture de la fiche individuelle.
+    detail_verifie: bool = False
+    detail_erreur: str = ""
 
     @property
     def identifiant(self):
@@ -114,8 +117,13 @@ class Collecteur:
         soup = BeautifulSoup(resp.text, "html.parser")
         for el in soup.select("script, style, nav, footer, header, aside, form"):
             el.decompose()
+        # Une fiche individuelle est prioritaire sur le menu et les listes d'offres.
+        # Pour TYPO3 (Bremen), <main> contient les tâches / prérequis de l'annonce.
         root = soup.select_one("main") or soup.select_one("article") or soup.body or soup
-        return normaliser(txt(root))[:50000]
+        contenu = normaliser(txt(root))[:50000]
+        if len(contenu) < 180 or re.search(r"(?:404\s+not\s+found|seite\s+nicht\s+gefunden|access\s+denied)", contenu[:300], re.I):
+            raise RuntimeError(f"Description individuelle absente/trop courte ({len(contenu)} caractères)")
+        return contenu
 
     def collect_oldenburg(self, src):
         resp = self.get(src["url"])
@@ -357,22 +365,26 @@ def classe(titre, texte):
 
 
 def niveau_associe_a_allemand(texte, niveau):
-    """Trouve DEUTSCH + niveau ; évite d'attribuer Englisch C1 à Deutsch B2.
+    """Associe C1/C2 à Deutsch/German et non à Englisch/English.
 
-    Heuristique : associe le niveau à l'étiquette de langue la plus proche
-    dans une fenêtre de 45 caractères, sans franchir une ponctuation forte.
+    Les annonces utilisent aussi « deutschen Sprache ... (mind. CEF-Level C1) » :
+    ce libellé dépasse la fenêtre de 45 caractères de la V3. On considère
+    la langue la plus proche, mais sans traverser une fin de phrase / puce.
     """
-    for match in re.finditer(r"\b" + re.escape(niveau) + r"\b", texte, re.I):
-        language_hits = []
-        for lang in re.finditer(r"deutsch\w*|german|englisch\w*|english", texte, re.I):
-            a, b = sorted((match.start(), lang.start()))
-            between = texte[a:b]
-            if len(between) > 45 or re.search(r"[;\n.]", between):
+    langues = list(re.finditer(r"\b(?:deutsch\w*|german|englisch\w*|english)\b", texte, re.I))
+    for niveau_match in re.finditer(r"(?<!\w)" + re.escape(niveau) + r"(?!\w)", texte, re.I):
+        candidats = []
+        for langue in langues:
+            debut, fin = sorted((niveau_match.start(), langue.start()))
+            entre = texte[debut:fin]
+            # « mind. CEF-Level C1 » contient une abréviation et non une fin
+            # de phrase. Neutraliser ces points AVANT le test de séparation.
+            entre_sans_abreviations = re.sub(r"\b(?:mind|ggf|bzw|z\.b)\.\s*", " ", entre, flags=re.I)
+            if len(entre) > 110 or re.search(r"[;\n]|[.!?](?:\s|$)", entre_sans_abreviations):
                 continue
-            distance = abs(lang.start() - match.start())
-            language_hits.append((distance, lang.group(0).lower()))
-        if language_hits and min(language_hits)[1].startswith(("deutsch", "german")):
-            yield match
+            candidats.append((abs(langue.start() - niveau_match.start()), langue.group(0).lower()))
+        if candidats and min(candidats, key=lambda x: x[0])[1].startswith(("deutsch", "german")):
+            yield niveau_match
 
 
 def exclure(titre, texte):
@@ -387,12 +399,20 @@ def exclure(titre, texte):
         return "postdoctorat"
     for niveau in ("c1", "c2"):
         for match in niveau_associe_a_allemand(s, niveau):
-            voisinage = s[max(0, match.start()-50):match.end()+50]
-            if re.search(r"wünschenswert|von vorteil|optional|nicht erforderlich|keine voraussetzung", voisinage):
+            # Les mentions « wünschenswert » ou « von Vorteil » qui qualifient
+            # le niveau NE doivent PAS déclencher une exclusion.
+            avant = s[max(0, match.start()-110):match.start()]
+            apres = s[match.end():match.end()+55]
+            if re.search(r"^\s*(?:\)|,|:|-)?\s*(?:wünschenswert|von vorteil|optional|nicht erforderlich|keine voraussetzung)\b", apres):
                 continue
-            if re.search(r"mindestens|zwingend|vorausgesetzt|erforderlich|voraussetzung|erwartet|minimum|nachweis", voisinage):
+            if re.search(r"(?:wünschenswert|von vorteil|optional)\W{0,18}(?:cef[- ]?level\s*)?$", avant):
+                continue
+            # Le contexte « mind. CEF-Level C1 » est une exigence explicite.
+            if re.search(r"(?:mind\.?|mindestens|zwingend|vorausgesetzt|erforderlich|voraussetzung|erwartet|minimum|nachweis|sicher\w* beherrschung)", avant[-90:] + " " + apres[:22]):
                 return "allemand C1/C2 requis"
-            if re.search(r"(?:deutsch\w*|german)\s*(?:auf\s+)?(?:niveau\s*)?(?:c1|c2)\b", voisinage):
+            # Quand la langue est explicitement qualifiée C1/C2 sans "souhaité",
+            # elle est considérée comme exigée (ex. « Deutsch C1 »).
+            if re.search(r"\b(?:deutsch\w*|german)\b.{0,100}(?:cef[- ]?level\s*)?$", avant):
                 return "allemand C1/C2 requis"
     if re.search(r"\b(?:muttersprachlich\w*|native\s+german)\b.{0,30}\bdeutsch", s) or re.search(r"\bdeutsch\w*\b.{0,30}\bmuttersprachlich", s):
         return "allemand maternel exigé"
@@ -411,7 +431,9 @@ def points_contrat(texte):
     sal = 10 if n >= 13 else 8 if n == 12 else 6 if n in (10, 11) else 4 if n >= 9 else 0
     percent = re.search(r"\b(100|90|80|75|70|65|60|50)\s*%", s)
     q = int(percent.group(1)) if percent else 0
-    temps = 5 if q >= 100 or "vollzeit" in s or "full-time" in s else 3 if q >= 75 else 1 if q >= 50 else 0
+    # Si 50% est annoncé, ne pas l'écraser avec la mention « Gehalt für eine
+    # Vollzeitstelle » dans le paragraphe standard sur les salaires.
+    temps = (5 if q >= 100 else 3 if q >= 75 else 1 if q >= 50 else 0) if q else (5 if re.search(r"\bvollzeit\b|\bfull[- ]time\b", s) else 0)
     return min(15, sal + temps), (f"TV-L E{n}" if n else "Rémunération inconnue") + (f", {q}%" if q else "")
 
 
@@ -423,10 +445,26 @@ def noter(o, cfg):
     lieu, typ = geo(o.ville, texte)
     contrat, cond = points_contrat(texte)
     score = skills + lieu + contrat
+    # Noter() fonctionne également sur des offres synthétiques (tests de score).
+    # Le contrôle obligatoire du détail est appliqué dans main() avant e-mail.
     eligible = not exclusion and typ != "HORS ZONE" and score >= cfg["seuil_total"] and skills >= cfg["minimum_competences"]
+    motifs = []
+    if exclusion: motifs.append(exclusion)
+    if typ == "HORS ZONE": motifs.append("hors zone et pas de remote vérifiable")
+    if skills < cfg["minimum_competences"]: motifs.append(f"compétences {skills}/{cfg['minimum_competences']}")
+    if score < cfg["seuil_total"]: motifs.append(f"total {score}/{cfg['seuil_total']}")
     return {"score": score, "skills": skills, "lieu": lieu, "contrat": contrat, "conditions": cond,
             "localite": typ, "categorie": classe(o.titre, o.texte), "competences": trouve,
-            "exclusion": exclusion, "eligible": eligible}
+            "exclusion": exclusion, "eligible": eligible, "motifs": motifs}
+
+
+def decision_apres_verification(offre, note):
+    """Une fiche manquante ne doit jamais déclencher un faux positif."""
+    if not offre.detail_verifie:
+        note["eligible"] = False
+        if "fiche complète non vérifiée" not in note["motifs"]:
+            note["motifs"].append("fiche complète non vérifiée")
+    return note
 
 
 def emailer(resultats, destinataire, adresse, mot_de_passe):
@@ -470,9 +508,16 @@ def main():
                 # Pour Emden, Playwright aura résolu la liste mais le détail peut varier.
                 if item.url.split('#')[0] != src["url"].split('#')[0]:
                     try:
-                        item.texte += " " + collector.page_text(item.url)
+                        detail = collector.page_text(item.url)
+                        item.texte += " " + detail
+                        item.detail_verifie = True
+                        log.info("DETAIL OK %s — %d caractères ; %s", key, len(detail), item.url[:130])
                     except Exception as exc:
-                        log.warning("Description incomplète %s : %s", item.url, exc)
+                        item.detail_erreur = str(exc)
+                        log.warning("DETAIL NON VERIFIE %s — %s — %s", key, item.url[:130], exc)
+                else:
+                    item.detail_erreur = "Le lien renvoie à la liste des annonces"
+                    log.warning("DETAIL NON VERIFIE %s — %s", key, item.detail_erreur)
                 offres[item.identifiant] = item
         except Exception as exc:
             log.error("Source %s non analysée : %s", key, exc)
@@ -480,11 +525,18 @@ def main():
     qualifiees = []
     for o in offres.values():
         score = noter(o, cfg)
-        log.info("%3d points (skills %2d) %s — %s", score["score"], score["skills"], o.source, o.titre[:90])
+        score = decision_apres_verification(o, score)
+        raison = "; ".join(score["motifs"]) if score["motifs"] else "conditions remplies"
+        log.info("%3d points (skills %2d) %s — %s — %s — %s", score["score"], score["skills"], o.source,
+                 "QUALIFIEE" if score["eligible"] else "ECARTEE", raison, o.titre[:110])
         if score["eligible"]: qualifiees.append((o, score))
     qualifiees.sort(key=lambda x:x[1]["score"], reverse=True)
     nombre = min(len(qualifiees), cfg["max_offres_email"])
-    log.info("%d offres qualifiées, %d pour e-mail ; %d source(s) en échec", len(qualifiees), nombre, len(erreurs))
+    incompletes = [o for o in offres.values() if not o.detail_verifie]
+    log.info("%d offres qualifiées, %d pour e-mail ; %d source(s) en échec ; %d fiche(s) incomplète(s)",
+             len(qualifiees), nombre, len(erreurs), len(incompletes))
+    if incompletes:
+        log.warning("Attention: %d annonces n'ont PAS pu être évaluées sur leur texte complet. Vérifier les avertissements DETAIL NON VERIFIE.", len(incompletes))
     if args.dry_run:
         for o,n in qualifiees[:nombre]: print(f"{n['score']:>3}/100 [{o.source}] {o.titre}: {o.url}")
     elif nombre:
