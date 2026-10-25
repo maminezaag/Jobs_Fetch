@@ -74,3 +74,15 @@ GitHub, les secrets présents et le workflow activé.
 - Un passage via GitHub Actions + Playwright peut prendre quelques minutes.
 - Le code a des tests unitaires hors ligne ; **la collecte réelle des quatre
   plateformes n'a pas encore été validée depuis ce contexte**.
+
+## Correctif après le premier run GitHub (v2)
+
+- Jade : domaine `www.jade-hs.de` (au lieu de `m.jade-hs.de`, certificat SSL invalide).
+- Jade : reconnaît aussi les références `F&T 05/26` ; ignore les annonces dont la date limite est passée.
+- Emden/Leer : supprime le filtre `standort=1` pour couvrir Emden **et** Leer.
+- Emden/Leer : zéro ligne ne suffit plus à déclarer la source valide ; l'absence d'annonces doit être explicitement signalée par le site.
+- Le script échoue volontairement (code 2) si une source n'a pas pu être vérifiée.
+- Les 11 tests précédents n'étaient que des tests unitaires, pas des tests live.
+- Si une source est indisponible, ne pas masquer l'erreur avec `verify=False` ou l'abandon silencieux de la source.
+
+**Remplacement** : remplacer seulement `university_watcher/` et `.github/workflows/university_watcher.yml` par les fichiers corrigés. Ne modifier ni les autres scripts ni leurs secrets. Lancer d'abord Actions manuellement.

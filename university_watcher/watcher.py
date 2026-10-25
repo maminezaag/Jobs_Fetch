@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime, date
 from email.message import EmailMessage
 from io import BytesIO
 import hashlib
@@ -157,59 +158,94 @@ class Collecteur:
         return offres
 
     def collect_jade(self, src):
+        """Lit les offres tarifaires sur le sous-domaine HTTPS officiel www.
+
+        La date limite est dans la 3e colonne : ne pas alerter après expiration.
+        """
         soup = BeautifulSoup(self.get(src["url"]).text, "html.parser")
         offres = []
-        # Chaque ligne tarifaire inclut une Kennziffer (p.ex. V 07/26),
-        # une description, et la date limite.
         for row in soup.select("table tr"):
             cells = row.find_all(["td", "th"], recursive=False)
-            if len(cells) < 2:
+            if len(cells) < 3:
                 continue
-            text = normaliser(txt(row))
-            if not re.search(r"\b[A-Z&]{1,6}\s*\d{1,3}/\d{2}\b", text, re.I):
+            reference = normaliser(txt(cells[0]))
+            # V 07/26, F&T 05/26 etc. (la regex originale ratait F&T).
+            if not re.fullmatch(r"[A-Z]{1,6}(?:&[A-Z]{1,6})?\s+\d{1,3}/\d{2}", reference, re.I):
                 continue
-            links = [a for a in row.find_all("a", href=True) if a["href"].strip()]
-            link = urljoin(src["url"], links[0]["href"]) if links else src["url"] + "#" + hashlib.sha1(text.encode()).hexdigest()[:10]
+            m = re.search(r"\b(\d{1,2}\.\d{1,2}\.\d{4})\b", txt(cells[2]))
+            if m:
+                try:
+                    if datetime.strptime(m.group(1), "%d.%m.%Y").date() < date.today():
+                        log.info("jade: offre expirée écartée : %s (%s)", reference, m.group(1))
+                        continue
+                except ValueError:
+                    log.warning("jade: date de fin invalide : %s", m.group(1))
+            links = [a for a in cells[1].find_all("a", href=True) if a["href"].strip()]
+            # Ne pas générer de pseudo-URL pour une annonce sans lien.
+            if not links:
+                log.warning("jade: pas de lien d'annonce pour %s", reference)
+                continue
+            link = urljoin(src["url"], links[0]["href"])
             titre = normaliser(txt(cells[1]))[:220]
-            ville = ville_depuis_texte(text, src["ville_defaut"])
-            offres.append(Offre("jade", titre, link, ville, text))
+            ville = ville_depuis_texte(txt(row), src["ville_defaut"])
+            offres.append(Offre("jade", titre, link, ville, normaliser(txt(row))))
         return offres
 
+    @staticmethod
+    def coveto_offres_depuis_html(html_source, source_url):
+        """Parse les lignes du tableau Coveto, si elles sont présentes dans HTML."""
+        soup = BeautifulSoup(html_source, "html.parser")
+        items = []
+        for row in soup.select("table tr"):
+            cells = row.find_all("td", recursive=False)
+            if len(cells) < 2:
+                continue
+            anchor = cells[0].find("a", href=True)
+            if not anchor:
+                continue
+            title = normaliser(txt(cells[0]))
+            url = urljoin(source_url, anchor.get("href", ""))
+            if not title or not url.startswith("https://"):
+                continue
+            city = normaliser(txt(cells[1])) or "Emden"
+            items.append(Offre("emden", title[:220], url, ville_depuis_texte(city, city), normaliser(txt(row))))
+        return items
+
+    @staticmethod
+    def coveto_indique_aucune_offre(texte):
+        """N'accepte qu'un vrai message de 'aucun résultat', jamais l'en-tête Stellenname."""
+        return bool(re.search(r"\b(?:keine\s+(?:offenen?\s+|aktuellen?\s+)?"
+                              r"(?:stellen|stellenangebote|treffer)|0\s+(?:treffer|ergebnisse)|"
+                              r"keine\s+ergebnisse)\b", texte, re.I))
+
     def collect_emden(self, src):
-        # Coveto charge actuellement ses résultats via JS dans une iframe.
-        # Vérifier robots.txt et la disponibilité avant de lancer Chromium.
-        self.get(src["url"])
+        """Consulte Coveto sans filtre de campus ; distingue 0 vrai et parseur cassé."""
+        response = self.get(src["url"])
+        # Certains rendus Coveto insèrent les lignes dès la réponse HTML.
+        offres = self.coveto_offres_depuis_html(response.text, src["url"])
+        if offres:
+            return offres
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as exc:
-            raise RuntimeError("Playwright absent. Installer les dépendances et Chromium (voir README).") from exc
-        offres = []
+            raise RuntimeError("Playwright absent. Installer Chromium (voir README).") from exc
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             try:
                 page = browser.new_page(user_agent=HEADERS["User-Agent"])
                 page.goto(src["url"], wait_until="domcontentloaded", timeout=45000)
                 page.wait_for_timeout(4500)
-                # Collecter les ancres visibles de la liste. Pas de faux positifs
-                # sur le formulaire, menu ou footer.
-                data = page.locator("table tr, [class*='job-item'], [class*='job-list'] li").evaluate_all("""nodes => nodes.map(n => {
-                    let a = n.querySelector('a[href]');
-                    return {title:(n.innerText||'').trim(), link:a ? a.href : ''};
-                })""")
+                # La liste peut être injectée dans la table après JS.
+                page_html = page.content()
+                offres = self.coveto_offres_depuis_html(page_html, src["url"])
+                if offres:
+                    return offres
                 body = page.locator("body").inner_text(timeout=10000)
-                if not data and not re.search(r"Stellenname|Keine Stellen|keine Stellen|keine Treffer|0 Ergebnisse", body, re.I):
-                    raise RuntimeError("Coveto : aucune liste exploitable ; contrôler le sélecteur/JS")
-                for row in data:
-                    titre = normaliser(row.get("title", ""))
-                    url = row.get("link", "")
-                    if not titre or not url or not url.startswith("http"):
-                        continue
-                    if any(x in titre.casefold() for x in ("stellenname arbeitsort", "datenschutzerklärung", "impressum")):
-                        continue
-                    offres.append(Offre("emden", titre[:220], url, ville_depuis_texte(titre, "Emden"), titre))
+                if self.coveto_indique_aucune_offre(body):
+                    return []
+                raise RuntimeError("Coveto: 0 offre extraite, mais aucune confirmation d'une liste vide ; source NON VÉRIFIÉE")
             finally:
                 browser.close()
-        return offres
 
     def collect(self, cle, src):
         methods = {"oldenburg": self.collect_oldenburg, "bremen": self.collect_bremen,
@@ -217,7 +253,7 @@ class Collecteur:
         if cle not in methods:
             raise ValueError(f"Source inconnue: {cle}")
         items = methods[cle](src)
-        if not items and cle in {"oldenburg", "bremen"}:
+        if not items and cle in {"oldenburg", "bremen", "jade"}:
             raise RuntimeError("0 offre détectée sur un portail normalement actif : extraction à vérifier")
         return items
 

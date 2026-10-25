@@ -5,37 +5,300 @@
   "max_offres_email": 15,
   "delai_requetes_secondes": 1.5,
   "sources": {
-    "oldenburg": {"nom": "Universität Oldenburg", "ville_defaut": "Oldenburg", "url": "https://uol.de/jobs/rss?kat=wm"},
-    "bremen": {"nom": "Universität Bremen", "ville_defaut": "Bremen", "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen"},
-    "jade": {"nom": "Jade Hochschule", "ville_defaut": "Wilhelmshaven", "url": "https://m.jade-hs.de/karriere/stellenangebote/tarifbeschaeftigte/"},
-    "emden": {"nom": "Hochschule Emden/Leer", "ville_defaut": "Emden", "url": "https://k60540.coveto.de/public/jobs/?standort=1"}
+    "oldenburg": {
+      "nom": "Universität Oldenburg",
+      "ville_defaut": "Oldenburg",
+      "url": "https://uol.de/jobs/rss?kat=wm"
+    },
+    "bremen": {
+      "nom": "Universität Bremen",
+      "ville_defaut": "Bremen",
+      "url": "https://www.uni-bremen.de/universitaet/die-uni-als-arbeitgeber/offene-stellen"
+    },
+    "jade": {
+      "nom": "Jade Hochschule",
+      "ville_defaut": "Wilhelmshaven",
+      "url": "https://www.jade-hs.de/karriere/stellenangebote/tarifbeschaeftigte/"
+    },
+    "emden": {
+      "nom": "Hochschule Emden/Leer",
+      "ville_defaut": "Emden",
+      "url": "https://k60540.coveto.de/public/jobs/?i18nLocale=de_DE"
+    }
   },
   "competences": [
-    {"nom": "Linux / Red Hat / Ubuntu / SUSE", "points": 5, "synonymes": ["linux", "rhel", "red hat", "redhat", "ubuntu", "suse", "debian", "almalinux"]},
-    {"nom": "IT-Systemadministration", "points": 5, "synonymes": ["systemadministrator", "systemadministration", "it-administration", "it-infrastruktur", "system engineer", "infrastrukturadministration", "it-betrieb"]},
-    {"nom": "BPM / BPMN", "points": 5, "synonymes": ["bpmn", "business process management", "geschäftsprozessmanagement", "bpm"]},
-    {"nom": "IoT", "points": 5, "synonymes": ["internet of things", "iot", "sensorik", "sensor networks"]},
-    {"nom": "Puppet / Konfigurationsmanagement", "points": 5, "synonymes": ["puppet", "konfigurationsmanagement", "configuration management"]},
-    {"nom": "Prozess- und Workflowautomatisierung", "points": 4, "synonymes": ["prozessautomatisierung", "workflow-automatisierung", "workflow automation", "process automation", "n8n", "prozessdigitalisierung"]},
-    {"nom": "VMware / Proxmox", "points": 4, "synonymes": ["vmware", "vsphere", "esxi", "vcenter", "proxmox", "virtualisierung", "virtualization"]},
-    {"nom": "Monitoring", "points": 4, "synonymes": ["checkmk", "check_mk", "monitoring", "nagios", "zabbix", "prometheus", "grafana"]},
-    {"nom": "Informationssysteme / Digitalisierung", "points": 4, "synonymes": ["informationssysteme", "information systems", "digitalisierung", "digital transformation", "digitale transformation", "business informatics", "wirtschaftsinformatik"]},
-    {"nom": "IT Support", "points": 4, "synonymes": ["it support", "it-support", "second level", "2nd level", "it service", "technical support"]},
-    {"nom": "Active Directory / GPO", "points": 4, "synonymes": ["active directory", "group policy", "gruppenrichtlinien", "gpo", "entra id"]},
-    {"nom": "Veeam / Backup", "points": 4, "synonymes": ["veeam", "backup", "disaster recovery", "datensicherung"]},
-    {"nom": "Bash / Shell", "points": 3, "synonymes": ["bash", "shell scripting", "shell-skripte", "shellskripte", "linux scripting"]},
-    {"nom": "Ansible", "points": 3, "synonymes": ["ansible"]},
-    {"nom": "Terraform", "points": 3, "synonymes": ["terraform", "infrastructure as code", "infrastructure-as-code"]},
-    {"nom": "Windows Server", "points": 3, "synonymes": ["windows server", "windows administration", "windows-systemadministration"]},
-    {"nom": "Datenbanken", "points": 3, "synonymes": ["postgresql", "mysql", "mariadb", "oracle database", "datenbankadministration", "sql database"]},
-    {"nom": "Python", "points": 3, "synonymes": ["python"]},
-    {"nom": "Docker", "points": 3, "synonymes": ["docker", "containerisierung", "docker compose"]},
-    {"nom": "Git", "points": 3, "synonymes": ["git", "gitlab", "github"]},
-    {"nom": "Cloud / Azure", "points": 3, "synonymes": ["microsoft azure", "azure", "cloud infrastructure", "cloud computing"]},
-    {"nom": "DevOps", "points": 3, "synonymes": ["devops", "ci/cd", "continuous integration"]},
-    {"nom": "Digitale Gesundheit", "points": 3, "synonymes": ["digital health", "digitale gesundheit", "e-health", "medizininformatik", "gesundheitsinformatik"]},
-    {"nom": "Netzwerke / Firewall", "points": 2, "synonymes": ["netzwerke", "networking", "firewall", "routing", "tcp/ip", "vpn"]},
-    {"nom": "NetApp / Storage", "points": 2, "synonymes": ["netapp", "storage", "san", "nas"]},
-    {"nom": "Kubernetes", "points": 1, "synonymes": ["kubernetes", "k3s"]}
+    {
+      "nom": "Linux / Red Hat / Ubuntu / SUSE",
+      "points": 5,
+      "synonymes": [
+        "linux",
+        "rhel",
+        "red hat",
+        "redhat",
+        "ubuntu",
+        "suse",
+        "debian",
+        "almalinux"
+      ]
+    },
+    {
+      "nom": "IT-Systemadministration",
+      "points": 5,
+      "synonymes": [
+        "systemadministrator",
+        "systemadministration",
+        "it-administration",
+        "it-infrastruktur",
+        "system engineer",
+        "infrastrukturadministration",
+        "it-betrieb"
+      ]
+    },
+    {
+      "nom": "BPM / BPMN",
+      "points": 5,
+      "synonymes": [
+        "bpmn",
+        "business process management",
+        "geschäftsprozessmanagement",
+        "bpm"
+      ]
+    },
+    {
+      "nom": "IoT",
+      "points": 5,
+      "synonymes": [
+        "internet of things",
+        "iot",
+        "sensorik",
+        "sensor networks"
+      ]
+    },
+    {
+      "nom": "Puppet / Konfigurationsmanagement",
+      "points": 5,
+      "synonymes": [
+        "puppet",
+        "konfigurationsmanagement",
+        "configuration management"
+      ]
+    },
+    {
+      "nom": "Prozess- und Workflowautomatisierung",
+      "points": 4,
+      "synonymes": [
+        "prozessautomatisierung",
+        "workflow-automatisierung",
+        "workflow automation",
+        "process automation",
+        "n8n",
+        "prozessdigitalisierung"
+      ]
+    },
+    {
+      "nom": "VMware / Proxmox",
+      "points": 4,
+      "synonymes": [
+        "vmware",
+        "vsphere",
+        "esxi",
+        "vcenter",
+        "proxmox",
+        "virtualisierung",
+        "virtualization"
+      ]
+    },
+    {
+      "nom": "Monitoring",
+      "points": 4,
+      "synonymes": [
+        "checkmk",
+        "check_mk",
+        "monitoring",
+        "nagios",
+        "zabbix",
+        "prometheus",
+        "grafana"
+      ]
+    },
+    {
+      "nom": "Informationssysteme / Digitalisierung",
+      "points": 4,
+      "synonymes": [
+        "informationssysteme",
+        "information systems",
+        "digitalisierung",
+        "digital transformation",
+        "digitale transformation",
+        "business informatics",
+        "wirtschaftsinformatik"
+      ]
+    },
+    {
+      "nom": "IT Support",
+      "points": 4,
+      "synonymes": [
+        "it support",
+        "it-support",
+        "second level",
+        "2nd level",
+        "it service",
+        "technical support"
+      ]
+    },
+    {
+      "nom": "Active Directory / GPO",
+      "points": 4,
+      "synonymes": [
+        "active directory",
+        "group policy",
+        "gruppenrichtlinien",
+        "gpo",
+        "entra id"
+      ]
+    },
+    {
+      "nom": "Veeam / Backup",
+      "points": 4,
+      "synonymes": [
+        "veeam",
+        "backup",
+        "disaster recovery",
+        "datensicherung"
+      ]
+    },
+    {
+      "nom": "Bash / Shell",
+      "points": 3,
+      "synonymes": [
+        "bash",
+        "shell scripting",
+        "shell-skripte",
+        "shellskripte",
+        "linux scripting"
+      ]
+    },
+    {
+      "nom": "Ansible",
+      "points": 3,
+      "synonymes": [
+        "ansible"
+      ]
+    },
+    {
+      "nom": "Terraform",
+      "points": 3,
+      "synonymes": [
+        "terraform",
+        "infrastructure as code",
+        "infrastructure-as-code"
+      ]
+    },
+    {
+      "nom": "Windows Server",
+      "points": 3,
+      "synonymes": [
+        "windows server",
+        "windows administration",
+        "windows-systemadministration"
+      ]
+    },
+    {
+      "nom": "Datenbanken",
+      "points": 3,
+      "synonymes": [
+        "postgresql",
+        "mysql",
+        "mariadb",
+        "oracle database",
+        "datenbankadministration",
+        "sql database"
+      ]
+    },
+    {
+      "nom": "Python",
+      "points": 3,
+      "synonymes": [
+        "python"
+      ]
+    },
+    {
+      "nom": "Docker",
+      "points": 3,
+      "synonymes": [
+        "docker",
+        "containerisierung",
+        "docker compose"
+      ]
+    },
+    {
+      "nom": "Git",
+      "points": 3,
+      "synonymes": [
+        "git",
+        "gitlab",
+        "github"
+      ]
+    },
+    {
+      "nom": "Cloud / Azure",
+      "points": 3,
+      "synonymes": [
+        "microsoft azure",
+        "azure",
+        "cloud infrastructure",
+        "cloud computing"
+      ]
+    },
+    {
+      "nom": "DevOps",
+      "points": 3,
+      "synonymes": [
+        "devops",
+        "ci/cd",
+        "continuous integration"
+      ]
+    },
+    {
+      "nom": "Digitale Gesundheit",
+      "points": 3,
+      "synonymes": [
+        "digital health",
+        "digitale gesundheit",
+        "e-health",
+        "medizininformatik",
+        "gesundheitsinformatik"
+      ]
+    },
+    {
+      "nom": "Netzwerke / Firewall",
+      "points": 2,
+      "synonymes": [
+        "netzwerke",
+        "networking",
+        "firewall",
+        "routing",
+        "tcp/ip",
+        "vpn"
+      ]
+    },
+    {
+      "nom": "NetApp / Storage",
+      "points": 2,
+      "synonymes": [
+        "netapp",
+        "storage",
+        "san",
+        "nas"
+      ]
+    },
+    {
+      "nom": "Kubernetes",
+      "points": 1,
+      "synonymes": [
+        "kubernetes",
+        "k3s"
+      ]
+    }
   ]
 }

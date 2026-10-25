@@ -1,5 +1,6 @@
 """Tests isolés : ne consultent ni les sites ni Gmail."""
 import json
+from datetime import date, timedelta
 from pathlib import Path
 import unittest
 from unittest.mock import Mock
@@ -71,6 +72,26 @@ class ParsersTests(unittest.TestCase):
         jobs = self.c.collect("bremen",CFG["sources"]["bremen"])
         self.assertEqual(len(jobs), 1)
         self.assertIn("Informatiker", jobs[0].titre)
+
+    def test_coveto_no_false_empty(self):
+        self.assertFalse(self.c.coveto_indique_aucune_offre("Stellenname Arbeitsort Kategorie"))
+        self.assertTrue(self.c.coveto_indique_aucune_offre("Keine Stellenangebote"))
+
+    def test_coveto_html_table(self):
+        html = '<table><tr><th>Stellenname</th><th>Arbeitsort</th></tr><tr><td><a href="/job-test-123.html">Wissenschaftlicher Mitarbeiter IoT</a></td><td>Leer</td><td>Technik</td></tr></table>'
+        results = self.c.coveto_offres_depuis_html(html, "https://k60540.coveto.de/public/jobs/")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].ville, "Leer")
+        self.assertIn("job-test-123.html", results[0].url)
+
+    def test_jade_expired_and_ampersand_reference(self):
+        expired = (date.today() - timedelta(days=3)).strftime("%d.%m.%Y")
+        active = (date.today() + timedelta(days=10)).strftime("%d.%m.%Y")
+        html = f'<table><tr><td>V 07/26</td><td><a href="/expired">Ancien Linux</a></td><td>{expired}</td></tr><tr><td>F&T 05/26</td><td><a href="/open">IoT und BPM</a></td><td>{active}</td></tr></table>' 
+        self.c.get = Mock(return_value=Mock(text=html))
+        jobs = self.c.collect("jade", CFG["sources"]["jade"])
+        self.assertEqual(len(jobs), 1)
+        self.assertIn('/open', jobs[0].url)
 
     def test_jade(self):
         html = '<table><tr><th>Kennziffer</th><th>Beschreibung</th></tr><tr><td>V 07/26</td><td><a href="/doc.pdf">Linux Informatiker E11 TV-L 100%</a></td><td>31.12.2026</td></tr></table>'
