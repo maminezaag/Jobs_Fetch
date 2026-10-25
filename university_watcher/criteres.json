@@ -308,5 +308,6 @@
         "k3s"
       ]
     }
-  ]
+  ],
+  "reverifier_apres_jours": 7
 }

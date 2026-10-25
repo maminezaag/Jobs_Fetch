@@ -3,8 +3,11 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 import unittest
-from unittest.mock import Mock
-from watcher import Offre, Collecteur, exclure, geo, noter, points_contrat, decision_apres_verification
+from unittest.mock import Mock, patch
+import tempfile
+import os
+import watcher
+from watcher import Offre, Collecteur, exclure, geo, noter, points_contrat, decision_apres_verification, signature_liste, cache_a_rafraichir, analyser_une_offre, empreinte, charger_analyses, sauvegarder_json
 
 CFG = json.loads((Path(__file__).parent / "criteres.json").read_text(encoding="utf-8"))
 
@@ -168,5 +171,150 @@ class ParsersTests(unittest.TestCase):
         jobs = self.c.collect("jade",CFG["sources"]["jade"])
         self.assertEqual(len(jobs),1)
         self.assertIn('doc.pdf', jobs[0].url)
+
+class HistoryV5Tests(unittest.TestCase):
+    def setUp(self):
+        self.src = CFG["sources"]["oldenburg"]
+        self.today = date(2026, 10, 25)
+        self.offre = Offre("oldenburg", "IT-Systemadministrator Linux", "https://uol.de/jobs/it1", "Oldenburg", "IoT")
+        self.c = Mock()
+        self.c.page_text.return_value = "Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend"
+
+    def premiere_analyse(self):
+        note, entry, status = analyser_une_offre(self.offre, self.c, self.src, None, CFG, self.today)
+        self.assertTrue(note["eligible"])
+        self.assertEqual(status, "analyse du détail")
+        self.assertTrue(entry["detail_verifie"])
+        self.assertEqual(self.c.page_text.call_count, 1)
+        return entry
+
+    def test_initial_is_downloaded(self):
+        self.premiere_analyse()
+
+    def test_same_listing_skips_network_and_scoring(self):
+        old = self.premiere_analyse()
+        new_offre = Offre("oldenburg", "IT-Systemadministrator Linux", self.offre.url, "Oldenburg", "IoT")
+        result, entry, status = analyser_une_offre(new_offre, self.c, self.src, old, CFG, self.today+timedelta(days=1))
+        self.assertEqual(self.c.page_text.call_count, 1, "Pas de second téléchargement")
+        self.assertEqual(status, "cache réutilisé")
+        self.assertTrue(result["eligible"])
+        self.assertEqual(entry["dernier_controle"], self.today.isoformat())
+
+    def test_list_changed_forces_recheck(self):
+        old = self.premiere_analyse()
+        second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT : nouveau projet")
+        _, entry, reason = analyser_une_offre(second, self.c, self.src, old, CFG, self.today+timedelta(days=1))
+        self.assertEqual(self.c.page_text.call_count, 2)
+        self.assertEqual(reason, "analyse du détail")
+        self.assertEqual(entry["dernier_controle"], (self.today+timedelta(days=1)).isoformat())
+
+    def test_after_7_days_forces_recheck(self):
+        old = self.premiere_analyse()
+        second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT")
+        _, _, reason = analyser_une_offre(second, self.c, self.src, old, CFG, self.today+timedelta(days=7))
+        self.assertEqual(self.c.page_text.call_count, 2)
+        self.assertEqual(reason, "analyse du détail")
+
+    def test_criteria_change_rescores_without_reloading(self):
+        old = self.premiere_analyse()
+        cfg_changed = dict(CFG)
+        cfg_changed["seuil_total"] = 101
+        second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT")
+        note, entry, status = analyser_une_offre(second, self.c, self.src, old, cfg_changed, self.today+timedelta(days=1))
+        self.assertEqual(self.c.page_text.call_count, 1)
+        self.assertEqual(status, "nouveaux critères : re-scoring du cache")
+        self.assertFalse(note["eligible"])
+        self.assertNotEqual(entry["signature_regles"], old["signature_regles"])
+
+    def test_missing_details_retried_next_time(self):
+        self.c.page_text.side_effect = RuntimeError("PDF inaccessible")
+        _, entry, _ = analyser_une_offre(self.offre, self.c, self.src, None, CFG, self.today)
+        self.assertFalse(entry["detail_verifie"])
+        self.c.page_text.side_effect = None
+        self.c.page_text.return_value = "Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit"
+        second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT")
+        note, refreshed, _ = analyser_une_offre(second, self.c, self.src, entry, CFG, self.today+timedelta(days=1))
+        self.assertEqual(self.c.page_text.call_count, 2)
+        self.assertTrue(refreshed["detail_verifie"])
+        self.assertTrue(note["eligible"])
+
+    def test_stale_fetch_failure_blocks_cached_alert(self):
+        old = self.premiere_analyse()
+        self.c.page_text.side_effect = RuntimeError("Erreur HTTP")
+        second = Offre("oldenburg", self.offre.titre, self.offre.url, "Oldenburg", "IoT")
+        note, entry, _ = analyser_une_offre(second, self.c, self.src, old, CFG, self.today+timedelta(days=7))
+        self.assertFalse(note["eligible"])
+        self.assertFalse(entry["detail_verifie"])
+        self.assertIn('fiche complète non vérifiée', note['motifs'])
+
+    def test_cache_persistent_roundtrip(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d)/"analysed_university_jobs.json"
+            self.assertEqual(charger_analyses(f), {"version":1,"offres":{}})
+            value = {"version":1,"offres":{"id1":{"titre":"Techniker"}}}
+            sauvegarder_json(f, value)
+            self.assertEqual(charger_analyses(f), value)
+
+    def test_cache_invalid_is_not_silently_reset(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d)/"analysed_university_jobs.json"
+            f.write_text('[]')
+            with self.assertRaises(RuntimeError):
+                charger_analyses(f)
+
+    def test_unchanged_identity_is_stable(self):
+        other = Offre(self.offre.source, self.offre.titre, self.offre.url+'#ancre', self.offre.ville, self.offre.texte)
+        self.assertEqual(self.offre.identifiant, other.identifiant)
+
+class IntegrationHistoryTests(unittest.TestCase):
+    def test_two_runs_only_download_once_and_email_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            cfg = dict(CFG)
+            cfg['sources'] = {'oldenburg': CFG['sources']['oldenburg']}
+            (base/'criteres.json').write_text(json.dumps(cfg, ensure_ascii=False))
+            (base/'seen_university_jobs.json').write_text('[]')
+            collector = Mock()
+            def collect(*args):
+                return [Offre('oldenburg','IT-Systemadministrator Linux', 'https://uol.de/jobs/it1','Oldenburg','IoT')]
+            collector.collect.side_effect = collect
+            collector.page_text.return_value = 'Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
+            with (patch.object(watcher,'BASE',base), patch.object(watcher,'Collecteur',return_value=collector),
+                  patch.object(watcher,'emailer') as send,
+                  patch.dict(os.environ, {'GMAIL_ADDRESS':'test@example.com',
+                                          'GMAIL_APP_PASSWORD':'test-password',
+                                          'GMAIL_TO':'dest@example.com'}),
+                  patch('sys.argv',['watcher.py'])):
+                self.assertEqual(watcher.main(),0)
+                self.assertEqual(watcher.main(),0)
+                self.assertEqual(collector.page_text.call_count,1)
+                self.assertEqual(send.call_count,1)
+                hist = json.loads((base/'seen_university_jobs.json').read_text())
+                analyses = json.loads((base/'analysed_university_jobs.json').read_text())
+                self.assertEqual(len(hist),1)
+                self.assertEqual(len(analyses['offres']),1)
+
+    def test_change_criteria_notifies_new_match_without_network(self):
+        with tempfile.TemporaryDirectory() as d:
+            base=Path(d)
+            cfg=dict(CFG)
+            cfg['sources']={'oldenburg':CFG['sources']['oldenburg']}
+            cfg['seuil_total']=101
+            (base/'criteres.json').write_text(json.dumps(cfg,ensure_ascii=False))
+            (base/'seen_university_jobs.json').write_text('[]')
+            collector=Mock()
+            collector.collect.side_effect=lambda *args: [Offre('oldenburg','IT-Systemadministrator Linux','https://uol.de/jobs/it1','Oldenburg','IoT')]
+            collector.page_text.return_value='Linux, Puppet, Checkmk, VMware, BPM, IoT, TV-L E13, Vollzeit. Deutsch B2 ausreichend'
+            with (patch.object(watcher,'BASE',base), patch.object(watcher,'Collecteur',return_value=collector),
+                  patch.object(watcher,'emailer') as send,
+                  patch.dict(os.environ, {'GMAIL_ADDRESS':'test@example.com', 'GMAIL_APP_PASSWORD':'fake', 'GMAIL_TO':'dest@example.com'}),
+                  patch('sys.argv',['watcher.py'])):
+                self.assertEqual(watcher.main(),0)
+                self.assertEqual(send.call_count,0)
+                cfg['seuil_total']=60
+                (base/'criteres.json').write_text(json.dumps(cfg,ensure_ascii=False))
+                self.assertEqual(watcher.main(),0)
+                self.assertEqual(collector.page_text.call_count,1)
+                self.assertEqual(send.call_count,1)
 
 if __name__ == "__main__": unittest.main()

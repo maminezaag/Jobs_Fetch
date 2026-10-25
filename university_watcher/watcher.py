@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from email.message import EmailMessage
 from io import BytesIO
 import hashlib
@@ -484,73 +484,205 @@ def emailer(resultats, destinataire, adresse, mot_de_passe):
         smtp.send_message(msg)
 
 
+
+def empreinte(valeur):
+    """Empreinte stable du contenu d'une annonce ou des règles de scoring."""
+    valeur = valeur if isinstance(valeur, str) else json.dumps(valeur, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(valeur.encode('utf-8')).hexdigest()
+
+
+def signature_liste(offre):
+    """Détecte un changement visible dans le flux / la liste d'annonces."""
+    return empreinte([offre.titre, offre.url, offre.ville, normaliser(offre.texte)])
+
+
+def charger_analyses(path):
+    """Ne jamais effacer silencieusement un cache endommagé."""
+    if not path.exists():
+        return {"version": 1, "offres": {}}
+    contenu = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(contenu, dict) or contenu.get('version') != 1 or not isinstance(contenu.get('offres'), dict):
+        raise RuntimeError('Format du cache universitaire inconnu : intervention requise')
+    return contenu
+
+
+def sauvegarder_json(path, contenu):
+    temporaire = path.with_name(path.name + '.tmp')
+    temporaire.write_text(json.dumps(contenu, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    os.replace(temporaire, path)
+
+
+def cache_a_rafraichir(offre, ancien, aujourd_hui, ttl):
+    """Nouvelle annonce / changement dans la liste / contrôle périodique.
+
+    Un changement uniquement dans les critères n'impose PAS de requête réseau :
+    on peut re-noter sur la description complète déjà enregistrée.
+    """
+    if not ancien or not ancien.get('detail_verifie') or not ancien.get('detail_texte'):
+        return True, 'nouvelle annonce ou détail incomplet'
+    if ancien.get('signature_liste') != signature_liste(offre):
+        return True, 'liste modifiée'
+    try:
+        dernier = date.fromisoformat(ancien['dernier_controle'])
+    except (ValueError, TypeError, KeyError):
+        return True, 'date de contrôle inconnue'
+    if (aujourd_hui - dernier).days >= ttl or dernier > aujourd_hui:
+        return True, 'revérification périodique'
+    return False, 'cache inchangé'
+
+
+def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
+    """Retourne (note, entrée persistable, situation).
+
+    Une annonce récente inchangée n'est ni téléchargée ni re-notée.
+    Si les critères changent, elle est re-notée à partir du texte complet en cache.
+    Une fiche dont le téléchargement échoue n'est jamais automatiquement qualifiée.
+    """
+    aujourd_hui = aujourd_hui or date.today()
+    ttl = max(1, int(cfg.get('reverifier_apres_jours', 7)))
+    actualiser, raison = cache_a_rafraichir(offre, ancien, aujourd_hui, ttl)
+    entree = dict(ancien or {})
+    entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
+                   'ville': offre.ville, 'signature_liste': signature_liste(offre),
+                   'derniere_presence': aujourd_hui.isoformat()})
+    regles = empreinte({k: cfg[k] for k in ('competences', 'minimum_competences',
+                                            'seuil_total', 'plafond_competences')})
+    if actualiser:
+        if offre.url.split('#')[0] == src['url'].split('#')[0]:
+            offre.detail_erreur = 'Le lien renvoie à la liste des annonces'
+        else:
+            try:
+                detail = collector.page_text(offre.url)
+                offre.texte += ' ' + detail
+                offre.detail_verifie = True
+                entree.update({'detail_verifie': True, 'detail_texte': detail,
+                               'dernier_controle': aujourd_hui.isoformat(),
+                               'empreinte_detail': empreinte(detail)})
+                log.info('DETAIL OK %s — %d caractères ; %s', offre.source, len(detail), offre.url[:130])
+            except Exception as exc:
+                offre.detail_erreur = str(exc)
+        if not offre.detail_verifie:
+            # Ne pas valider une offre sur la base d'un détail périmé.
+            # Au prochain passage, réessayer le téléchargement de cette fiche.
+            entree.update({'detail_verifie': False, 'detail_texte': ''})
+            log.warning('DETAIL NON VERIFIE %s — %s — %s', offre.source, offre.url[:130], offre.detail_erreur)
+    else:
+        offre.texte += ' ' + ancien['detail_texte']
+        offre.detail_verifie = True
+        log.info('CACHE HIT %s — sans nouveau téléchargement : %s', offre.source, offre.titre[:75])
+
+    if (not actualiser and ancien.get('signature_regles') == regles
+            and isinstance(ancien.get('note'), dict)):
+        note = dict(ancien['note'])
+        situation = 'cache réutilisé'
+    else:
+        note = decision_apres_verification(offre, noter(offre, cfg))
+        entree.update({'note': note, 'signature_regles': regles})
+        situation = ('analyse du détail' if actualiser else 'nouveaux critères : re-scoring du cache')
+    # Ne jamais retenir une ancienne note éligible si la fiche est maintenant inaccessible.
+    note = decision_apres_verification(offre, note)
+    entree.update({'note': note, 'signature_regles': regles})
+    return note, entree, situation
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Offres universitaires : scoring + e-mail")
-    ap.add_argument("--dry-run", action="store_true", help="analyse sans envoyer ni enregistrer")
-    ap.add_argument("--sources", nargs="*", choices=["oldenburg", "bremen", "jade", "emden"], default=None)
+    ap = argparse.ArgumentParser(description='Offres universitaires : scoring + e-mail + cache')
+    ap.add_argument('--dry-run', action='store_true', help='analyse sans envoyer ni enregistrer')
+    ap.add_argument('--sources', nargs='*', choices=['oldenburg', 'bremen', 'jade', 'emden'], default=None)
     args = ap.parse_args()
-    cfg = json.loads((BASE / "criteres.json").read_text(encoding="utf-8"))
-    etat = BASE / "seen_university_jobs.json"
-    seen = set(json.loads(etat.read_text(encoding="utf-8"))) if etat.exists() else set()
+    cfg = json.loads((BASE / 'criteres.json').read_text(encoding='utf-8'))
+    etat = BASE / 'seen_university_jobs.json'  # Historique des notifications, conserve
+    historiques = BASE / 'analysed_university_jobs.json'  # Nouveau cache d'analyse
+    seen = set(json.loads(etat.read_text(encoding='utf-8'))) if etat.exists() else set()
+    cache = charger_analyses(historiques)
     collector = Collecteur(cfg)
     offres, erreurs = {}, []
-    for key, src in cfg["sources"].items():
-        if args.sources and key not in args.sources: continue
+    for key, src in cfg['sources'].items():
+        if args.sources and key not in args.sources:
+            continue
         try:
             items = collector.collect(key, src)
-            log.info("%s: %d offres brutes", key, len(items))
+            log.info('%s: %d offres brutes', key, len(items))
             for item in items:
-                # Pas de lien: ne pas inventer de résultat.
-                if not item.url.startswith("http"): continue
-                if item.identifiant in offres: continue
-                if item.identifiant in seen and not args.dry_run: continue
-                # Lire la description complète quand elle est accessible.
-                # Pour Emden, Playwright aura résolu la liste mais le détail peut varier.
-                if item.url.split('#')[0] != src["url"].split('#')[0]:
-                    try:
-                        detail = collector.page_text(item.url)
-                        item.texte += " " + detail
-                        item.detail_verifie = True
-                        log.info("DETAIL OK %s — %d caractères ; %s", key, len(detail), item.url[:130])
-                    except Exception as exc:
-                        item.detail_erreur = str(exc)
-                        log.warning("DETAIL NON VERIFIE %s — %s — %s", key, item.url[:130], exc)
-                else:
-                    item.detail_erreur = "Le lien renvoie à la liste des annonces"
-                    log.warning("DETAIL NON VERIFIE %s — %s", key, item.detail_erreur)
-                offres[item.identifiant] = item
+                if not item.url.startswith('http'):
+                    continue
+                if item.identifiant in offres:
+                    continue
+                offres[item.identifiant] = (item, src)
         except Exception as exc:
-            log.error("Source %s non analysée : %s", key, exc)
-            erreurs.append(f"{key}: {exc}")
+            log.error('Source %s non analysée : %s', key, exc)
+            erreurs.append(f'{key}: {exc}')
+
     qualifiees = []
-    for o in offres.values():
-        score = noter(o, cfg)
-        score = decision_apres_verification(o, score)
-        raison = "; ".join(score["motifs"]) if score["motifs"] else "conditions remplies"
-        log.info("%3d points (skills %2d) %s — %s — %s — %s", score["score"], score["skills"], o.source,
-                 "QUALIFIEE" if score["eligible"] else "ECARTEE", raison, o.titre[:110])
-        if score["eligible"]: qualifiees.append((o, score))
-    qualifiees.sort(key=lambda x:x[1]["score"], reverse=True)
-    nombre = min(len(qualifiees), cfg["max_offres_email"])
-    incompletes = [o for o in offres.values() if not o.detail_verifie]
-    log.info("%d offres qualifiées, %d pour e-mail ; %d source(s) en échec ; %d fiche(s) incomplète(s)",
+    stats = {'cache réutilisé': 0, 'analyse du détail': 0,
+             'nouveaux critères : re-scoring du cache': 0}
+    incompletes = []
+    for identifiant, (offre, src) in offres.items():
+        try:
+            note, entree, situation = analyser_une_offre(
+                offre, collector, src, cache['offres'].get(identifiant), cfg)
+            cache['offres'][identifiant] = entree
+            stats[situation] += 1
+            if not offre.detail_verifie:
+                incompletes.append(offre)
+            raison = '; '.join(note['motifs']) if note['motifs'] else 'conditions remplies'
+            log.info('%3d points (skills %2d) %s — %s — %s — %s [%s]',
+                     note['score'], note['skills'], offre.source,
+                     'QUALIFIEE' if note['eligible'] else 'ECARTEE', raison,
+                     offre.titre[:110], situation)
+            if note['eligible'] and identifiant not in seen:
+                qualifiees.append((offre, note))
+        except Exception as exc:
+            log.error('Analyse impossible pour %s : %s', offre.url[:130], exc)
+            erreurs.append(f'fiche {offre.source}: {exc}')
+
+    qualifiees.sort(key=lambda x: x[1]['score'], reverse=True)
+    nombre = min(len(qualifiees), cfg['max_offres_email'])
+    log.info('CACHE: %d réutilisées, %d analyses téléchargées, %d re-notées sur critères modifiés',
+             stats['cache réutilisé'], stats['analyse du détail'],
+             stats['nouveaux critères : re-scoring du cache'])
+    log.info('%d offres qualifiées non notifiées, %d pour e-mail ; %d source(s)/fiche(s) en échec ; %d fiche(s) incomplète(s)',
              len(qualifiees), nombre, len(erreurs), len(incompletes))
     if incompletes:
-        log.warning("Attention: %d annonces n'ont PAS pu être évaluées sur leur texte complet. Vérifier les avertissements DETAIL NON VERIFIE.", len(incompletes))
+        log.warning('Attention: %d fiches sans texte complet. Vérifier DETAIL NON VERIFIE.', len(incompletes))
+
     if args.dry_run:
-        for o,n in qualifiees[:nombre]: print(f"{n['score']:>3}/100 [{o.source}] {o.titre}: {o.url}")
-    elif nombre:
-        noms = ("GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "GMAIL_TO")
-        if not all(os.getenv(k) for k in noms):
-            log.error("Secrets manquants : %s", ", ".join(k for k in noms if not os.getenv(k)))
+        for offre, note in qualifiees[:nombre]:
+            print(f"{note['score']:>3}/100 [{offre.source}] {offre.titre}: {offre.url}")
+        if erreurs:
+            return 2
+        return 0
+
+    # Garder le cache pour 90 jours après disparition des annonces.
+    limite = date.today() - timedelta(days=90)
+    for identifiant, entree in list(cache['offres'].items()):
+        try:
+            dernier = date.fromisoformat(entree.get('derniere_presence', ''))
+        except ValueError:
+            dernier = date.min
+        if dernier < limite:
+            del cache['offres'][identifiant]
+
+    # En cas d'échec de SMTP, conserver quand même les évaluations dans le cache
+    # afin de pouvoir retenter l'e-mail au prochain passage sans re-télécharger.
+    if nombre:
+        secrets = ('GMAIL_ADDRESS', 'GMAIL_APP_PASSWORD', 'GMAIL_TO')
+        if not all(os.getenv(k) for k in secrets):
+            log.error('Secrets manquants : %s', ', '.join(k for k in secrets if not os.getenv(k)))
+            sauvegarder_json(historiques, cache)
             return 1
-        emailer(qualifiees[:nombre], os.environ["GMAIL_TO"], os.environ["GMAIL_ADDRESS"], os.environ["GMAIL_APP_PASSWORD"])
-        seen.update(o.identifiant for o,_ in qualifiees[:nombre])
-        etat.write_text(json.dumps(sorted(seen), indent=2) + "\n", encoding="utf-8")
-        log.info("Notification envoyée ; état enregistré")
+        try:
+            emailer(qualifiees[:nombre], os.environ['GMAIL_TO'], os.environ['GMAIL_ADDRESS'],
+                    os.environ['GMAIL_APP_PASSWORD'])
+        except Exception:
+            sauvegarder_json(historiques, cache)
+            raise
+        seen.update(offre.identifiant for offre, _ in qualifiees[:nombre])
+        log.info('Notification envoyée ; historique des notifications actualisé')
+    sauvegarder_json(historiques, cache)
+    sauvegarder_json(etat, sorted(seen))
     if erreurs:
-        # Code 2 : collecte partielle, même si d'autres offres ont été envoyées.
-        print("ATTENTION : sources non vérifiées : " + " | ".join(erreurs), file=sys.stderr)
+        print('ATTENTION : sources non vérifiées : ' + ' | '.join(erreurs), file=sys.stderr)
         return 2
     return 0
 
