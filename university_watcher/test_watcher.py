@@ -77,6 +77,19 @@ class ParsersTests(unittest.TestCase):
         self.assertFalse(self.c.coveto_indique_aucune_offre("Stellenname Arbeitsort Kategorie"))
         self.assertTrue(self.c.coveto_indique_aucune_offre("Keine Stellenangebote"))
 
+    def test_coveto_empty_header_structure(self):
+        html = '<table><thead><tr><th>Stellenname</th><th>Arbeitsort</th><th>Kategorie</th></tr></thead><tbody></tbody></table>'
+        self.assertTrue(self.c.coveto_table_reconnue(html))
+        self.assertEqual(self.c.coveto_offres_depuis_html(html, "https://k60540.coveto.de/public/jobs/"), [])
+
+    def test_coveto_unrelated_table_not_accepted(self):
+        html = '<table><tr><th>Name</th><th>Stadt</th></tr></table>'
+        self.assertFalse(self.c.coveto_table_reconnue(html))
+
+    def test_coveto_loading_indicator(self):
+        self.assertTrue(self.c.coveto_semble_charger("Bitte warten, Daten werden geladen"))
+        self.assertFalse(self.c.coveto_semble_charger("Stellenname Arbeitsort Kategorie"))
+
     def test_coveto_html_table(self):
         html = '<table><tr><th>Stellenname</th><th>Arbeitsort</th></tr><tr><td><a href="/job-test-123.html">Wissenschaftlicher Mitarbeiter IoT</a></td><td>Leer</td><td>Technik</td></tr></table>'
         results = self.c.coveto_offres_depuis_html(html, "https://k60540.coveto.de/public/jobs/")

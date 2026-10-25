@@ -212,6 +212,25 @@ class Collecteur:
         return items
 
     @staticmethod
+    def coveto_table_reconnue(html_source):
+        """Valide la structure du portail, indépendamment de la présence de jobs.
+
+        Un tableau arbitraire ne suffit pas : les colonnes officielles doivent
+        être présentes. Utilisé uniquement APRES le chargement dynamique.
+        """
+        soup = BeautifulSoup(html_source, "html.parser")
+        for table in soup.find_all("table"):
+            headings = normaliser(" ".join(txt(t) for t in table.select("th"))).casefold()
+            if "stellenname" in headings and "arbeitsort" in headings:
+                return True
+        return False
+
+    @staticmethod
+    def coveto_semble_charger(texte):
+        """Empêche de déclarer vide une page affichant encore le chargement."""
+        return bool(re.search(r"(?:bitte\s+warten|daten\s+werden\s+geladen|jobs?\s+werden\s+geladen|loading\s+(?:jobs|data))", texte, re.I))
+
+    @staticmethod
     def coveto_indique_aucune_offre(texte):
         """N'accepte qu'un vrai message de 'aucun résultat', jamais l'en-tête Stellenname."""
         return bool(re.search(r"\b(?:keine\s+(?:offenen?\s+|aktuellen?\s+)?"
@@ -219,9 +238,13 @@ class Collecteur:
                               r"keine\s+ergebnisse)\b", texte, re.I))
 
     def collect_emden(self, src):
-        """Consulte Coveto sans filtre de campus ; distingue 0 vrai et parseur cassé."""
+        """Consulte le portail public Coveto sur l'hôte officiel de l'établissement.
+
+        N'accepte zéro annonce que si le navigateur a fini son chargement,
+        que le VRAI tableau de jobs a été reconnu et que son état est stable.
+        Une erreur réseau ou une page sans tableau restent des erreurs.
+        """
         response = self.get(src["url"])
-        # Certains rendus Coveto insèrent les lignes dès la réponse HTML.
         offres = self.coveto_offres_depuis_html(response.text, src["url"])
         if offres:
             return offres
@@ -233,17 +256,61 @@ class Collecteur:
             browser = p.chromium.launch(headless=True)
             try:
                 page = browser.new_page(user_agent=HEADERS["User-Agent"])
-                page.goto(src["url"], wait_until="domcontentloaded", timeout=45000)
-                page.wait_for_timeout(4500)
-                # La liste peut être injectée dans la table après JS.
-                page_html = page.content()
-                offres = self.coveto_offres_depuis_html(page_html, src["url"])
-                if offres:
-                    return offres
-                body = page.locator("body").inner_text(timeout=10000)
-                if self.coveto_indique_aucune_offre(body):
-                    return []
-                raise RuntimeError("Coveto: 0 offre extraite, mais aucune confirmation d'une liste vide ; source NON VÉRIFIÉE")
+                erreurs_reseau = []
+                hote = urlparse(src["url"]).hostname
+
+                def reponse_observee(r):
+                    if (urlparse(r.url).hostname == hote
+                            and r.request.resource_type in {"document", "xhr", "fetch"}
+                            and r.status >= 400):
+                        erreurs_reseau.append(f"HTTP {r.status} sur {r.url[:120]}")
+
+                def requete_echouee(req):
+                    if (urlparse(req.url).hostname == hote
+                            and req.resource_type in {"document", "xhr", "fetch"}):
+                        erreurs_reseau.append(f"Échec réseau sur {req.url[:120]}")
+
+                page.on("response", reponse_observee)
+                page.on("requestfailed", requete_echouee)
+                resp = page.goto(src["url"], wait_until="load", timeout=45000)
+                if resp is None or resp.status >= 400:
+                    raise RuntimeError(f"Coveto: erreur chargement du document ({resp.status if resp else 'sans réponse'})")
+
+                # Plusieurs observations pour éviter les faux zéros lorsque
+                # le JavaScript ne termine pas encore son rendu.
+                precedent = None
+                etat_stable = 0
+                for _ in range(6):
+                    page.wait_for_timeout(2000)
+                    rendu = page.content()
+                    offres = self.coveto_offres_depuis_html(rendu, src["url"])
+                    if offres:
+                        return offres
+                    corps = page.locator("body").inner_text(timeout=10000)
+                    if erreurs_reseau:
+                        raise RuntimeError("Coveto: requête nécessaire en échec : " + "; ".join(erreurs_reseau[:2]))
+                    if self.coveto_indique_aucune_offre(corps):
+                        log.info("emden: Coveto signale explicitement zéro offre")
+                        return []
+                    tables_visibles = page.locator("table").filter(has_text="Stellenname")
+                    table_visible = (self.coveto_table_reconnue(rendu)
+                                     and tables_visibles.count() > 0
+                                     and tables_visibles.first.is_visible())
+                    en_chargement = self.coveto_semble_charger(corps)
+                    # Le contenu peut inclure des horodatages dynamiques ;
+                    # on compare seulement les lignes du tableau principal.
+                    soup = BeautifulSoup(rendu, "html.parser")
+                    signature = tuple(normaliser(txt(row)) for row in soup.select("table tr"))
+                    if table_visible and not en_chargement and signature == precedent:
+                        etat_stable += 1
+                    else:
+                        etat_stable = 0
+                    precedent = signature if table_visible and not en_chargement else None
+                    if etat_stable >= 2:
+                        log.warning("emden: tableau Coveto reconnu, vide et stable après rendu JS ; zéro offre actuellement visible")
+                        return []
+                raise RuntimeError("Coveto: liste non confirmée après chargement JS ; source NON VÉRIFIÉE "
+                                   f"(tableau reconnu={self.coveto_table_reconnue(page.content())})")
             finally:
                 browser.close()
 
