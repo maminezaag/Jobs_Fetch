@@ -1,159 +1,223 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Diagnostic additionnel en lecture seule pour les offres absentes de stat_jobs.
+"""Audit comparatif, en lecture seule, de 4 annonces Arbeitsagentur.
 
-Remplace l'ancien audit_stat_jobs.py; utilise le MEME workflow GitHub Actions.
-Ne change ni l'archive, ni la configuration, ni Google Sheets.
+Remplacer stat_jobs/audit_stat_jobs.py par ce fichier dans le dépôt.
+Conserver le workflow GitHub Actions déjà installé : options --pages / --complet.
 
-Tests : recherche v6 / v4-app, variantes de paramètres, références ciblées,
-        détails v4 / v3. Rapport : audit_stat_jobs_resultat.json.
+N'écrit PAS dans Google Sheets et ne modifie NI stat_jobs.py NI config.json
+NI l'archive. Écrit uniquement stat_jobs/audit_stat_jobs_resultat.json.
 """
 import argparse
 import base64
+import glob
 import json
 import os
 import time
 from datetime import date
+
 import requests
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-ROOT = 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service'
-HEADERS = {'X-API-Key': 'jobboerse-jobsuche', 'User-Agent': 'stat_jobs-audit/2.0'}
-TARGETS = {
-    'event it AG': ['10001-1003579803-S'],
-    'ANG GmbH': ['10001-1003810414-S', '10001-1003810365-S',
-                 '10001-1003859776-S', '10001-1003859757-S'],
+URL = 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service'
+ENTETES = {'X-API-Key': 'jobboerse-jobsuche', 'User-Agent': 'stat_jobs-audit-comparaison/3.0'}
+TAILLE_PAGE = 100
+
+ANNONCES = {
+    'event_absente': {
+        'ref': '10001-1003579803-S',
+        'entreprise': 'event it AG',
+        'titre': 'Linux-Systemadministrator (m/w/d)',
+        'publication': '2026-08-21',
+    },
+    'ferchau_pdf_c1': {
+        'ref': '12265-469948_JB5262478-S',
+        'entreprise': 'FERCHAU GmbH Niederlassung Köln',
+        'titre': 'Linux-Systemadministrator (m/w/d)',
+        'publication': '2026-10-02',
+    },
+    'ferchau_recente': {
+        'ref': '12265-469948_JB5283281-S',
+        'entreprise': 'FERCHAU GmbH Niederlassung Köln',
+        'titre': 'Linux-Systemadministrator (m/w/d)',
+        'publication': '2026-10-27',
+    },
+    'hays_pdf_b2': {
+        'ref': '13319-899515/1_5536CS-S',
+        'entreprise': 'Hays Professional Solutions GmbH Standort Frankfurt',
+        'titre': 'Linux Admin (m/w/d)',
+        'publication': '2026-10-26',
+    },
 }
-TARGET_REFS = set(sum(TARGETS.values(), []))
-SIZE = 100
 
 
-def get_json(session, path, params=None):
-    err = None
-    for attempt in range(3):
+def lire_json(fichier):
+    with open(fichier, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def etat_archive():
+    """Recherche aussi dans les archives des autres mois, si elles existent."""
+    par_ref = {}
+    for fichier in sorted(glob.glob(os.path.join(BASE, 'archive', '*.jsonl'))):
+        with open(fichier, encoding='utf-8') as f:
+            for n, ligne in enumerate(f, 1):
+                if not ligne.strip():
+                    continue
+                try:
+                    o = json.loads(ligne)
+                except ValueError:
+                    print(f'Archive corrompue {fichier}:{n} (ligne ignorée)')
+                    continue
+                ref = o.get('refnr')
+                if ref:
+                    par_ref[ref] = {
+                        'fichier': os.path.basename(fichier),
+                        'statut': o.get('statut'),
+                        'titre': o.get('titel'),
+                        'publication': o.get('datum'),
+                        'premiere_vue': o.get('premiere_vue'),
+                        'recherches': o.get('recherches'),
+                    }
+    return {
+        nom: {'presente': meta['ref'] in par_ref, 'fiche': par_ref.get(meta['ref'])}
+        for nom, meta in ANNONCES.items()
+    }
+
+
+def requete(session, chemin, params=None):
+    erreur = None
+    for tentative in range(3):
         try:
-            response = session.get(ROOT + path, params=params, headers=HEADERS, timeout=40)
-            if response.status_code in (404, 410):
-                return None, response.status_code
-            response.raise_for_status()
-            return response.json(), response.status_code
+            reponse = session.get(URL + chemin, params=params, headers=ENTETES, timeout=40)
+            if reponse.status_code in (404, 410):
+                return None, reponse.status_code, None
+            reponse.raise_for_status()
+            return reponse.json(), reponse.status_code, None
         except (requests.RequestException, ValueError) as e:
-            err = e
-            if attempt < 2:
-                time.sleep((2, 6)[attempt])
-    return {'erreur': str(err)}, None
+            erreur = str(e)
+            if tentative < 2:
+                time.sleep((2, 6)[tentative])
+    return None, None, erreur
 
 
-def list_offres(session, name, path, base_params, max_pages):
-    records, api_total, err = {}, None, None
-    pages, complete = 0, False
-    keys = []
-    for page in range(1, max_pages + 1):
-        params = dict(base_params, page=page, size=SIZE)
-        data, code = get_json(session, path, params)
+def chercher(session, nom, params, pages_max):
+    fiches = {}
+    total = None
+    erreur = None
+    nb_pages = 0
+    complet = False
+    for page in range(1, pages_max + 1):
+        p = dict(params, page=page, size=TAILLE_PAGE)
+        data, statut, err = requete(session, '/pc/v6/jobs', p)
         if data is None:
-            err = f'HTTP {code}'
+            erreur = err or ('HTTP ' + str(statut))
             break
-        if data.get('erreur'):
-            err = data['erreur']
-            break
-        if page == 1:
-            keys = list(data.keys())
         liste = data.get('ergebnisliste') or data.get('stellenangebote') or []
-        api_total = data.get('maxErgebnisse', api_total)
-        pages += 1
-        for offer in liste:
-            ref = offer.get('referenznummer') or offer.get('refnr') or ''
+        total = data.get('maxErgebnisse', total)
+        nb_pages += 1
+        for offre in liste:
+            ref = offre.get('referenznummer') or offre.get('refnr')
             if ref:
-                records[ref] = {
-                    'titre': offer.get('stellenangebotsTitel') or offer.get('hauptberuf') or '',
-                    'entreprise': offer.get('firma') or '',
-                    'publication': offer.get('datumErsteVeroeffentlichung') or '',
+                fiches[ref] = {
+                    'titre': offre.get('stellenangebotsTitel') or offre.get('hauptberuf') or '',
+                    'entreprise': offre.get('firma', ''),
+                    'publication': offre.get('datumErsteVeroeffentlichung', ''),
                 }
-        if len(liste) < SIZE or (api_total is not None and len(records) >= int(api_total)):
-            complete = True
+        if len(liste) < TAILLE_PAGE or (total is not None and page * TAILLE_PAGE >= int(total)):
+            complet = True
             break
-        time.sleep(.12)
-    refs = {ref: info for ref, info in records.items() if ref in TARGET_REFS}
-    companies = {ref: info for ref, info in records.items()
-                 if 'ang gmbh' in info['entreprise'].lower() or 'event it' in info['entreprise'].lower()}
-    result = dict(test=name, endpoint=path, params=base_params, pages=pages,
-                  api_total=api_total, unique_results=len(records), complete=complete,
-                  found_targets=refs, found_companies=companies, error=err,
-                  response_keys=keys)
-    print(f'{name:29} | {len(records):5} offre(s) | {len(refs)} refs | {len(companies)} entreprises | '
-          f'{"complet" if complete else "partiel/erreur"}')
-    return result
+        time.sleep(0.15)
+
+    recensement = {nom: {
+        'trouvee': meta['ref'] in fiches,
+        'details_liste': fiches.get(meta['ref'])
+    } for nom, meta in ANNONCES.items()}
+    resume = {nom: ('OUI' if v['trouvee'] else ('NON' if complet else 'INCONNU (pagination partielle)'))
+              for nom, v in recensement.items()}
+    print(f"\n{nom}: {len(fiches)} résultats, total API {total}, {nb_pages} page(s), complet={complet}")
+    print('  ' + '; '.join(f'{k}={v}' for k, v in resume.items()))
+    if erreur:
+        print('  Erreur:', erreur)
+    return {
+        'test': nom, 'params': params, 'total_api': total,
+        'total_uniques_lus': len(fiches), 'pages_lues': nb_pages,
+        'complet': complet, 'erreur': erreur, 'annonces': recensement,
+    }
 
 
-def detail(session, ref):
-    encoded = base64.b64encode(ref.encode()).decode()
-    output = {'reference': ref}
-    for version in ('v4', 'v3'):
-        data, status = get_json(session, '/pc/' + version + '/jobdetails/' + encoded)
-        if data is None:
-            output[version] = {'status': status, 'accessible': False}
-        elif data.get('erreur'):
-            output[version] = {'status': status, 'accessible': False, 'erreur': data['erreur']}
-        else:
-            texte = data.get('stellenangebotsBeschreibung') or data.get('stellenbeschreibung') or ''
-            output[version] = {
-                'status': status, 'accessible': True,
-                'titre': data.get('stellenangebotsTitel') or data.get('titel'),
-                'publication': data.get('datumErsteVeroeffentlichung'),
-                'modification': data.get('datumLetzteAenderung'),
-                'longueur_description': len(texte),
-                'mention_c1': 'c1' in texte.lower(),
-            }
-    print('DETAIL', ref, 'v4=', output['v4']['status'], 'v3=', output['v3']['status'])
-    return output
+def obtenir_detail(session, nom, meta):
+    ref = meta['ref']
+    b64 = base64.b64encode(ref.encode('utf-8')).decode('ascii')
+    data, statut, erreur = requete(session, '/pc/v4/jobdetails/' + b64)
+    if data is None:
+        print(f'DETAIL {nom}: HTTP {statut}, erreur={erreur}')
+        return {'http': statut, 'accessible': False, 'erreur': erreur}
+    titre = data.get('stellenangebotsTitel') or data.get('titel')
+    texte = data.get('stellenangebotsBeschreibung') or data.get('stellenbeschreibung') or ''
+    resultat = {
+        'http': statut, 'accessible': True,
+        'titre_api': titre, 'publication_api': data.get('datumErsteVeroeffentlichung'),
+        'derniere_modification': data.get('datumLetzteAenderung'),
+        'longueur_description': len(texte),
+        'champs_disponibles': sorted(data.keys()),
+    }
+    print(f'DETAIL {nom}: HTTP {statut}, titre={titre!r}, publication={resultat["publication_api"]}')
+    return resultat
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--pages', type=int, default=3)
-    ap.add_argument('--complet', action='store_true', help='Utilise jusqu\'à 60 pages par test')
+    ap = argparse.ArgumentParser(description='Comparer une offre absente à trois offres archivées')
+    ap.add_argument('--pages', type=int, default=5)
+    ap.add_argument('--complet', action='store_true')
     ap.add_argument('--sans-detail', action='store_true')
     args = ap.parse_args()
     if not 1 <= args.pages <= 60:
         ap.error('--pages doit être compris entre 1 et 60')
-    cfg = json.load(open(os.path.join(BASE, 'config.json'), encoding='utf8'))
+    limite = 60 if args.complet else args.pages
+    cfg = lire_json(os.path.join(BASE, 'config.json'))
+    bf = cfg.get('berufsfeld')
     jours = cfg.get('recherche_jours', 100)
-    common = {'angebotsart': cfg.get('angebotsart', 1),
-              'zeitarbeit': str(bool(cfg.get('zeitarbeit', True))).lower()}
-    root_tests = [
-        ('ANG, titre, 100j', 'v6', {'was': 'Administrator Linux', 'veroeffentlichtseit': jours}),
-        ('ANG, titre, sans date', 'v6', {'was': 'Administrator Linux'}),
-        ('ANG, employeur, 100j', 'v6', {'arbeitgeber': 'ANG GmbH', 'veroeffentlichtseit': jours}),
-        ('ANG, employeur, sans date', 'v6', {'arbeitgeber': 'ANG GmbH'}),
-        ('ANG, Bochum', 'v6', {'was': 'Administrator Linux', 'wo': 'Bochum', 'veroeffentlichtseit': jours}),
-        ('ANG, titre, pav=true', 'v6', {'was': 'Administrator Linux', 'pav': 'true', 'veroeffentlichtseit': jours}),
-        ('event, titre, 100j', 'v6', {'was': 'Linux-Systemadministrator', 'veroeffentlichtseit': jours}),
-        ('event, titre, sans date', 'v6', {'was': 'Linux-Systemadministrator'}),
-        ('event, employeur, 100j', 'v6', {'arbeitgeber': 'event it AG', 'veroeffentlichtseit': jours}),
-        ('event, employeur, sans date', 'v6', {'arbeitgeber': 'event it AG'}),
-        ('event, Hannover', 'v6', {'was': 'Linux-Systemadministrator', 'wo': 'Hannover', 'veroeffentlichtseit': jours}),
-        ('event, titre, pav=true', 'v6', {'was': 'Linux-Systemadministrator', 'pav': 'true', 'veroeffentlichtseit': jours}),
-        ('ANG, app v4', 'v4app', {'was': 'Administrator Linux', 'veroeffentlichtseit': jours}),
-        ('event, app v4', 'v4app', {'was': 'Linux-Systemadministrator', 'veroeffentlichtseit': jours}),
+    base = {'angebotsart': cfg.get('angebotsart', 1),
+            'zeitarbeit': 'true' if cfg.get('zeitarbeit', True) else 'false'}
+    titres = [
+        ('01 - même titre, paramètres du script', {'was': 'Linux-Systemadministrator',
+                                                   'berufsfeld': bf, 'veroeffentlichtseit': jours}),
+        ('02 - même titre, sans champ', {'was': 'Linux-Systemadministrator',
+                                        'veroeffentlichtseit': jours}),
+        ('03 - même titre, sans limite date', {'was': 'Linux-Systemadministrator'}),
+        ('04 - même titre, sans champ, zeitarbeit=false', {'was': 'Linux-Systemadministrator',
+                                                          'veroeffentlichtseit': jours, 'zeitarbeit': 'false'}),
+        ('05 - même titre, sans champ, zeitarbeit omis', {'was': 'Linux-Systemadministrator',
+                                                        'veroeffentlichtseit': jours, 'zeitarbeit': None}),
+        ('06 - mot large, paramètres script', {'was': 'Systemadministrator', 'berufsfeld': bf,
+                                              'veroeffentlichtseit': jours}),
+        ('07 - contrôle B2 Hays, mot large', {'was': 'Linux Admin',
+                                            'veroeffentlichtseit': jours}),
     ]
-    endpoint = {'v6': '/pc/v6/jobs', 'v4app': '/pc/v4/app/jobs'}
-    results = {'audit_date': date.today().isoformat(), 'version': 2,
-               'note': 'Recherches avec pagination limitée : complete=false signifie résultat non exhaustif.',
-               'targets': TARGETS, 'searches': [], 'details': []}
+    resultats = {
+        'version': 3, 'date_audit': date.today().isoformat(),
+        'objectif': 'Comparer une annonce absente et trois offres archivées, y compris deux titres identiques',
+        'annonces_testees': ANNONCES,
+        'archive': etat_archive(), 'recherches': [], 'details': {},
+    }
+    print('=== CONTRÔLE ARCHIVE ===')
+    for nom, info in resultats['archive'].items():
+        print(nom, ':', 'PRESENTE' if info['presente'] else 'ABSENTE')
     with requests.Session() as s:
-        for name, api, extras in root_tests:
-            p = dict(common, **extras)
-            results['searches'].append(list_offres(s, name, endpoint[api], p,
-                                                   60 if args.complet else args.pages))
+        for nom, variante in titres:
+            p = dict(base)
+            p.update(variante)
+            p = {k: v for k, v in p.items() if v is not None}
+            resultats['recherches'].append(chercher(s, nom, p, limite))
         if not args.sans_detail:
-            for refs in TARGETS.values():
-                for ref in refs:
-                    results['details'].append(detail(s, ref))
-    output = os.path.join(BASE, 'audit_stat_jobs_resultat.json')
-    with open(output, 'w', encoding='utf8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-    print('Rapport enregistré :', output)
+            for nom, meta in ANNONCES.items():
+                resultats['details'][nom] = obtenir_detail(s, nom, meta)
+    sortie = os.path.join(BASE, 'audit_stat_jobs_resultat.json')
+    with open(sortie, 'w', encoding='utf-8') as f:
+        json.dump(resultats, f, indent=2, ensure_ascii=False)
+    print('\nRapport écrit:', sortie)
+    print('Aucun fichier historique, fichier de configuration ou Sheet n’a été modifié.')
 
 
 if __name__ == '__main__':
