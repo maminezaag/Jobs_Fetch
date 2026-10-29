@@ -9,6 +9,7 @@
     "titres_exclus  : métiers hors domaine. Une offre dont le TITRE contient une de ces regex est retirée PARTOUT",
     "                 (Summary, C1 Offers, B2 or Lower Offers, Trends, Profiles). Elle reste dans l'archive : retirer un mot la fait revenir.",
     "berufsfeld     : filtre domaine de l'API. Mets null (sans guillemets) pour le désactiver (plus d'offres, plus de bruit).",
+    "zeitarbeit     : 'alle' = toutes les offres (agences et employeurs directs) ; true = intérim ; false = hors intérim (audit API 29-10-2026).",
     "periode_jours  : période glissante des statistiques (offres publiées ces N derniers jours, encore en ligne ou retirées).",
     "recherche_jours: paramètre de l'API (100 maximum) ; laisser 100.",
     "archive_dossier: dossier de l'archive (dans stat_jobs/). NE PAS supprimer ce dossier : c'est l'historique.",
@@ -55,7 +56,7 @@
 
   "berufsfeld": "IT-Netzwerktechnik, -Administration, -Organisation",
   "angebotsart": 1,
-  "zeitarbeit": true,
+  "zeitarbeit": "alle",
 
   "periode_jours": 90,
   "recherche_jours": 100,

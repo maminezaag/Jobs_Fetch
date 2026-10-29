@@ -159,9 +159,17 @@ def lancer_recherche(session, cfg, mot_cle, berufsfeld=None):
             "page": page,
             "veroeffentlichtseit": min(int(cfg.get("recherche_jours", 100)), 100),
             "angebotsart": cfg.get("angebotsart", 1),
-            # IMPORTANT : booléen en minuscules ("true"), sinon l'API renvoie 0 résultat
-            "zeitarbeit": str(bool(cfg.get("zeitarbeit", True))).lower(),
         }
+        # Audit du 29-10-2026 : true ne renvoie que les offres d'intérim,
+        # false seulement celles hors intérim ; l'absence du paramètre renvoie les deux.
+        # Mode "alle" (par défaut) : ne pas envoyer le paramètre zeitarbeit.
+        zeitarbeit = cfg.get("zeitarbeit", "alle")
+        if zeitarbeit is True:
+            params["zeitarbeit"] = "true"
+        elif zeitarbeit is False:
+            params["zeitarbeit"] = "false"
+        elif zeitarbeit not in (None, "alle"):
+            raise StatJobsError("config.json : zeitarbeit doit être 'alle', true, false ou null")
         if berufsfeld:
             params["berufsfeld"] = berufsfeld
 
