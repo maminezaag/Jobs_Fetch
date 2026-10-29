@@ -1,0 +1,43 @@
+name: Audit stat_jobs (manuel, sans modification)
+
+on:
+  workflow_dispatch:
+    inputs:
+      complet:
+        description: "Rejouer toutes les recherches actuelles (potentiellement long)"
+        required: true
+        type: boolean
+        default: false
+      pages:
+        description: "Pages par recherche ciblée (1 a 60)"
+        required: true
+        default: '5'
+        type: string
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer requests
+        run: python -m pip install requests
+      - name: Executer l'audit (lecture seule)
+        shell: bash
+        env:
+          COMPLET: ${{ inputs.complet }}
+          PAGES: ${{ inputs.pages }}
+        run: |
+          OPTIONS="--pages $PAGES"
+          if [ "$COMPLET" = "true" ]; then OPTIONS="--complet"; fi
+          python stat_jobs/audit_stat_jobs.py $OPTIONS
+      - name: Telecharger le rapport JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-stat-jobs
+          path: stat_jobs/audit_stat_jobs_resultat.json
+          if-no-files-found: warn
