@@ -6,6 +6,26 @@
 <title>Jobs_Fetch — Scoring GitHub</title>
 <style>
 *{box-sizing:border-box}body{font:15px/1.5 Arial,sans-serif;max-width:1020px;margin:24px auto;padding:0 16px;color:#243642;background:#f7f9fa}h1{font-size:26px;margin-bottom:4px}p{color:#576a73}header,.panel{background:white;border:1px solid #dce5e9;border-radius:12px;padding:18px;margin-bottom:16px}header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}.buttons{display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid #b7cbd0;background:#fff;border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700}button.primary{background:#16727b;color:white;border-color:#16727b}button:disabled{opacity:.5;cursor:not-allowed}input,textarea{width:100%;border:1px solid #b7cbd0;border-radius:8px;padding:9px;font:inherit}input[type=number]{max-width:75px;text-align:center;font-weight:700}input[type=password]{max-width:430px}.token-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0}.remember-label{display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:normal}.remember-label input{width:auto;margin:0;accent-color:#16727b}.token-actions button{padding:7px 11px}.security-note{font-size:12px;color:#596d77}label{font-weight:700;display:block;margin:8px 0}small{color:#657780}#message{padding:12px;background:#edf4f5;border-radius:8px;white-space:pre-wrap}#message.error{background:#fff0ee;color:#9c3027}#message.success{background:#e8f6ed;color:#116841}#message a{color:inherit}details{border:1px solid #dae5e7;border-radius:10px;margin:8px 0;background:white}summary{cursor:pointer;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:bold}summary span{flex:1}summary input{flex:0 0 75px}summary button{font-size:12px}.inner{border-top:1px solid #dae5e7;padding:12px 14px}.inner textarea{min-height:80px}.heading{display:flex;justify-content:space-between;align-items:center;gap:8px}.heading h2{margin:0;font-size:20px}#groups{margin-top:10px}#searchterms{min-height:165px}a{color:#16727b}@media(max-width:600px){header{display:block}.buttons{margin-top:14px}summary button{padding:5px}}
+
+/* Interface d'ajout/suppression d'expertises */
+#groups details {transition: border-color .15s ease}
+#groups details:hover {border-color:#9db8be}
+#groups summary .skill-score {max-width:75px;flex:0 0 75px}
+#groups summary .remove-skill {flex:0 0 auto;color:#a12e28;border:1px solid #f2c9c4;background:#fff5f4;padding:6px 10px;font-size:13px}
+#groups summary .remove-skill:hover {background:#ffe4e0}
+.heading-right {display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#count {color:#647781;white-space:nowrap}
+.form-help {font-size:13px;color:#637680;margin-top:4px}
+#add-dialog {border:1px solid #c8d9de;border-radius:14px;box-shadow:0 12px 38px #1d374b33;padding:22px;width:min(94vw,525px);max-height:90vh;overflow:auto;color:#243642}
+#add-dialog::backdrop {background:#122a36aa}
+#add-dialog h2 {margin:0 0 10px;font-size:22px}
+#add-dialog label {margin-top:16px}
+#add-dialog input[type=number] {max-width:130px;text-align:left}
+#add-dialog textarea {min-height:115px}
+#add-dialog .dialog-actions {display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+#form-error {color:#a12e28;min-height:20px;margin:5px 0;font-size:13px}
+.empty-hint {padding:18px;border:1px dashed #ccd9dc;border-radius:10px;text-align:center;color:#637780}
+@media(max-width:600px){#groups summary{gap:6px;flex-wrap:wrap}#groups summary .remove-skill{font-size:12px}.heading-right{justify-content:flex-start}}
 </style>
 </head>
 <body>
@@ -25,8 +45,8 @@
  <div id="message">Chargement du fichier depuis GitHub…</div>
 </section>
 <section class="panel">
- <div class="heading"><h2>Compétences et points</h2><button id="add" disabled>+ Ajouter une compétence</button></div>
- <p>Modifie les points, puis ouvre une compétence pour modifier ses synonymes (un mot par ligne).</p>
+ <div class="heading"><h2>Expertises et points</h2><div class="heading-right"><small id="count">— expertises</small><button type="button" id="add" disabled>+ Ajouter une expertise</button></div></div>
+ <p>Ajoute une expertise avec son nom, son nombre de points et ses synonymes. Pour en supprimer une, clique sur « Supprimer » à droite. Les changements ne sont enregistrés qu'après « Commit sur GitHub ».</p>
  <div id="groups"></div>
 </section>
 <section class="panel">
@@ -34,6 +54,23 @@
  <p>Un mot-clé par ligne. Les autres règles de <code>criteres.json</code> sont conservées.</p>
  <textarea id="searchterms" disabled></textarea>
 </section>
+<dialog id="add-dialog" aria-labelledby="add-title">
+ <form id="add-form" novalidate>
+  <h2 id="add-title">Ajouter une expertise</h2>
+  <label for="skill-name">Nom de l’expertise</label>
+  <input id="skill-name" maxlength="120" required placeholder="Ex. : Microsoft Azure">
+  <label for="skill-score">Points</label>
+  <input id="skill-score" type="number" min="0" max="100" step="1" value="3" required>
+  <p class="form-help">0 point = détectée sans augmenter le score.</p>
+  <label for="skill-words">Synonymes / mots-clés (un par ligne)</label>
+  <textarea id="skill-words" required placeholder="Azure&#10;Microsoft Azure&#10;Azure Administrator"></textarea>
+  <div id="form-error" role="alert"></div>
+  <div class="dialog-actions">
+    <button type="button" id="cancel-add">Annuler</button>
+    <button type="submit" class="primary">Ajouter l’expertise</button>
+  </div>
+ </form>
+</dialog>
 <script>
 'use strict';
 const owner='maminezaag', repo='Jobs_Fetch', branch='main', path='criteres.json';
@@ -100,34 +137,89 @@ async function getRemote(){
  const obj=JSON.parse(decode64(result.content));checkData(obj);
  return {obj,sha:result.sha};
 }
+function wordsFromLines(s){
+ return [...new Set(s.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
+}
+function groupNameAlreadyExists(n,except=null){
+ return config.points_positifs.groupes.some(g=>g!==except&&g.nom.trim().toLocaleLowerCase('fr')===n.trim().toLocaleLowerCase('fr'));
+}
 function render(){
  const target=$('groups');target.replaceChildren();
- config.points_positifs.groupes.forEach((group,i)=>{
+ const groups=config.points_positifs.groupes;
+ $('count').textContent=groups.length+' expertise'+(groups.length>1?'s':'');
+ if(!groups.length){
+  const empty=document.createElement('div');empty.className='empty-hint';
+  empty.textContent='Aucune expertise pour le moment. Utilise « Ajouter une expertise ».';
+  target.append(empty);
+ }
+ groups.forEach((group,i)=>{
   const detail=document.createElement('details');
   const summary=document.createElement('summary');
   const title=document.createElement('span');title.textContent=group.nom;
-  const score=document.createElement('input');score.type='number';score.min='0';score.max='100';score.step='1';score.value=group.poids;score.title='Points';
+  const score=document.createElement('input');
+  score.className='skill-score';score.type='number';score.min='0';score.max='100';score.step='1';
+  score.value=group.poids;score.title='Points pour '+group.nom;
+  score.setAttribute('aria-label','Points pour '+group.nom);
   score.addEventListener('click',e=>e.stopPropagation());
   score.addEventListener('keydown',e=>e.stopPropagation());
   score.addEventListener('change',()=>{
+   if(score.value.trim()===''){score.value=group.poids;return alert('Saisis un nombre de points.');}
    const v=Number(score.value);
    if(!Number.isInteger(v)||v<0||v>100){score.value=group.poids;return alert('Choisis un nombre entre 0 et 100.');}
-   group.poids=v;setDirty();
+   if(group.poids!==v){group.poids=v;setDirty();}
   });
-  summary.append(title,score);detail.append(summary);
+  const del=document.createElement('button');del.type='button';del.className='remove-skill';
+  del.textContent='✕ Supprimer';del.title='Supprimer '+group.nom;
+  del.setAttribute('aria-label','Supprimer '+group.nom);
+  del.addEventListener('click',e=>{
+   e.preventDefault();e.stopPropagation();
+   if(confirm('Supprimer définitivement l’expertise « '+group.nom+' » du prochain commit ?')){
+    groups.splice(i,1);render();setDirty();
+   }
+  });
+  del.addEventListener('keydown',e=>e.stopPropagation());
+  summary.append(title,score,del);detail.append(summary);
   const inner=document.createElement('div');inner.className='inner';
-  const lab=document.createElement('label');lab.textContent='Nom de la compétence';
+  const lab=document.createElement('label');lab.textContent='Nom de l’expertise';
   const name=document.createElement('input');name.value=group.nom;
-  name.addEventListener('change',()=>{group.nom=name.value.trim();title.textContent=group.nom;setDirty();});
+  name.addEventListener('input',()=>{
+   group.nom=name.value.trim();title.textContent=group.nom||'(sans nom)';
+   score.setAttribute('aria-label','Points pour '+group.nom);setDirty();
+  });
   const lab2=document.createElement('label');lab2.textContent='Mots-clés / synonymes (un par ligne)';
   const words=document.createElement('textarea');words.value=group.mots.join('\n');
-  words.addEventListener('change',()=>{group.mots=words.value.split('\n').map(x=>x.trim()).filter(Boolean);setDirty();});
-  const del=document.createElement('button');del.textContent='Supprimer le groupe';
-  del.addEventListener('click',()=>{if(confirm('Supprimer « '+group.nom+' » ?')){config.points_positifs.groupes.splice(i,1);render();setDirty();}});
-  inner.append(lab,name,lab2,words,document.createElement('p'),del);detail.append(inner);target.append(detail);
+  words.addEventListener('input',()=>{group.mots=wordsFromLines(words.value);setDirty();});
+  const help=document.createElement('p');help.className='form-help';
+  help.textContent='Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.';
+  inner.append(lab,name,lab2,words,help);detail.append(inner);target.append(detail);
  });
  $('searchterms').value=config.recherche.mots_cles.join('\n');
 }
+function openAddDialog(){
+ if(!config)return;
+ $('add-form').reset();$('form-error').textContent='';
+ $('add-dialog').showModal();$('skill-name').focus();
+}
+function closeAddDialog(){$('add-dialog').close();}
+function addExpertise(e){
+ e.preventDefault();
+ if(!config)return;
+ const nom=$('skill-name').value.trim();
+ const rawScore=$('skill-score').value.trim();
+ const poids=Number(rawScore);
+ const mots=wordsFromLines($('skill-words').value);
+ let error='';
+ if(!nom)error='Saisis le nom de l’expertise.';
+ else if(groupNameAlreadyExists(nom))error='Cette expertise existe déjà.';
+ else if(rawScore===''||!Number.isInteger(poids)||poids<0||poids>100)error='Le score doit être un entier entre 0 et 100.';
+ else if(!mots.length)error='Ajoute au moins un mot-clé ou synonyme.';
+ if(error){$('form-error').textContent=error;return;}
+ config.points_positifs.groupes.push({nom,poids,mots});
+ closeAddDialog();render();setDirty();
+ const last=$('groups').lastElementChild;
+ if(last&&last.tagName==='DETAILS'){last.open=true;last.scrollIntoView({behavior:'smooth',block:'center'});}
+}
+
 async function load(){
  if(busy)return;
  if(dirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;
@@ -142,8 +234,10 @@ async function load(){
 async function commit(){
  if(busy||!config||!dirty)return;
  if(!$('token').value.trim())return show('Ajoute ton jeton GitHub dans le champ avant le commit.','error');
- if(!config.points_positifs.groupes.every(g=>g.nom&&Number.isInteger(g.poids)&&g.poids>=0&&g.mots.length&&g.mots.every(Boolean)))
-  return show('Erreur : un groupe a un nom, des mots-clés ou des points invalides.','error');
+ if(!config.points_positifs.groupes.every(g=>g.nom&&Number.isInteger(g.poids)&&g.poids>=0&&g.poids<=100&&g.mots.length&&g.mots.every(Boolean)))
+  return show('Erreur : une expertise a un nom, des mots-clés ou des points invalides.','error');
+ const names=config.points_positifs.groupes.map(g=>g.nom.trim().toLocaleLowerCase('fr'));
+ if(new Set(names).size!==names.length)return show('Erreur : deux expertises ont le même nom.','error');
  if(!confirm('Enregistrer tes modifications dans criteres.json sur GitHub (branche main) ?'))return;
  busy=true;$('commit').disabled=true;$('load').disabled=true;show('Vérification de la version GitHub…');
  try{
@@ -163,8 +257,10 @@ $('forget').addEventListener('click',forgetToken);
 restoreToken();
 $('load').addEventListener('click',load);
 $('commit').addEventListener('click',commit);
-$('searchterms').addEventListener('change',()=>{if(!config)return;config.recherche.mots_cles=$('searchterms').value.split('\n').map(x=>x.trim()).filter(Boolean);setDirty();});
-$('add').addEventListener('click',()=>{if(!config)return;config.points_positifs.groupes.push({nom:'Nouvelle compétence',poids:0,mots:['nouveau mot-clé']});render();setDirty();});
+$('searchterms').addEventListener('input',()=>{if(!config)return;config.recherche.mots_cles=wordsFromLines($('searchterms').value);setDirty();});
+$('add').addEventListener('click',openAddDialog);
+$('cancel-add').addEventListener('click',closeAddDialog);
+$('add-form').addEventListener('submit',addExpertise);
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 load();
 </script>
