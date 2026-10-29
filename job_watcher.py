@@ -177,6 +177,45 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
 
 
 # --------------------------------------------------------------------------
+# Transport API fiable : les erreurs temporaires sont retentees.
+# --------------------------------------------------------------------------
+
+def _api_json_avec_retry(
+    session: requests.Session,
+    url: str,
+    *,
+    params: dict[str, Any] | None = None,
+    contexte: str = "API",
+    essais: int = 3,
+) -> tuple[dict[str, Any], str]:
+    """Retourne (JSON, URL finale). Ne masque jamais une erreur persistante."""
+    for tentative in range(1, essais + 1):
+        try:
+            response = session.get(
+                url, headers=HEADERS, params=params, timeout=REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            data = response.json()
+            if not isinstance(data, dict):
+                raise ValueError(f"Réponse JSON inattendue ({type(data).__name__})")
+            return data, response.url
+        except (requests.RequestException, ValueError) as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            # Les 4xx permanentes (ex. une annonce retiree -> 404) ne
+            # beneficient pas de nouvelles tentatives.
+            erreur_permanente = status is not None and 400 <= status < 500 and status not in (408, 429)
+            if tentative == essais or erreur_permanente:
+                raise
+            pause = 2 * tentative
+            logger.warning(
+                "%s : tentative %s/%s échouée (%s), nouvel essai dans %ss",
+                contexte, tentative, essais, exc, pause,
+            )
+            time.sleep(pause)
+    raise RuntimeError(f"{contexte} : échec inattendu")
+
+
+# --------------------------------------------------------------------------
 # Recherche (une seule liste de mots-clés, nationale, sans filtre de lieu)
 # --------------------------------------------------------------------------
 
@@ -205,14 +244,21 @@ def _run_search(
 
         logger.info("Recherche %r (page %s)...", query, page)
         try:
-            r = session.get(SEARCH_ENDPOINT, headers=HEADERS, params=params, timeout=REQUEST_TIMEOUT)
-            logger.info("URL appelée : %s", r.url)
-            r.raise_for_status()
-        except requests.RequestException as e:
-            logger.error("Échec de la recherche pour %r : %s", query, e)
-            return
+            data, final_url = _api_json_avec_retry(
+                session, SEARCH_ENDPOINT, params=params,
+                contexte=f"Recherche {query!r}, page {page}",
+            )
+            logger.info("URL appelée : %s", final_url)
+        except (requests.RequestException, ValueError) as exc:
+            # IMPORTANT : ne pas envoyer de notifications ni enregistrer l'état
+            # si une recherche est partielle, sous peine de perdre des offres.
+            raise RuntimeError(f"Recherche incomplète pour {query!r}, page {page}") from exc
 
-        data = r.json()
+        if not isinstance(data.get("ergebnisliste"), list):
+            raise RuntimeError(
+                f"Réponse API incompatible pour {query!r}, page {page} : "
+                "clé 'ergebnisliste' absente ou incorrecte"
+            )
         # NOTE (23-24.09.2026) : la réponse réelle en production diffère du
         # schéma openapi.yaml documenté (périmé). Clé de la liste d'offres :
         # "ergebnisliste" (pas "stellenangebote") ; identifiant d'offre :
@@ -228,7 +274,7 @@ def _run_search(
         except (TypeError, ValueError):
             max_results = 0
 
-        if not offers or page * PAGE_SIZE >= max_results:
+        if not offers or (max_results > 0 and page * PAGE_SIZE >= max_results) or (max_results == 0 and len(offers) < PAGE_SIZE):
             return
         page += 1
         time.sleep(REQUEST_DELAY_S)
@@ -239,12 +285,26 @@ def search_jobs(cfg: dict[str, Any], session: requests.Session) -> list[dict[str
     mot-clé de criteres.json > recherche.mots_cles, fusionnée et dédoublonnée."""
     recherche = cfg["criteres"]["recherche"]
     commun = recherche.get("parametres_communs", {})
+    # "interim": "alle" -> NE PAS envoyer 'zeitarbeit' du tout.
+    # API : true = intérim seulement, false = hors intérim seulement.
+    # Absence du paramètre = les deux catégories.
+    interim = commun.get("interim", "alle")
+    if interim is None or (isinstance(interim, str) and interim.strip().lower() in ("alle", "tous", "all", "both")):
+        zeitarbeit = None
+    elif isinstance(interim, bool):
+        zeitarbeit = interim
+    elif isinstance(interim, str) and interim.strip().lower() in ("true", "false"):
+        zeitarbeit = interim.strip().lower() == "true"
+    else:
+        raise ValueError("recherche.parametres_communs.interim doit valoir 'alle', true ou false")
+
     common_params = {
         "berufsfeld": commun.get("domaine"),
         "veroeffentlichtseit": commun.get("jours", 7),
         "angebotsart": commun.get("type_offre", 1),
-        "zeitarbeit": commun.get("interim", True),
+        "zeitarbeit": zeitarbeit,
     }
+    logger.info("Filtre intérim : %s", "toutes les offres" if zeitarbeit is None else f"zeitarbeit={zeitarbeit}")
 
     fusion: dict[str, dict[str, Any]] = {}
     for query in recherche.get("mots_cles", []):
@@ -311,12 +371,10 @@ def fetch_description(session: requests.Session, refnr: str) -> str:
         return ""
     encoded_refnr = url_quote(base64.b64encode(refnr.encode("utf-8")).decode("ascii"), safe="")
     try:
-        r = session.get(
-            DETAILS_ENDPOINT.format(encoded_refnr=encoded_refnr),
-            headers=HEADERS, timeout=REQUEST_TIMEOUT,
+        data, _ = _api_json_avec_retry(
+            session, DETAILS_ENDPOINT.format(encoded_refnr=encoded_refnr),
+            contexte=f"Détail {refnr}",
         )
-        r.raise_for_status()
-        data = r.json()
         description = data.get("stellenangebotsBeschreibung") or data.get("stellenbeschreibung")
         if not description and not _description_field_warned:
             logger.warning(
@@ -325,7 +383,7 @@ def fetch_description(session: requests.Session, refnr: str) -> str:
             )
             _description_field_warned = True
         return description or ""
-    except requests.RequestException as e:
+    except (requests.RequestException, ValueError) as e:
         logger.warning("Détails indisponibles pour refnr=%s : %s", refnr, e)
         return ""
 
@@ -539,7 +597,7 @@ def build_email_body(jobs: list[JobResult]) -> str:
     return "\n".join(lines)
 
 
-def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> None:
+def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> bool:
     email_cfg = cfg["email"]
     host = email_cfg.get("smtp_host", "smtp.gmail.com")
     port = int(email_cfg.get("smtp_port", 587))
@@ -553,7 +611,7 @@ def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> None:
             "Variables d'environnement manquantes : GMAIL_ADDRESS / GMAIL_APP_PASSWORD / "
             "GMAIL_TO doivent être définies. Aucun e-mail envoyé."
         )
-        return
+        return False
 
     recipients = [addr.strip() for addr in to_raw.split(",") if addr.strip()]
     nb_fr = sum(1 for j in jobs if j.francais)
@@ -574,8 +632,10 @@ def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> None:
             server.login(address, app_password)
             server.sendmail(address, recipients, msg.as_string())
         logger.info("E-mail envoyé à %s (%d offre(s)).", ", ".join(recipients), len(jobs))
+        return True
     except Exception as e:
         logger.error("Échec de l'envoi de l'e-mail : %s", e)
+        return False
 
 
 # --------------------------------------------------------------------------
@@ -593,6 +653,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    if args.dry_run and args.reset:
+        raise SystemExit("--dry-run et --reset ne peuvent pas être combinés (protection de seen_jobs.json).")
     st_path = resolve_path(args.config, cfg["etat"].get("fichier", "seen_jobs.json"))
 
     if args.reset and st_path.exists():
@@ -626,6 +688,13 @@ def main() -> None:
             via_francais_seul=bool(o.get("_via_francais_seul")),
         )
         job.description = fetch_description(session, job.refnr)
+        if not job.description.strip():
+            logger.warning(
+                "Annonce %s sans description : non marquée comme vue ; "
+                "elle sera retentée au prochain passage si toujours en ligne.",
+                job.refnr,
+            )
+            continue
         evaluate(job, cfg)
         classify_source(job, cfg)  # doit venir APRÈS evaluate() (utilise matched_positive)
         results.append(job)
@@ -657,12 +726,23 @@ def main() -> None:
         logger.info("  ○ %s — %s (%d pts, sous le seuil de %d) [%s] %s", j.title, j.employer, j.score, seuil, j.source, j.url)
 
     if qualifies and not args.dry_run:
-        send_email(cfg, qualifies)
+        if not send_email(cfg, qualifies):
+            # Sans confirmation SMTP, ces offres doivent rester disponibles
+            # pour une nouvelle notification lors de la prochaine exécution.
+            for j in qualifies:
+                state["vus"].pop(j.refnr, None)
+            logger.warning(
+                "SMTP en échec : %d annonce(s) qualifiée(s) NON marquée(s) vue(s) ; nouvel essai au prochain run.",
+                len(qualifies),
+            )
     elif qualifies and args.dry_run:
         print("\n--- APERÇU (dry-run, aucun e-mail envoyé) ---\n")
         print(build_email_body(qualifies))
 
-    save_state(st_path, state)
+    if args.dry_run:
+        logger.info("Mode dry-run : seen_jobs.json laissé intact.")
+    else:
+        save_state(st_path, state)
 
 
 if __name__ == "__main__":
