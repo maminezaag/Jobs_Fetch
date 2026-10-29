@@ -1,35 +1,27 @@
 # =============================================================================
 # .github/workflows/job_watcher.yml
 # =============================================================================
-# Exécute job_watcher.py (recherche IT) PUIS job_watcher_bochra.py (recherche
-# chimie / labo pour Bochra) sur les serveurs GitHub Actions, dans UN SEUL job.
-#
-# DÉCLENCHEMENT : ce workflow N'UTILISE PAS le planificateur natif GitHub
-# Actions (la section "schedule: cron:"), volontairement — il est déclenché
-# par un événement "repository_dispatch" envoyé depuis l'EXTÉRIEUR (crontab.org
-# appelle l'API GitHub à intervalle régulier). Voir README.md pour la
-# configuration précise côté crontab.org (URL, en-têtes, token).
-# Un seul déclencheur suffit pour les deux scripts : rien à changer côté
-# crontab.org.
-#
-# "workflow_dispatch" est aussi activé en plus, pour pouvoir lancer le
-# workflow manuellement depuis l'onglet "Actions" de GitHub (pratique pour
-# tester sans attendre le prochain déclenchement crontab.org).
+# Lance les deux collecteurs (IT et Bochra), puis sauvegarde leurs historiques.
+# Le déclenchement reste externe (repository_dispatch / crontab.org) ou manuel.
+# Correction : si un autre workflow (ex. stat_jobs) pousse sur main pendant
+# la collecte, on récupère ses commits avant de pousser les historiques.
 
 name: Job Watcher
 
 on:
   repository_dispatch:
-    # Le type d'événement envoyé par crontab.org doit correspondre EXACTEMENT
-    # à cette valeur dans le corps JSON de sa requête POST :
-    #   { "event_type": "run-job-watcher" }
     types: [run-job-watcher]
-  workflow_dispatch: {}  # bouton "Run workflow" manuel dans l'onglet Actions
+  workflow_dispatch: {}
 
-# Nécessaire pour que le job puisse recommitter seen_jobs.json et
-# seen_jobs_bochra.json dans le repo
 permissions:
   contents: write
+
+# Empêche deux exécutions de Job Watcher d'écrire simultanément les mêmes états.
+# N'annule jamais une exécution en cours. Les autres workflows (stat_jobs)
+# continuent de fonctionner indépendamment.
+concurrency:
+  group: job-watcher-main
+  cancel-in-progress: false
 
 jobs:
   run-job-watcher:
@@ -37,6 +29,9 @@ jobs:
     steps:
       - name: Récupérer le code du repo
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Installer Python
         uses: actions/setup-python@v5
@@ -48,18 +43,13 @@ jobs:
 
       - name: Lancer job_watcher.py
         env:
-          # Ces trois noms doivent être créés comme "Secrets" du repo
-          # (Settings > Secrets and variables > Actions > New repository secret)
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GMAIL_TO: ${{ secrets.GMAIL_TO }}
         run: python job_watcher.py --config config.yaml
 
       - name: Lancer job_watcher_bochra.py
-        # "!cancelled()" : cette étape se lance MÊME SI l'étape précédente a
-        # échoué, pour qu'une panne d'un script ne bloque jamais l'autre.
-        # Même secrets Gmail que ci-dessus ; aucun secret Google Sheet n'est
-        # nécessaire pour ce script (état local uniquement).
+        # Continuer si le script IT a échoué, sauf annulation explicite.
         if: ${{ !cancelled() }}
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
@@ -67,20 +57,45 @@ jobs:
           GMAIL_TO: ${{ secrets.GMAIL_TO }}
         run: python job_watcher_bochra.py --config config_bochra.yaml
 
-      - name: Sauvegarder l'historique des offres déjà vues (seen_jobs*.json)
-        # Sans cette étape, les fichiers seen_jobs*.json créés/modifiés pendant
-        # le run seraient perdus à la fin de l'exécution (les runners GitHub
-        # Actions sont éphémères) — le prochain run croirait que TOUTES les
-        # offres sont nouvelles. On recommit donc les fichiers dans le repo,
-        # seulement s'ils ont changé.
-        # Le motif 'seen_jobs*.json' prend à la fois seen_jobs.json (IT) et
-        # seen_jobs_bochra.json. Un SEUL commit est fait, après les deux
-        # scripts : pas de conflit entre eux.
-        # "!cancelled()" : on sauvegarde même si un des deux scripts a échoué.
+      - name: Sauvegarder les historiques seen_jobs*.json
+        # Sauvegarder même si un collecteur a échoué, sauf annulation.
         if: ${{ !cancelled() }}
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name "job-watcher-bot"
           git config user.email "job-watcher-bot@users.noreply.github.com"
-          git add 'seen_jobs*.json'
-          git diff --staged --quiet || git commit -m "chore: mise à jour de l'historique des offres vues [skip ci]"
-          git push
+
+          # Uniquement les deux historiques, jamais les archives de stat_jobs.
+          git add -- 'seen_jobs*.json'
+          if git diff --cached --quiet; then
+            echo "Aucun historique modifié : rien à pousser."
+            exit 0
+          fi
+
+          git commit -m "chore: mise à jour de l'historique des offres vues [skip ci]"
+
+          # Un workflow indépendant peut modifier main pendant les recherches.
+          # Rebase sur le dernier main, puis retry si une nouvelle mise à jour
+          # arrive entre fetch et push. Pas de push --force.
+          for tentative in 1 2 3 4 5; do
+            echo "Synchronisation Git (tentative ${tentative}/5)..."
+            git fetch --no-tags origin main
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "Conflit Git sur les mêmes fichiers : sauvegarde interrompue pour éviter une perte de données." >&2
+              exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              echo "Historiques sauvegardés sur GitHub."
+              exit 0
+            fi
+
+            echo "La branche main a changé entre fetch et push : nouvelle tentative..."
+            sleep $((tentative * 3))
+          done
+
+          echo "Échec du push après 5 tentatives. Aucun push forcé." >&2
+          exit 1
