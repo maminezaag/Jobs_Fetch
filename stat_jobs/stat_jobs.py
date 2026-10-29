@@ -644,6 +644,35 @@ def analyser_tendances(offres, themes, groupes, regles_cfg, debut_archive, aujou
     return [titre] + texte
 
 
+# Classification du coeur de métier : indépendante des mots-clés qui ont trouvé l'annonce.
+def attribuer_domaine(offres, cfg):
+    """Ajoute 'est_domaine' en mémoire, sans modifier les archives JSONL.
+
+    Les titres de métiers voisins sont prioritaires sur les mots-clés génériques.
+    Les titres coeur de métier peuvent réintégrer les tableaux même si la
+    référence est historiquement archivée uniquement sous 'marche'.
+    """
+    try:
+        coeur = [re.compile(p, re.I) for p in cfg.get("titres_domaine_force", [])]
+        voisins = [re.compile(p, re.I) for p in cfg.get("titres_marche_force", [])]
+    except re.error as e:
+        raise StatJobsError(f"config.json : regex invalide dans les titres de métiers : {e}")
+    recuperes, voisins_ecartes = 0, 0
+    for o in offres:
+        titre = o.get("titel") or ""
+        sources = o.get("recherches") or ["domaine"]
+        si_voisin = any(p.search(titre) for p in voisins)
+        si_coeur = any(p.search(titre) for p in coeur)
+        est_domaine = not si_voisin and ("domaine" in sources or si_coeur)
+        o["est_domaine"] = est_domaine
+        if est_domaine and "domaine" not in sources:
+            recuperes += 1
+        if si_voisin and "domaine" in sources:
+            voisins_ecartes += 1
+    log.info("Classification titres : %d offres marché -> domaine ; %d métiers voisins réservés aux tendances",
+             recuperes, voisins_ecartes)
+
+
 # =========================================================================== 5b. tableaux du Sheet
 
 def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archive, groupes=None, analyse=None,
@@ -652,7 +681,7 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
     offres_tous = offres de la période (classées, dédoublonnées, avec texte), listes 'domaine' ET 'marche'.
     Résumé + Offres C1 : uniquement la liste 'domaine' (mes postes). Tendances : tout (domaine + marché).
     """
-    offres = [o for o in offres_tous if "domaine" in (o.get("recherches") or ["domaine"])]
+    offres = [o for o in offres_tous if o.get("est_domaine", "domaine" in (o.get("recherches") or ["domaine"]))]
     lib_local = f"{cfg['lieu_reference']['nom']} + {int(cfg['rayon_km'])} km"
     lib_moins = "Below C1 or not specified"
     loc = [o for o in offres if o["zone"] == "local"]
@@ -682,13 +711,22 @@ def construire_tableaux(offres_tous, cfg, themes, aujourdhui, debut, debut_archi
         "values": r, "gras": [0, 3], "gris": (h1, h1 + 2), "col_widths": {0: 330, 1: 150, 2: 120},
         "charts": [{"type": "COLUMN", "stacked": True, "titre": "German level required (% of offers)",
                     "header_row": h1, "last_row": h1 + 2, "domain_col": 0, "series_cols": [1, 2],
+                    # C1 (rouge) ; B2 ou moins / sans niveau précisé (bleu)
+                    "series_colors": [
+                        {"red": 0.82, "green": 0.17, "blue": 0.18},
+                        {"red": 0.16, "green": 0.43, "blue": 0.76},
+                    ],
                     "anchor_row": 2, "anchor_col": 4, "y_title": "% of offers"}]}
 
     # ---------------------------------------------------------------- Offres C1 / Offres B2 ou moins
     def liste_offres(selection, derniere_col, valeur):
         rows = [["Zone", "Company", "Title", "Location", "Publication date", "Link", derniere_col]]
-        ordre = (sorted([o for o in selection if o["zone"] == "local"], key=lambda o: o["datum"], reverse=True) +
-                 sorted([o for o in selection if o["zone"] != "local"], key=lambda o: o["datum"], reverse=True))
+        # Tri demandé : d'abord Oldenburg + 60 km, puis le reste de l'Allemagne.
+        # Dans chacune de ces deux zones, les annonces les plus récentes passent en tête.
+        # Référence et entreprise stabilisent l'ordre en cas de même date.
+        ordre = sorted(selection, key=lambda o: ((o.get("firma") or "").casefold(), o.get("refnr") or ""))
+        ordre.sort(key=lambda o: o.get("datum") or "", reverse=True)
+        ordre.sort(key=lambda o: o.get("zone") != "local")
         for o in ordre:
             lieu = f"{o.get('plz') or ''} {o.get('ort') or ''}".strip() or o.get("region") or "not stated"
             rows.append([cellule(x) for x in [
@@ -853,8 +891,9 @@ def _requete_graphique(sid, d):
     horizontal = d["type"] == "BAR"
     basic = {"chartType": d["type"], "legendPosition": "BOTTOM_LEGEND", "headerCount": 1,
              "domains": [{"domain": plage(d["domain_col"])}],
-             "series": [{"series": plage(c), "targetAxis": "BOTTOM_AXIS" if horizontal else "LEFT_AXIS"}
-                        for c in d["series_cols"]]}
+             "series": [{**{"series": plage(c), "targetAxis": "BOTTOM_AXIS" if horizontal else "LEFT_AXIS"},
+                         **({"color": d["series_colors"][i]} if i < len(d.get("series_colors", [])) else {})}
+                        for i, c in enumerate(d["series_cols"])]}
     if d.get("stacked"):
         basic["stackedType"] = "STACKED"
     axes = []
@@ -979,6 +1018,7 @@ def main(argv=None, session=None):
     log.info("Métiers hors domaine retirés (titres_exclus) : %d offres", avant - len(tous))
     classifier(tous, cfg, sprache, expressions, themes, profils)
     tous = [o for o in dedoublonner(tous, cfg) if o.get("statut") == "ok"]
+    attribuer_domaine(tous, cfg)  # recalculé à chaque exécution, archive inchangée
     debut = (date.today() - timedelta(days=int(cfg.get("periode_jours", 90)))).isoformat()
     uniques = [o for o in tous if o["datum"] >= debut]
 
@@ -996,7 +1036,7 @@ def main(argv=None, session=None):
                               analyse, profils, themes_cfg.get("onglets"))
     sauvegarder_local(tab)
 
-    uniques = [o for o in uniques if "domaine" in (o.get("recherches") or ["domaine"])]   # chiffres C1 = mes postes
+    uniques = [o for o in uniques if o.get("est_domaine")]   # mêmes règles que les onglets C1/B2
     loc = [o for o in uniques if o["zone"] == "local"]
     log.info("RÉSULTAT (%s -> %s) Allemagne : %d offres, %d C1 ou plus (%.1f %%)", debut, aujourdhui,
              len(uniques), sum(o["c1"] for o in uniques), pct(sum(o["c1"] for o in uniques), len(uniques)))

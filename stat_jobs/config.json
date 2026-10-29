@@ -7,6 +7,8 @@
     "berufsfeld_marche: filtre domaine pour la liste 'marché' ; null = aucun filtre (ces postes sont classés ailleurs).",
     "profils_datei  : règles qui déduisent le type de poste du titre (onglet 'Profils').",
     "titres_exclus  : métiers hors domaine. Une offre dont le TITRE contient une de ces regex est retirée PARTOUT",
+    "titres_domaine_force : titres du coeur de métier ; inclus dans Summary et C1/B2 même si l'archive dit seulement 'marche'.",
+    "titres_marche_force : titres de métiers voisins (Cloud Administrator et VDI Engineer) exclus de Summary/C1/B2 mais gardés dans Trends/Profiles.",
     "                 (Summary, C1 Offers, B2 or Lower Offers, Trends, Profiles). Elle reste dans l'archive : retirer un mot la fait revenir.",
     "berufsfeld     : filtre domaine de l'API. Mets null (sans guillemets) pour le désactiver (plus d'offres, plus de bruit).",
     "zeitarbeit     : 'alle' = toutes les offres (agences et employeurs directs) ; true = intérim ; false = hors intérim (audit API 29-10-2026).",
@@ -19,66 +21,83 @@
     "tendance_min_offres       : une semaine n'est tracée que si sa fenêtre contient au moins N offres (évite les pics absurdes).",
     "ATTENTION : le JSON n'accepte ni commentaires ni virgule après le dernier élément d'une liste."
   ],
-
   "mots_cles": [
     "Systemadministrator",
     "IT-Administrator",
     "Linux Administrator",
     "IT Support",
-    "System Engineer"
+    "System Engineer",
+    "Linux Engineer",
+    "Infrastructure Engineer"
   ],
-
   "mots_cles_marche": [
     "Cloud Engineer",
     "Cloud Administrator",
     "DevOps Engineer",
     "Platform Engineer",
     "Site Reliability Engineer",
-    "Infrastructure Engineer",
-    "Linux Engineer",
     "VDI Engineer"
   ],
   "berufsfeld_marche": null,
-
   "titres_exclus": [
-    "tester", "\\btest\\b", "test ?engineer",
-    "security", "sicherheit", "cyber", "hacker", "penetration",
-    "entwickler", "developer", "software ?engineer", "programmierer",
-    "\\bsap\\b", "\\berp\\b",
+    "tester",
+    "\\btest\\b",
+    "test ?engineer",
+    "security",
+    "sicherheit",
+    "cyber",
+    "hacker",
+    "penetration",
+    "entwickler",
+    "developer",
+    "software ?engineer",
+    "programmierer",
+    "\\bsap\\b",
+    "\\berp\\b",
     "\\bcad\\b",
     "\\bki\\b",
-    "architekt", "architect",
-    "projektleit", "projektmanag", "projektsteuer", "project ?manager",
-    "consultant", "berater",
+    "architekt",
+    "architect",
+    "projektleit",
+    "projektmanag",
+    "projektsteuer",
+    "project ?manager",
+    "consultant",
+    "berater",
     "safety",
     "servicenow"
   ],
-
   "berufsfeld": "IT-Netzwerktechnik, -Administration, -Organisation",
   "angebotsart": 1,
   "zeitarbeit": "alle",
-
   "periode_jours": 90,
   "recherche_jours": 100,
-
   "lieu_reference": {
     "nom": "Oldenburg",
     "latitude": 53.1435,
     "longitude": 8.2146
   },
   "rayon_km": 60,
-
   "themes_datei": "themes.json",
   "sprache_datei": "sprache.json",
   "analyse_datei": "analyse.json",
   "profils_datei": "profils.json",
   "archive_dossier": "archive",
-
   "tendance_fenetre_semaines": 4,
   "tendance_min_offres": 20,
   "tendance_top_synthese": 25,
-
   "doublon_aehnlichkeit": 0.85,
   "parallele_anfragen": 3,
-  "pause_s": 0.15
+  "pause_s": 0.15,
+  "titres_domaine_force": [
+    "\\blinux[\\s/-]+(?:system[\\s/-]*)?administrator\\b",
+    "\\b(?:it[\\s/-]+)?administrator[\\s/-]+linux\\b",
+    "\\blinux[\\s/-]+engineer\\b",
+    "\\b(?:it[\\s/-]+)?infrastructure[\\s/-]+engineer\\b",
+    "\\binfrastruktur[\\s/-]+engineer\\b"
+  ],
+  "titres_marche_force": [
+    "\\bcloud[\\s/-]+administrator\\b",
+    "\\bvdi[\\s/-]+engineer\\b"
+  ]
 }
