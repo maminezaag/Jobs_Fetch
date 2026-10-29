@@ -254,27 +254,42 @@ def _run_search(
             # si une recherche est partielle, sous peine de perdre des offres.
             raise RuntimeError(f"Recherche incomplète pour {query!r}, page {page}") from exc
 
-        if not isinstance(data.get("ergebnisliste"), list):
+        # Avec ZERO résultat, l'API /pc/v6/jobs omet `ergebnisliste` :
+        # {"maxErgebnisse": 0, ...} est une réponse tout à fait valide.
+        # En revanche, une réponse vide, une erreur JSON de proxy ou un
+        # `maxErgebnisse` absent/invalide ne doit PAS être prise pour 0 annonce.
+        try:
+            if "maxErgebnisse" not in data or isinstance(data["maxErgebnisse"], bool):
+                raise ValueError("maxErgebnisse absent ou invalide")
+            max_results = int(data["maxErgebnisse"])
+            if max_results < 0:
+                raise ValueError("maxErgebnisse négatif")
+        except (TypeError, ValueError) as exc:
             raise RuntimeError(
                 f"Réponse API incompatible pour {query!r}, page {page} : "
-                "clé 'ergebnisliste' absente ou incorrecte"
+                f"maxErgebnisse absent/invalide ; clés reçues : {list(data)}"
+            ) from exc
+
+        offers = data.get("ergebnisliste")
+        if max_results == 0 and offers is None:
+            logger.info("Recherche %r : aucun résultat (maxErgebnisse=0).", query)
+            return
+        if not isinstance(offers, list) or (max_results == 0 and offers):
+            raise RuntimeError(
+                f"Réponse API incompatible pour {query!r}, page {page} : "
+                f"ergebnisliste incohérente avec maxErgebnisse={max_results} ; "
+                f"clés reçues : {list(data)}"
             )
         # NOTE (23-24.09.2026) : la réponse réelle en production diffère du
         # schéma openapi.yaml documenté (périmé). Clé de la liste d'offres :
         # "ergebnisliste" (pas "stellenangebote") ; identifiant d'offre :
         # "referenznummer" (pas "refnr"). Voir main() pour le mapping complet.
-        offers = data.get("ergebnisliste", []) or []
         for o in offers:
             refnr = o.get("referenznummer")
             if refnr and refnr not in fusion:
                 fusion[refnr] = o
 
-        try:
-            max_results = int(data.get("maxErgebnisse", 0))
-        except (TypeError, ValueError):
-            max_results = 0
-
-        if not offers or (max_results > 0 and page * PAGE_SIZE >= max_results) or (max_results == 0 and len(offers) < PAGE_SIZE):
+        if not offers or page * PAGE_SIZE >= max_results:
             return
         page += 1
         time.sleep(REQUEST_DELAY_S)
