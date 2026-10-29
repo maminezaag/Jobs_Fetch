@@ -1,0 +1,136 @@
+{
+  "_lisez_moi": [
+    "Ce fichier définit quoi chercher et comment noter les offres.",
+    "config.yaml conserve les paramètres techniques (e-mail, seuil, chemins de fichiers).",
+    "Recherche nationale par mot-clé puis classification locale, remote ou hors_zone.",
+    "Les offres locales sont à moins de rayon_km de lieu_reference.",
+    "Les offres éloignées sans télétravail sont écartées, sauf exception liée au français.",
+    "Les synonymes d'un même groupe ne rapportent des points qu'une seule fois."
+  ],
+  "recherche": {
+    "_aide": "Mots-clés de recherche envoyés à l'API Jobsuche dans toute l'Allemagne.",
+    "mots_cles": [
+      "Linux Systemadministrator",
+      "IT-Systemadministrator",
+      "IT-Administration und Betreuung",
+      "Netzwerkadministrator",
+      "DevOps Engineer",
+      "IT Support Engineer",
+      "Linux Support",
+      "IT Administrator",
+      "IT Infrastructure Engineer",
+      "Linux Administrator",
+      "Infrastrukturadministrator",
+      "IT-Infrastruktur Administrator",
+      "Systemadministrator Linux",
+      "System Engineer Infrastruktur"
+    ],
+    "lieu_reference": {
+      "_aide": "Centre-ville utilisé pour le calcul de distance.",
+      "nom": "Oldenburg",
+      "latitude": 53.1435,
+      "longitude": 8.2146
+    },
+    "rayon_km": 70,
+    "parametres_communs": {
+      "_aide": "Paramètres API inchangés.",
+      "domaine": "IT-Netzwerktechnik, -Administration, -Organisation",
+      "jours": 7,
+      "type_offre": 1,
+      "interim": true
+    }
+  },
+  "elimination": {
+    "_aide": [
+      "mots_stricts élimine toujours les offres avec allemand C1/C2 explicite ou natif.",
+      "mots_souples est ignoré si des marqueurs B2 explicites sont présents.",
+      "Les marqueurs utilisent des expressions complètes pour réduire les faux positifs."
+    ],
+    "mots_stricts": [
+      "mindestens C1", "C1-Niveau", "C1 Niveau", "Sprachniveau C1",
+      "Deutschkenntnisse C1", "Deutsch C1", "Niveau C1",
+      "mindestens C2", "C2-Niveau", "C2 Niveau", "Sprachniveau C2",
+      "Deutschkenntnisse C2", "Deutsch C2", "Niveau C2",
+      "muttersprachliches Deutsch", "muttersprachliche Deutsch",
+      "muttersprachlichem Deutsch", "muttersprachlichen Deutsch",
+      "Deutsch auf Muttersprachniveau", "Muttersprache Deutsch"
+    ],
+    "mots_souples": [
+      "verhandlungssicheres Deutsch", "verhandlungssichere Deutsch",
+      "verhandlungssicherem Deutsch", "verhandlungssicheren Deutsch"
+    ],
+    "b2_marqueurs": [
+      "B2-Niveau", "B2 Niveau", "Niveau B2", "Sprachniveau B2",
+      "Deutschkenntnisse B2", "Deutsch B2", "mindestens B2", "ab B2"
+    ]
+  },
+  "points_positifs": {
+    "_aide": [
+      "Chaque groupe représente une compétence avec son nom, son poids et ses synonymes.",
+      "Un groupe ne peut donner ses points qu'une seule fois.",
+      "Rééquilibrage pour les postes Linux, systèmes Windows et infrastructure hybride."
+    ],
+    "groupes": [
+      { "nom": "Linux (RedHat/RHEL)", "poids": 5, "mots": ["RedHat", "Red Hat", "RHEL", "Red Hat Enterprise Linux"] },
+      { "nom": "Linux (général)", "poids": 5, "mots": ["Linux"] },
+      { "nom": "CheckMK / Nagios", "poids": 5, "mots": ["CheckMK", "Check_MK", "Check MK", "Nagios"] },
+      { "nom": "Bash / Shell Scripting", "poids": 5, "mots": ["Bash", "Shell-Skript", "Shellskript", "Shell Scripting", "Shell-Scripting", "Shellskripte"] },
+      { "nom": "Proxmox", "poids": 5, "mots": ["Proxmox", "Proxmox VE"] },
+      { "nom": "Puppet", "poids": 5, "mots": ["Puppet"] },
+      { "nom": "Ubuntu", "poids": 5, "mots": ["Ubuntu"] },
+      { "nom": "Zimbra", "poids": 5, "mots": ["Zimbra"] },
+      { "nom": "IT-Support", "poids": 3, "mots": ["IT-Support", "IT Support", "Anwendersupport", "1st Level Support", "2nd Level Support"] },
+      { "nom": "VMware vSphere / ESXi", "poids": 5, "mots": ["vSphere", "VMware vSphere", "VMware ESXi", "ESXi", "VMware"] },
+      { "nom": "Ansible", "poids": 4, "mots": ["Ansible"] },
+      { "nom": "Active Directory / GPO", "poids": 5, "mots": ["Active Directory", "AD-Administration", "GPO", "Gruppenrichtlinien", "Group Policy"] },
+      { "nom": "Veeam", "poids": 4, "mots": ["Veeam"] },
+      { "nom": "Kaspersky Security Center", "poids": 4, "mots": ["Kaspersky", "Kaspersky Security Center", "Kaspersky Endpoint Security"] },
+      { "nom": "Terraform", "poids": 3, "mots": ["Terraform"] },
+      { "nom": "Git", "poids": 3, "mots": ["Git", "GitHub", "GitLab"] },
+      { "nom": "Datenbanken", "poids": 3, "mots": ["Oracle", "MySQL", "MariaDB", "PostgreSQL"] },
+      { "nom": "Prometheus / Grafana", "poids": 3, "mots": ["Prometheus", "Grafana"] },
+      { "nom": "Windows Server", "poids": 5, "mots": ["Windows Server", "Windows-Server", "Windows- und Linux-Server", "Windows Serverlandschaft"] },
+      { "nom": "Python", "poids": 3, "mots": ["Python-Skript", "Python Scripting", "Python"] },
+      { "nom": "Docker", "poids": 3, "mots": ["Docker"] },
+      { "nom": "Zertifizierungen (RHCSA/AZ-104/LPIC)", "poids": 3, "mots": ["RHCSA", "Red Hat Certified System Administrator", "AZ-104", "Azure Administrator Associate", "Azure Administrator", "LPIC-1", "LPIC-2", "LPIC1", "LPIC2", "Linux Professional Institute"] },
+      { "nom": "Networking", "poids": 4, "mots": ["Networking", "Netzwerktechnik", "Netzwerkadministration", "Netzwerkinfrastruktur", "Netzwerkmanagement", "LAN/WAN"] },
+      { "nom": "Firewalling", "poids": 3, "mots": ["Firewall", "Firewalling"] },
+      { "nom": "Storage (NetApp/3PAR)", "poids": 4, "mots": ["NetApp", "NetApp FAS", "HP 3PAR", "3PAR", "Storage-Management", "SAN", "Speichersysteme"] },
+      { "nom": "Kubernetes", "poids": 2, "mots": ["Kubernetes", "k3s"] },
+      { "nom": "Homeoffice / Remote / Hybrid", "poids": 3, "mots": ["Homeoffice", "Home-Office", "Remote", "hybrides Arbeiten", "mobiles Arbeiten", "Telearbeit"] }
+    ]
+  },
+  "francais": {
+    "_aide": [
+      "Les offres IT demandant le français sont recherchées dans toute l'Allemagne.",
+      "Les recherches français ignorent le filtre domaine mais exigent un titre IT.",
+      "Les offres demandant le français passent automatiquement le seuil et la distance.",
+      "L'exclusion allemand C1/C2/natif continue de s'appliquer selon les règles du script."
+    ],
+    "mots_cles": [
+      "IT Support Französisch", "Systemadministrator Französisch",
+      "IT Administrator Französisch", "Service Desk Französisch",
+      "Helpdesk Französisch", "French speaking IT Support"
+    ],
+    "titre_doit_contenir": [
+      "IT", "EDV", "Support", "Admin", "System", "Helpdesk", "Help Desk", "Service Desk", "Servicedesk",
+      "Netzwerk", "Network", "Infrastruktur", "Infrastructure", "Linux", "Windows", "Client", "Workplace",
+      "Engineer", "Techniker", "Informatik"
+    ],
+    "mots_detection": [
+      "Französischkenntnisse", "Französisch-Kenntnisse", "Kenntnisse in Französisch",
+      "Kenntnisse der französischen Sprache", "französische Sprachkenntnisse",
+      "fließend Französisch", "fließendes Französisch", "Französisch fließend",
+      "verhandlungssicheres Französisch", "verhandlungssicher Französisch", "Französisch verhandlungssicher",
+      "Französisch in Wort und Schrift", "Französisch auf",
+      "Deutsch und Französisch", "Deutsch- und Französisch", "Englisch und Französisch", "Englisch- und Französisch",
+      "Französisch und Englisch", "Französisch und Deutsch", "Französisch- und Englisch", "Französisch- und Deutsch",
+      "Französisch als Muttersprache", "Muttersprache Französisch", "Französisch (Muttersprache",
+      "Französisch C1", "Französisch B2", "Französisch (C1", "Französisch (B2",
+      "Französisch von Vorteil", "Französisch wünschenswert", "Französisch ist ein Plus",
+      "französischsprachig", "frankophon",
+      "French speaking", "French-speaking", "fluent French", "fluent in French", "French language",
+      "proficiency in French", "French skills"
+    ]
+  }
+}
