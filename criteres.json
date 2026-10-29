@@ -94,7 +94,7 @@
     "groupes": [
       {
         "nom": "Linux (RedHat/RHEL)",
-        "poids": 5,
+        "poids": 10,
         "mots": [
           "RedHat",
           "Red Hat",
