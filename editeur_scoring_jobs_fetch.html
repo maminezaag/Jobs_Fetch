@@ -1,283 +1,135 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <title>Jobs_Fetch — Éditeur visuel de criteres.json</title>
-  <style>
-    :root{--bg:#f6f8fa;--panel:#fff;--ink:#172c36;--muted:#61747f;--line:#dce5e8;--teal:#157984;--teal-soft:#e5f4f4;--blue:#25516b;--danger:#ba4444;--amber:#91641b;--shadow:0 8px 26px rgba(21,52,61,.045)}
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.48 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
-    :focus-visible{outline:3px solid #85c4c8;outline-offset:2px}
-    .app{max-width:1480px;margin:0 auto;padding:26px 28px 55px}
-    .top{display:flex;gap:18px;justify-content:space-between;align-items:center;padding-bottom:22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-    .brand{display:flex;align-items:center;gap:13px}
-    .brand-icon{width:46px;height:46px;border-radius:14px;background:var(--teal);color:white;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;letter-spacing:-1px}
-    .brand h1{font-size:20px;margin:0 0 1px;letter-spacing:-.55px}.brand p{font-size:12px;color:var(--muted);margin:0}
-    .actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-    .btn{border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);padding:10px 15px;font-weight:650;font-size:13px;display:inline-flex;align-items:center;gap:8px;justify-content:center;line-height:1.25}
-    .btn:hover{border-color:#8fbcc0;background:#fafefe}.btn-primary{background:var(--teal);border-color:var(--teal);color:white}.btn-primary:hover{background:#0f6770;color:white}.btn-sm{font-size:12px;padding:8px 11px;border-radius:8px}
-    .btn-danger{color:var(--danger);border-color:#efd1d1}.btn-danger:hover{background:#fff5f5;border-color:#d9a0a0}
-    .status{display:flex;gap:7px;align-items:center;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;background:#66a596;border-radius:50%;display:inline-block}.dot.dirty{background:#e9ae51}
-    .layout{display:grid;grid-template-columns:228px minmax(0,1fr);gap:25px;margin-top:24px;align-items:start}
-    .side{position:sticky;top:18px;display:grid;gap:18px}
-    .navpanel,.side-note,.panel,.metric,.notice{border:1px solid var(--line);background:var(--panel);border-radius:15px;box-shadow:var(--shadow)}
-    .navpanel{padding:10px}.nav-label{text-transform:uppercase;font-size:10px;letter-spacing:1.4px;color:var(--muted);font-weight:800;padding:11px 11px 7px}
-    .navbtn{display:flex;align-items:center;gap:11px;text-align:left;border:0;background:none;color:#526b76;font-weight:650;font-size:13px;padding:12px 12px;width:100%;border-radius:10px}
-    .navbtn:hover{background:#f3f8f8}.navbtn.active{background:var(--teal-soft);color:#146870}
-    .navbtn .ico{font-size:17px;width:21px;text-align:center;line-height:1}
-    .side-note{padding:17px;font-size:12px;color:var(--muted)}.side-note b{color:var(--ink);display:block;margin-bottom:5px}.side-note a{color:var(--teal);font-weight:700}
-    .content{min-width:0}.pane{display:none}.pane.active{display:block}
-    .section-head{margin:0 0 21px;display:flex;align-items:flex-start;justify-content:space-between;gap:13px;flex-wrap:wrap}
-    .section-head h2{font-size:28px;margin:0 0 3px;letter-spacing:-1.1px}.sub{color:var(--muted);font-size:13px;margin:0;max-width:800px}
-    .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:19px}
-    .metric{padding:18px 19px}.metric small{color:var(--muted);font-size:12px;display:block}.metric strong{font-size:26px;letter-spacing:-1px;display:block;margin:3px 0 0}.metric .suffix{color:var(--muted);font-size:11px;font-weight:500;margin-left:5px}
-    .panel{padding:22px;margin-bottom:17px}.panel h3{margin:0 0 5px;font-size:17px;letter-spacing:-.3px}.panel p.help{margin:0 0 17px;color:var(--muted);font-size:13px}
-    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap}
-    .search{min-width:230px;flex:1;max-width:450px}.field,input[type="text"],input[type="number"],select,textarea{background:white;border:1px solid #cfdde1;border-radius:9px;color:var(--ink)}
-    input[type="text"],input[type="number"],select,textarea{padding:10px 12px;width:100%;min-width:0}input:focus,select:focus,textarea:focus{border-color:#5a9ca5;outline:2px solid #b6dce0}
-    textarea{resize:vertical;min-height:170px}.helper{font-size:12px;color:var(--muted);margin-top:7px}
-    .count{font-size:12px;color:var(--muted);font-weight:600}
-    .group-list{display:grid;gap:9px}
-    .group{border:1px solid var(--line);background:white;border-radius:12px;overflow:hidden}
-    .group-head{display:grid;grid-template-columns:minmax(0,1fr) 118px 106px;align-items:center;gap:12px;padding:13px 15px}
-    .gtitle{font-size:14px;font-weight:720}.gsub{font-size:11px;color:var(--muted);margin-top:3px}
-    .points{display:flex;align-items:center;gap:7px;justify-content:center}
-    .step{width:29px;height:29px;border:1px solid var(--line);border-radius:8px;background:#f8fafa;font-size:19px;color:#315560;display:flex;align-items:center;justify-content:center}
-    .step:hover{background:var(--teal-soft)}
-    .score-input{width:43px!important;padding:7px 4px!important;text-align:center;font-size:15px;font-weight:800;appearance:textfield;-moz-appearance:textfield;border:1px solid #bdd7da!important;background:var(--teal-soft)!important;color:#155e67!important}
-    .score-input::-webkit-inner-spin-button,.score-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-    .disclose{border:1px solid var(--line);background:white;border-radius:8px;padding:8px;font-size:12px;font-weight:650;color:#546c76}
-    .disclose:hover{background:#f3f8f8}
-    .group-edit{border-top:1px solid var(--line);background:#fafcfc;padding:15px 17px;display:none}.group.open .group-edit{display:block}
-    .group-edit .inputline{display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end}
-    .glabel{font-size:11px;font-weight:750;display:block;margin-bottom:6px;color:#4a6975}
-    .words{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 13px}.word{display:flex;align-items:center;gap:5px;padding:5px 6px 5px 10px;background:white;border:1px solid #d2e3e5;border-radius:8px;max-width:100%}
-    .word input{width:auto;max-width:260px;border:0;background:transparent;padding:2px 0;font-size:12px;min-width:40px;field-sizing:content}.word input:focus{outline:none;border:none}
-    .word button{border:0;background:#f4f7f7;color:#6b8289;border-radius:6px;width:23px;height:23px;font-size:16px}.word button:hover{color:var(--danger);background:#fceeee}
-    .inlineadd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.inlineadd input{flex:1;min-width:200px}
-    .editfooter{margin-top:13px;display:flex;justify-content:flex-end}
-    .fieldgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.fieldwrap label{font-size:12px;font-weight:750;display:block;margin-bottom:6px}.fieldwrap small{display:block;margin-top:5px;color:var(--muted);font-size:11px}
-    .fieldwrap.wide{grid-column:1/-1}.flexrow{display:flex;gap:10px;align-items:center}.flexrow select{width:auto}
-    .tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:15px;min-height:32px}
-    .tag{display:flex;align-items:center;gap:6px;background:#eff7f7;color:#255d65;border:1px solid #cde5e7;border-radius:7px;font-size:12px;padding:5px 5px 5px 10px;max-width:100%;overflow-wrap:anywhere}
-    .tag button{border:0;background:#deeeee;color:#567a80;border-radius:5px;line-height:1;padding:3px 5px;font-size:14px}.tag button:hover{color:#a63636;background:#f7dede}
-    .list-add{display:flex;gap:9px}.list-add input{flex:1}.list-add button{white-space:nowrap}
-    .hint{background:#f5f9fa;border-left:3px solid var(--teal);padding:12px 15px;font-size:12px;color:#4b6771;border-radius:0 8px 8px 0;margin:15px 0}
-    .warning{border-color:#f0deb9;background:#fffaf0;color:#6f571f}.notice{padding:14px 17px;color:#556f78;font-size:12px;margin:14px 0}.notice b{color:var(--ink)}
-    .test-result{display:none;margin-top:15px;border:1px solid var(--line);border-radius:12px;padding:15px;background:#f9fcfc}.test-result.show{display:block}
-    .result-head{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}.bigscore{font-size:30px;font-weight:800;letter-spacing:-1px}.pass{color:#19745b}.fail{color:#ac6034}
-    .match{display:flex;gap:12px;justify-content:space-between;border-bottom:1px solid #e3ecee;padding:9px 0;font-size:12px}.match:last-child{border-bottom:0}.match b{color:var(--teal)}
-    .progressbar{height:8px;border-radius:8px;background:#e3ecee;overflow:hidden;margin-top:13px}.progressbar div{height:100%;background:var(--teal)}
-    #toast{position:fixed;right:24px;bottom:22px;background:#1f3a42;color:white;padding:12px 17px;border-radius:10px;box-shadow:0 10px 38px #0003;z-index:30;max-width:390px;font-size:13px;display:none}#toast.show{display:block}
-    .foot{color:var(--muted);font-size:11px;text-align:center;padding:18px}
-    .hidden{display:none!important}
-    @media(max-width:1050px){.layout{grid-template-columns:185px minmax(0,1fr);gap:15px}.app{padding:18px}.group-head{grid-template-columns:minmax(0,1fr) 112px 84px;gap:6px}.group-head{padding:11px}.disclose{font-size:11px}}
-    @media(max-width:750px){.layout{display:block}.side{position:static;margin-bottom:20px}.navpanel{display:flex;overflow-x:auto;white-space:nowrap}.nav-label{display:none}.navbtn{width:auto;flex:0 0 auto}.side-note{display:none}.metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.metric{padding:12px}.metric strong{font-size:23px}.section-head h2{font-size:24px}.group-head{grid-template-columns:minmax(0,1fr) 102px 70px}.step{width:24px;height:25px;font-size:16px}.score-input{width:37px!important}.panel{padding:16px}.fieldgrid{grid-template-columns:1fr}}
-    @media(max-width:410px){.group-head{grid-template-columns:minmax(0,1fr) 100px;}.disclose{grid-column:2;grid-row:2}.points{grid-column:2;grid-row:1}.gtitle{font-size:12px}}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jobs_Fetch — Scoring GitHub</title>
+<style>
+*{box-sizing:border-box}body{font:15px/1.5 Arial,sans-serif;max-width:1020px;margin:24px auto;padding:0 16px;color:#243642;background:#f7f9fa}h1{font-size:26px;margin-bottom:4px}p{color:#576a73}header,.panel{background:white;border:1px solid #dce5e9;border-radius:12px;padding:18px;margin-bottom:16px}header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}.buttons{display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid #b7cbd0;background:#fff;border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700}button.primary{background:#16727b;color:white;border-color:#16727b}button:disabled{opacity:.5;cursor:not-allowed}input,textarea{width:100%;border:1px solid #b7cbd0;border-radius:8px;padding:9px;font:inherit}input[type=number]{max-width:75px;text-align:center;font-weight:700}input[type=password]{max-width:430px}label{font-weight:700;display:block;margin:8px 0}small{color:#657780}#message{padding:12px;background:#edf4f5;border-radius:8px;white-space:pre-wrap}#message.error{background:#fff0ee;color:#9c3027}#message.success{background:#e8f6ed;color:#116841}#message a{color:inherit}details{border:1px solid #dae5e7;border-radius:10px;margin:8px 0;background:white}summary{cursor:pointer;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:bold}summary span{flex:1}summary input{flex:0 0 75px}summary button{font-size:12px}.inner{border-top:1px solid #dae5e7;padding:12px 14px}.inner textarea{min-height:80px}.heading{display:flex;justify-content:space-between;align-items:center;gap:8px}.heading h2{margin:0;font-size:20px}#groups{margin-top:10px}#searchterms{min-height:165px}a{color:#16727b}@media(max-width:600px){header{display:block}.buttons{margin-top:14px}summary button{padding:5px}}
+</style>
 </head>
 <body>
-<div class="app">
-  <header class="top">
-    <div class="brand"><div class="brand-icon">JF</div><div><h1>Jobs_Fetch · Éditeur visuel</h1><p>Modifie les critères sans écrire de JSON ni changer le script Python</p></div></div>
-    <div class="actions">
-      <div class="status"><span id="statusDot" class="dot"></span><span id="statusText">Version de départ chargée</span></div>
-      <input type="file" id="fileImport" accept=".json,application/json" hidden>
-      <button class="btn" id="importBtn" type="button">↥ Importer mon JSON</button>
-      <button class="btn btn-primary" id="exportBtn" type="button">↓ Télécharger criteres.json</button>
-    </div>
-  </header>
-  <div class="layout">
-    <aside class="side">
-      <nav class="navpanel" aria-label="Sections de l'éditeur">
-        <div class="nav-label">Configuration</div>
-        <button class="navbtn active" data-tab="scores"><span class="ico">▤</span> Barème de points</button>
-        <button class="navbtn" data-tab="recherche"><span class="ico">⌕</span> Recherches</button>
-        <button class="navbtn" data-tab="langue"><span class="ico">◎</span> Filtre allemand</button>
-        <button class="navbtn" data-tab="francais"><span class="ico">FR</span> Offres en français</button>
-        <button class="navbtn" data-tab="tester"><span class="ico">⚗</span> Tester une annonce</button>
-      </nav>
-      <div class="side-note"><b>Comment ça marche ?</b>1. Modifie les points et les synonymes.<br>2. Télécharge le nouveau fichier.<br>3. Remplace <code>criteres.json</code> dans ton dépôt GitHub.<br><br><b>Ton fichier reste local.</b>Aucune donnée n'est envoyée sur Internet.<br><br><a href="https://github.com/maminezaag/Jobs_Fetch/blob/main/criteres.json" target="_blank" rel="noopener noreferrer">Ouvrir criteres.json sur GitHub ↗</a></div>
-    </aside>
-    <main class="content">
-      <section class="pane active" id="pane-scores">
-        <div class="section-head"><div><h2>Barème de scoring</h2><p class="sub">Clique sur + ou − pour adapter les points. « Synonymes » sert à choisir les expressions reconnues dans les annonces.</p></div><button class="btn btn-sm" id="resetBtn" type="button">↺ Version de départ</button></div>
-        <div class="metrics">
-          <div class="metric"><small>Compétences</small><strong id="statGroups">29</strong></div>
-          <div class="metric"><small>Points maximum théoriques</small><strong id="statTotal">—</strong></div>
-          <div class="metric"><small>Seuil de sélection</small><strong>12 <span class="suffix">pts*</span></strong></div>
-        </div>
-        <div class="panel">
-          <div class="toolbar"><input type="text" class="search" id="groupSearch" placeholder="Rechercher une compétence…" aria-label="Rechercher une compétence"><span class="count" id="groupCount"></span><button class="btn btn-sm" id="addGroupBtn" type="button">+ Ajouter une compétence</button></div>
-          <div class="group-list" id="groupList"></div>
-          <p class="helper">* Le seuil de 12 points est réglé dans <code>config.yaml</code> ; il n'est pas modifié par cet éditeur. Une compétence ne marque ses points qu'une seule fois, même si plusieurs synonymes correspondent.</p>
-        </div>
-        <div class="notice"><b>À propos de Git / GitLab / CI/CD :</b> ils sont séparés dans la version de départ : Git = 3 points, GitLab = 0, CI/CD = 0. Ces derniers ne sont pas exclus, mais ils n'ajoutent aucun point. La détection du script repose sur des sous-chaînes : les tests sont indicatifs.</div>
-      </section>
-      <section class="pane" id="pane-recherche">
-        <div class="section-head"><div><h2>Recherches d'emploi</h2><p class="sub">Les mots-clés envoyés à la recherche et les limites géographiques.</p></div></div>
-        <div class="panel"><h3>Mots-clés de recherche</h3><p class="help">Une recherche est lancée pour chaque expression. Ajoute ou retire un titre en un clic.</p><div id="searchTags"></div></div>
-        <div class="panel"><h3>Zone et paramètres</h3><p class="help">Ne change ces paramètres que si tu veux vraiment élargir ou réduire ta recherche.</p><div class="fieldgrid">
-          <div class="fieldwrap"><label for="baseCity">Ville de référence</label><input id="baseCity" type="text"></div>
-          <div class="fieldwrap"><label for="radius">Rayon local (km)</label><input id="radius" type="number" min="1" max="1000" step="1"><small>Distance autour d'Oldenburg dans la version de départ.</small></div>
-          <div class="fieldwrap"><label for="days">Offres publiées depuis (jours)</label><input id="days" type="number" min="1" max="365" step="1"></div>
-          <div class="fieldwrap"><label for="interim">Offres d'intérim</label><select id="interim"><option value="true">Incluses</option><option value="false">Exclues</option></select></div>
-          <div class="fieldwrap wide"><label for="domain">Domaine API</label><input id="domain" type="text"><small>Valeur transmise à l'API Jobsuche.</small></div>
-        </div><div class="hint">Les coordonnées, le type d'offre et les paramètres non affichés sont conservés tels quels à l'export. Les critères « local / remote / français » continuent à dépendre du script.</div></div>
-      </section>
-      <section class="pane" id="pane-langue">
-        <div class="section-head"><div><h2>Filtre d'allemand</h2><p class="sub">Gère les expressions qui éliminent une annonce ou qui indiquent un niveau B2 acceptable.</p></div></div>
-        <div class="panel"><h3>Exclusions strictes : C1 / C2 / langue maternelle</h3><p class="help">La présence d'une expression de cette liste entraîne une exclusion selon le script.</p><div id="strictTags"></div></div>
-        <div class="panel"><h3>Exclusions souples</h3><p class="help">Par exemple « verhandlungssicheres Deutsch ». Les marqueurs B2 peuvent neutraliser ces exclusions, selon le script.</p><div id="softTags"></div></div>
-        <div class="panel"><h3>Marqueurs B2</h3><p class="help">Expressions reconnaissant explicitement un niveau B2.</p><div id="b2Tags"></div></div>
-      </section>
-      <section class="pane" id="pane-francais">
-        <div class="section-head"><div><h2>Offres demandant le français</h2><p class="sub">Règles spéciales conservées dans <code>criteres.json</code>.</p></div></div>
-        <div class="panel"><h3>Recherches orientées français</h3><p class="help">Mots-clés destinés à trouver les postes IT francophones.</p><div id="frSearchTags"></div></div>
-        <div class="panel"><h3>Mots requis dans le titre IT</h3><p class="help">Permet de ne pas ramener des offres non informatiques demandant le français.</p><div id="frTitleTags"></div></div>
-        <div class="panel"><h3>Expressions détectant le français</h3><p class="help">Le programme les utilise pour reconnaître le besoin de français dans une annonce.</p><div id="frDetectTags"></div></div>
-      </section>
-      <section class="pane" id="pane-tester">
-        <div class="section-head"><div><h2>Tester une annonce</h2><p class="sub">Colle un titre et une description d'offre. Tu verras quelles compétences déclenchent des points.</p></div></div>
-        <div class="panel"><div class="fieldwrap"><label for="testTitle">Titre de l'offre</label><input type="text" id="testTitle" placeholder="Ex. Linux Systemadministrator (m/w/d)"></div><div class="fieldwrap" style="margin-top:13px"><label for="testText">Description / exigences de l'offre</label><textarea id="testText" placeholder="Colle ici les compétences demandées, par exemple : Administration Linux, VMware vSphere, Ansible…"></textarea></div>
-          <div class="flexrow" style="margin-top:13px;flex-wrap:wrap"><button class="btn btn-primary" id="testBtn" type="button">Calculer le score</button><button class="btn btn-sm" id="testExampleBtn" type="button">Charger un exemple fictif</button></div>
-          <div id="testResult" class="test-result" aria-live="polite"></div>
-          <div class="hint warning"><b>Simulation indicative :</b> elle imite la recherche des synonymes par sous-chaînes, mais ne reproduit pas tout le traitement de Jobs_Fetch : distance, langue, état « déjà vu », limites API et logique exacte peuvent changer le résultat final. Ne considère pas ce test comme une confirmation que l'offre serait envoyée.</div>
-        </div>
-      </section>
-      <footer class="foot">Page HTML autonome · Modifications dans ton navigateur uniquement · Export JSON sans accès à GitHub</footer>
-    </main>
-  </div>
-</div>
-<div id="toast" role="status" aria-live="polite"></div>
+<header>
+ <div><h1>Jobs_Fetch · Éditeur de scoring</h1><small>GitHub : maminezaag / Jobs_Fetch / main / criteres.json</small></div>
+ <div class="buttons"><button id="load">↻ Charger GitHub</button><button id="commit" class="primary" disabled>✓ Commit sur GitHub</button></div>
+</header>
+<section class="panel">
+ <label for="token">GitHub Fine-grained token (Contents : Read and write)</label>
+ <input id="token" type="password" autocomplete="off" placeholder="github_pat_…">
+ <p><small>Le jeton est utilisé uniquement dans cette page pour accéder à l'API GitHub. Ne l'ajoute jamais dans le code HTML ou le dépôt.</small></p>
+ <div id="message">Chargement du fichier depuis GitHub…</div>
+</section>
+<section class="panel">
+ <div class="heading"><h2>Compétences et points</h2><button id="add" disabled>+ Ajouter une compétence</button></div>
+ <p>Modifie les points, puis ouvre une compétence pour modifier ses synonymes (un mot par ligne).</p>
+ <div id="groups"></div>
+</section>
+<section class="panel">
+ <h2>Mots-clés de recherche</h2>
+ <p>Un mot-clé par ligne. Les autres règles de <code>criteres.json</code> sont conservées.</p>
+ <textarea id="searchterms" disabled></textarea>
+</section>
 <script>
 'use strict';
-const INITIAL = {"_lisez_moi":["Ce fichier définit quoi chercher et comment noter les offres.","config.yaml conserve les paramètres techniques (e-mail, seuil, chemins de fichiers).","Recherche nationale par mot-clé puis classification locale, remote ou hors_zone.","Les offres locales sont à moins de rayon_km de lieu_reference.","Les offres éloignées sans télétravail sont écartées, sauf exception liée au français.","Les synonymes d'un même groupe ne rapportent des points qu'une seule fois."],"recherche":{"_aide":"Mots-clés de recherche envoyés à l'API Jobsuche dans toute l'Allemagne.","mots_cles":["Linux Systemadministrator","IT-Systemadministrator","IT-Administration und Betreuung","Netzwerkadministrator","DevOps Engineer","IT Support Engineer","Linux Support","IT Administrator","IT Infrastructure Engineer","Linux Administrator","Infrastrukturadministrator","IT-Infrastruktur Administrator","Systemadministrator Linux","System Engineer Infrastruktur"],"lieu_reference":{"_aide":"Centre-ville utilisé pour le calcul de distance.","nom":"Oldenburg","latitude":53.1435,"longitude":8.2146},"rayon_km":70,"parametres_communs":{"_aide":"Paramètres API inchangés.","domaine":"IT-Netzwerktechnik, -Administration, -Organisation","jours":7,"type_offre":1,"interim":true}},"elimination":{"_aide":["mots_stricts élimine toujours les offres avec allemand C1/C2 explicite ou natif.","mots_souples est ignoré si des marqueurs B2 explicites sont présents.","Les marqueurs utilisent des expressions complètes pour réduire les faux positifs."],"mots_stricts":["mindestens C1","C1-Niveau","C1 Niveau","Sprachniveau C1","Deutschkenntnisse C1","Deutsch C1","Niveau C1","mindestens C2","C2-Niveau","C2 Niveau","Sprachniveau C2","Deutschkenntnisse C2","Deutsch C2","Niveau C2","muttersprachliches Deutsch","muttersprachliche Deutsch","muttersprachlichem Deutsch","muttersprachlichen Deutsch","Deutsch auf Muttersprachniveau","Muttersprache Deutsch"],"mots_souples":["verhandlungssicheres Deutsch","verhandlungssichere Deutsch","verhandlungssicherem Deutsch","verhandlungssicheren Deutsch"],"b2_marqueurs":["B2-Niveau","B2 Niveau","Niveau B2","Sprachniveau B2","Deutschkenntnisse B2","Deutsch B2","mindestens B2","ab B2"]},"points_positifs":{"_aide":["Chaque groupe représente une compétence avec son nom, son poids et ses synonymes.","Un groupe ne peut donner ses points qu'une seule fois.","Rééquilibrage pour les postes Linux, systèmes Windows et infrastructure hybride.","Git est distinct de GitLab et de CI/CD : GitLab et CI/CD valent 0 point (à apprendre).","La reconnaissance par sous-chaîne du script impose des synonymes contextualisés pour Git et SAN afin de réduire les faux positifs.","GitHub n'est pas un mot-clé de scoring autonome : évite de donner 3 points au seul GitHub Actions (CI/CD)."],"groupes":[{"nom":"Linux (RedHat/RHEL)","poids":5,"mots":["RedHat","Red Hat","RHEL","Red Hat Enterprise Linux"]},{"nom":"Linux (général)","poids":5,"mots":["Linux"]},{"nom":"CheckMK / Nagios","poids":5,"mots":["CheckMK","Check_MK","Check MK","Nagios"]},{"nom":"Bash / Shell Scripting","poids":5,"mots":["Bash","Shell-Skript","Shellskript","Shell Scripting","Shell-Scripting","Shellskripte"]},{"nom":"Proxmox","poids":5,"mots":["Proxmox","Proxmox VE"]},{"nom":"Puppet","poids":5,"mots":["Puppet"]},{"nom":"Ubuntu","poids":5,"mots":["Ubuntu"]},{"nom":"Zimbra","poids":5,"mots":["Zimbra"]},{"nom":"IT-Support","poids":3,"mots":["IT-Support","IT Support","Anwendersupport","1st Level Support","2nd Level Support"]},{"nom":"VMware vSphere / ESXi","poids":5,"mots":["vSphere","VMware vSphere","VMware ESXi","ESXi","VMware"]},{"nom":"Ansible","poids":4,"mots":["Ansible"]},{"nom":"Active Directory / GPO","poids":5,"mots":["Active Directory","AD-Administration","GPO","Gruppenrichtlinien","Group Policy"]},{"nom":"Veeam","poids":4,"mots":["Veeam"]},{"nom":"Kaspersky Security Center","poids":4,"mots":["Kaspersky","Kaspersky Security Center","Kaspersky Endpoint Security"]},{"nom":"Terraform","poids":3,"mots":["Terraform"]},{"nom":"Git","poids":3,"mots":["Git ","Git,","Git.","Git/","Git;","Git:","Git)","(Git)","Git\n","Git-Versionierung","Git-Repository","Git-Repositories","Git-Befehle","Git-Workflow"]},{"nom":"GitLab (à apprendre)","poids":0,"mots":["GitLab"]},{"nom":"CI/CD (à apprendre)","poids":0,"mots":["CI/CD","CI-CD","Continuous Integration","Continuous Delivery","Continuous Deployment","GitLab CI","GitHub Actions","Jenkins","Azure Pipelines","Azure DevOps Pipelines","Build Pipeline","Deployment Pipeline","Release Pipeline"]},{"nom":"Datenbanken","poids":3,"mots":["Oracle","MySQL","MariaDB","PostgreSQL"]},{"nom":"Prometheus / Grafana","poids":3,"mots":["Prometheus","Grafana"]},{"nom":"Windows Server","poids":5,"mots":["Windows Server","Windows-Server","Windows- und Linux-Server","Windows Serverlandschaft"]},{"nom":"Python","poids":3,"mots":["Python-Skript","Python Scripting","Python"]},{"nom":"Docker","poids":3,"mots":["Docker"]},{"nom":"Zertifizierungen (RHCSA/AZ-104/LPIC)","poids":3,"mots":["RHCSA","Red Hat Certified System Administrator","AZ-104","Azure Administrator Associate","Azure Administrator","LPIC-1","LPIC-2","LPIC1","LPIC2","Linux Professional Institute"]},{"nom":"Networking","poids":4,"mots":["Networking","Netzwerktechnik","Netzwerkadministration","Netzwerkinfrastruktur","Netzwerkmanagement","LAN/WAN"]},{"nom":"Firewalling","poids":3,"mots":["Firewall","Firewalling"]},{"nom":"Storage (NetApp/3PAR)","poids":4,"mots":["NetApp","NetApp FAS","HP 3PAR","3PAR","Storage-Management","Storage Area Network","Speichersysteme","SAN-","SAN/","SAN ","(SAN)","Fibre Channel"]},{"nom":"Kubernetes","poids":2,"mots":["Kubernetes","k3s"]},{"nom":"Homeoffice / Remote / Hybrid","poids":3,"mots":["Homeoffice","Home-Office","Remote","hybrides Arbeiten","mobiles Arbeiten","Telearbeit"]}]},"francais":{"_aide":["Les offres IT demandant le français sont recherchées dans toute l'Allemagne.","Les recherches français ignorent le filtre domaine mais exigent un titre IT.","Les offres demandant le français passent automatiquement le seuil et la distance.","L'exclusion allemand C1/C2/natif continue de s'appliquer selon les règles du script."],"mots_cles":["IT Support Französisch","Systemadministrator Französisch","IT Administrator Französisch","Service Desk Französisch","Helpdesk Französisch","French speaking IT Support"],"titre_doit_contenir":["IT","EDV","Support","Admin","System","Helpdesk","Help Desk","Service Desk","Servicedesk","Netzwerk","Network","Infrastruktur","Infrastructure","Linux","Windows","Client","Workplace","Engineer","Techniker","Informatik"],"mots_detection":["Französischkenntnisse","Französisch-Kenntnisse","Kenntnisse in Französisch","Kenntnisse der französischen Sprache","französische Sprachkenntnisse","fließend Französisch","fließendes Französisch","Französisch fließend","verhandlungssicheres Französisch","verhandlungssicher Französisch","Französisch verhandlungssicher","Französisch in Wort und Schrift","Französisch auf","Deutsch und Französisch","Deutsch- und Französisch","Englisch und Französisch","Englisch- und Französisch","Französisch und Englisch","Französisch und Deutsch","Französisch- und Englisch","Französisch- und Deutsch","Französisch als Muttersprache","Muttersprache Französisch","Französisch (Muttersprache","Französisch C1","Französisch B2","Französisch (C1","Französisch (B2","Französisch von Vorteil","Französisch wünschenswert","Französisch ist ein Plus","französischsprachig","frankophon","French speaking","French-speaking","fluent French","fluent in French","French language","proficiency in French","French skills"]}};
-let state = JSON.parse(JSON.stringify(INITIAL));
-let dirty = false;
-let expanded = new Set();
-let activeTab = 'scores';
-const $ = id => document.getElementById(id);
-const clone = value => JSON.parse(JSON.stringify(value));
-const escaped = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let toastTimer;
-function notify(msg){ const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500); }
-function setDirty(){dirty=true;$('statusDot').classList.add('dirty');$('statusText').textContent='Modifications non exportées';}
-function setClean(msg){dirty=false;$('statusDot').classList.remove('dirty');$('statusText').textContent=msg || 'Fichier chargé';}
-function changeTab(name){activeTab=name;document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p.id==='pane-'+name));if(name==='tester') $('testResult').classList.remove('show');}
-document.querySelectorAll('.navbtn').forEach(b=>b.addEventListener('click',()=>changeTab(b.dataset.tab)));
-function validJSON(x){
- if(!x||typeof x!=='object'||Array.isArray(x)||!x.recherche||!x.points_positifs||!x.elimination||!x.francais) throw Error('Sections requises manquantes (recherche, elimination, points_positifs, francais).');
- if(!Array.isArray(x.points_positifs.groupes)||!Array.isArray(x.recherche.mots_cles)) throw Error('Structure des compétences ou des recherches incorrecte.');
- for(const g of x.points_positifs.groupes){if(typeof g.nom!=='string'||typeof g.poids!=='number'||!Number.isFinite(g.poids)||!Number.isInteger(g.poids)||g.poids<0||!Array.isArray(g.mots))throw Error('Groupe de scoring invalide.');if(g.mots.some(w=>typeof w!=='string'))throw Error('Synonyme de scoring invalide.');}
- for(const section of [x.elimination.mots_stricts,x.elimination.mots_souples,x.elimination.b2_marqueurs,x.francais.mots_cles,x.francais.titre_doit_contenir,x.francais.mots_detection])if(!Array.isArray(section)||section.some(w=>typeof w!=='string'))throw Error('Liste de mots-clés invalide.');
- if(!x.recherche.lieu_reference || !x.recherche.parametres_communs)throw Error('Paramètres de recherche incomplets.');
+const owner='maminezaag', repo='Jobs_Fetch', branch='main', path='criteres.json';
+const api=`https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+const $=id=>document.getElementById(id);
+let config=null,sha=null,dirty=false,busy=false;
+function show(msg,type=''){
+ const el=$('message');el.className=type;el.textContent=msg;
 }
-function renderStats(){ const gs=state.points_positifs.groupes;$('statGroups').textContent=gs.length;$('statTotal').textContent=gs.reduce((s,g)=>s+g.poids,0); }
-const scoreLimit = n => Math.max(0, Math.min(99,Math.round(Number(n)||0)));
-function renderGroups(){
- const groups=state.points_positifs.groupes;const query=$('groupSearch').value.trim().toLocaleLowerCase();const filtered=groups.map((g,i)=>({g,i})).filter(({g})=>g.nom.toLocaleLowerCase().includes(query)||g.mots.some(w=>w.toLocaleLowerCase().includes(query)));
- $('groupCount').textContent=filtered.length+' / '+groups.length+' groupes';
- $('groupList').innerHTML=filtered.map(({g,i})=>`<div class="group ${expanded.has(i)?'open':''}" data-index="${i}">
- <div class="group-head"><div><div class="gtitle">${escaped(g.nom)}</div><div class="gsub">${g.mots.length} synonyme${g.mots.length>1?'s':''}${g.poids===0?' · 0 point (non pénalisant)':''}</div></div>
- <div class="points"><button class="step" data-action="decrement" aria-label="Retirer un point">−</button><input class="score-input" data-action="weight" aria-label="Poids pour ${escaped(g.nom)}" type="number" min="0" max="99" step="1" value="${g.poids}"><button class="step" data-action="increment" aria-label="Ajouter un point">+</button></div>
- <button class="disclose" data-action="expand">${expanded.has(i)?'Fermer':'Synonymes ▾'}</button></div>
- <div class="group-edit"><label class="glabel">Nom de la compétence</label><input type="text" value="${escaped(g.nom)}" data-action="rename" aria-label="Nom de la compétence">
- <label class="glabel" style="margin-top:12px">Expressions recherchées (une seule correspondance suffit)</label>
- <div class="words">${g.mots.map((w,j)=>`<div class="word"><input type="text" value="${escaped(w)}" data-action="editword" data-word="${j}" aria-label="Modifier le synonyme"><button type="button" data-action="removeword" data-word="${j}" aria-label="Supprimer le synonyme">×</button></div>`).join('')}</div>
- <div class="inlineadd"><input type="text" data-action="newword" placeholder="Nouveau synonyme…" aria-label="Nouveau synonyme"><button class="btn btn-sm" data-action="addword">+ Ajouter</button></div>
- <div class="editfooter"><button class="btn btn-sm btn-danger" data-action="removegroup">Supprimer ce groupe</button></div></div></div>`).join('') || '<p class="helper">Aucun groupe trouvé.</p>';
- renderStats();
+function setDirty(){dirty=true;$('commit').disabled=false;show('Modifications non enregistrées — clique sur « Commit sur GitHub ».');}
+function checkData(o){
+ if(!o||!Array.isArray(o.points_positifs?.groupes)||!Array.isArray(o.recherche?.mots_cles))
+  throw new Error('Structure inattendue de criteres.json');
 }
-$('groupSearch').addEventListener('input',renderGroups);
-$('groupList').addEventListener('click',event=>{
- const btn=event.target.closest('button[data-action]');if(!btn)return;
- const row=btn.closest('.group');if(!row)return;
- const i=Number(row.dataset.index);const g=state.points_positifs.groupes[i];const act=btn.dataset.action;
- if(act==='increment'||act==='decrement'){
-  g.poids=scoreLimit(g.poids+(act==='increment'?1:-1));row.querySelector('.score-input').value=g.poids;setDirty();renderStats();
- }else if(act==='expand'){if(expanded.has(i))expanded.delete(i);else expanded.add(i);renderGroups();}
- else if(act==='removeword'){g.mots.splice(Number(btn.dataset.word),1);setDirty();renderGroups();}
- else if(act==='addword'){
-  const input=row.querySelector('[data-action="newword"]');const w=input.value.trim();if(!w)return notify('Entre un mot-clé.');if(g.mots.some(s=>s.toLocaleLowerCase()===w.toLocaleLowerCase()))return notify('Ce synonyme existe déjà.');g.mots.push(w);setDirty();renderGroups();
- }else if(act==='removegroup'){
-  if(confirm('Supprimer définitivement le groupe « '+g.nom+' » de la configuration ?')){state.points_positifs.groupes.splice(i,1);expanded=new Set();setDirty();renderGroups();}
- }
-});
-$('groupList').addEventListener('change',event=>{
- const input=event.target;const row=input.closest('.group');if(!row)return;const g=state.points_positifs.groupes[Number(row.dataset.index)];const act=input.dataset.action;
- if(act==='weight'){g.poids=scoreLimit(input.value);input.value=g.poids;setDirty();renderStats();}
- if(act==='rename'){if(input.value.trim()){g.nom=input.value.trim();setDirty();renderGroups();}else{input.value=g.nom;notify('Le nom ne peut pas être vide.');}}
- if(act==='editword'){const j=Number(input.dataset.word);if(input.value.trim()){g.mots[j]=input.value.trim();setDirty();renderGroups();}else {input.value=g.mots[j];notify('Un synonyme ne peut pas être vide.');}}
-});
-$('groupList').addEventListener('keydown',event=>{if(event.key==='Enter'&&event.target.dataset.action==='newword'){event.preventDefault();event.target.closest('.group').querySelector('[data-action="addword"]').click();}});
-$('addGroupBtn').addEventListener('click',()=>{const name=prompt('Nom de la nouvelle compétence :');if(name===null)return;const clean=name.trim();if(!clean)return notify('Nom de compétence vide.');if(state.points_positifs.groupes.some(g=>g.nom.toLocaleLowerCase()===clean.toLocaleLowerCase()))return notify('Ce groupe existe déjà.');state.points_positifs.groupes.push({nom:clean,poids:0,mots:[]});$('groupSearch').value='';expanded=new Set([state.points_positifs.groupes.length-1]);setDirty();renderGroups();notify('Groupe ajouté. Définis les synonymes et le poids.');});
-function renderTagEditor(containerId,path){
- let target=state;path.forEach(k=>target=target[k]);const container=$(containerId);container.innerHTML='<div class="tags"></div><div class="list-add"><input type="text" placeholder="Ajouter une expression…" aria-label="Ajouter une expression"><button class="btn btn-sm" type="button">+ Ajouter</button></div>';
- const tags=container.querySelector('.tags');const input=container.querySelector('input');
- const draw=()=>{tags.innerHTML=target.map((w,i)=>`<span class="tag">${escaped(w)}<button type="button" data-index="${i}" aria-label="Retirer ${escaped(w)}">×</button></span>`).join('')};
- const add=()=>{const v=input.value.trim();if(!v)return;if(target.some(w=>w.toLocaleLowerCase()===v.toLocaleLowerCase()))return notify('Cette expression existe déjà.');target.push(v);input.value='';setDirty();draw();};
- tags.addEventListener('click',e=>{const btn=e.target.closest('button[data-index]');if(!btn)return;target.splice(Number(btn.dataset.index),1);setDirty();draw();});
- container.querySelector('.list-add button').addEventListener('click',add);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});draw();
+function encode64(str){
+ const bytes=new TextEncoder().encode(str);
+ let s='';for(const b of bytes)s+=String.fromCharCode(b);
+ return btoa(s);
 }
-const tagEditors={searchTags:['recherche','mots_cles'],strictTags:['elimination','mots_stricts'],softTags:['elimination','mots_souples'],b2Tags:['elimination','b2_marqueurs'],frSearchTags:['francais','mots_cles'],frTitleTags:['francais','titre_doit_contenir'],frDetectTags:['francais','mots_detection']};
-function renderSearchFields(){
- $('baseCity').value=state.recherche.lieu_reference.nom;
- $('radius').value=state.recherche.rayon_km;
- $('days').value=state.recherche.parametres_communs.jours;
- $('interim').value=String(state.recherche.parametres_communs.interim);
- $('domain').value=state.recherche.parametres_communs.domaine;
+function decode64(str){
+ const bytes=Uint8Array.from(atob(str.replace(/\s/g,'')),c=>c.charCodeAt(0));
+ return new TextDecoder().decode(bytes);
 }
-function renderAll(){renderGroups();Object.entries(tagEditors).forEach(([id,path])=>renderTagEditor(id,path));renderSearchFields();}
-function bindField(id,onChange){$(id).addEventListener('change',()=>{try{onChange($(id).value);setDirty();}catch(e){notify(e.message);renderSearchFields();}});}
-bindField('baseCity',v=>{if(!v.trim())throw Error('La ville ne peut pas être vide.');state.recherche.lieu_reference.nom=v.trim();});
-bindField('radius',v=>{const n=Number(v);if(!Number.isInteger(n)||n<1||n>1000)throw Error('Rayon attendu : entier entre 1 et 1000.');state.recherche.rayon_km=n;});
-bindField('days',v=>{const n=Number(v);if(!Number.isInteger(n)||n<1||n>365)throw Error('Nombre de jours attendu : entier entre 1 et 365.');state.recherche.parametres_communs.jours=n;});
-bindField('interim',v=>{state.recherche.parametres_communs.interim=v==='true';});
-bindField('domain',v=>{state.recherche.parametres_communs.domaine=v;});
-$('fileImport').addEventListener('change',async e=>{
- const file=e.target.files[0];if(!file)return;
- try{const x=JSON.parse(await file.text());validJSON(x);if(dirty&&!confirm('Importer ce fichier remplacera les changements non exportés. Continuer ?'))return;state=x;expanded=new Set();$('groupSearch').value='';renderAll();setClean('JSON importé : '+file.name);notify('Fichier chargé avec succès.');}
- catch(err){notify('Import impossible : '+err.message);}
- finally{e.target.value='';}
-});
-$('importBtn').addEventListener('click',()=>$('fileImport').click());
-$('resetBtn').addEventListener('click',()=>{if(!confirm('Restaurer la version de départ fournie avec cette page ?'))return;state=clone(INITIAL);expanded=new Set();$('groupSearch').value='';renderAll();setDirty();notify('Version de départ restaurée. Télécharge-la pour l’enregistrer.');});
-$('exportBtn').addEventListener('click',()=>{
+async function request(url,opts={}){
+ const token=$('token').value.trim();
+ const headers={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...opts.headers};
+ if(token)headers.Authorization='Bearer '+token;
+ const res=await fetch(url,{...opts,headers,cache:'no-store'});
+ const obj=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(`GitHub HTTP ${res.status} : ${obj.message||res.statusText}`);
+ return obj;
+}
+async function getRemote(){
+ const result=await request(api+'?ref='+branch);
+ if(result.type!=='file'||!result.sha||!result.content)throw new Error('Fichier GitHub introuvable ou réponse incomplète.');
+ const obj=JSON.parse(decode64(result.content));checkData(obj);
+ return {obj,sha:result.sha};
+}
+function render(){
+ const target=$('groups');target.replaceChildren();
+ config.points_positifs.groupes.forEach((group,i)=>{
+  const detail=document.createElement('details');
+  const summary=document.createElement('summary');
+  const title=document.createElement('span');title.textContent=group.nom;
+  const score=document.createElement('input');score.type='number';score.min='0';score.max='100';score.step='1';score.value=group.poids;score.title='Points';
+  score.addEventListener('click',e=>e.stopPropagation());
+  score.addEventListener('keydown',e=>e.stopPropagation());
+  score.addEventListener('change',()=>{
+   const v=Number(score.value);
+   if(!Number.isInteger(v)||v<0||v>100){score.value=group.poids;return alert('Choisis un nombre entre 0 et 100.');}
+   group.poids=v;setDirty();
+  });
+  summary.append(title,score);detail.append(summary);
+  const inner=document.createElement('div');inner.className='inner';
+  const lab=document.createElement('label');lab.textContent='Nom de la compétence';
+  const name=document.createElement('input');name.value=group.nom;
+  name.addEventListener('change',()=>{group.nom=name.value.trim();title.textContent=group.nom;setDirty();});
+  const lab2=document.createElement('label');lab2.textContent='Mots-clés / synonymes (un par ligne)';
+  const words=document.createElement('textarea');words.value=group.mots.join('\n');
+  words.addEventListener('change',()=>{group.mots=words.value.split('\n').map(x=>x.trim()).filter(Boolean);setDirty();});
+  const del=document.createElement('button');del.textContent='Supprimer le groupe';
+  del.addEventListener('click',()=>{if(confirm('Supprimer « '+group.nom+' » ?')){config.points_positifs.groupes.splice(i,1);render();setDirty();}});
+  inner.append(lab,name,lab2,words,document.createElement('p'),del);detail.append(inner);target.append(detail);
+ });
+ $('searchterms').value=config.recherche.mots_cles.join('\n');
+}
+async function load(){
+ if(busy)return;
+ if(dirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;
+ busy=true;$('load').disabled=true;show('Lecture depuis GitHub…');
  try{
- validJSON(state);
- const all=state.points_positifs.groupes;
- if(all.some(g=>!g.nom.trim()||g.mots.length===0||g.mots.some(w=>!w.trim())))throw Error('Certains groupes n’ont aucun synonyme valide. Corrige-les avant l’export.');
- const txt=JSON.stringify(state,null,2)+'\n';const url=URL.createObjectURL(new Blob([txt],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='criteres.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setClean('Fichier exporté');notify('criteres.json téléchargé. Remplace-le sur GitHub pour appliquer les changements.');
- }catch(err){notify('Export impossible : '+err.message);}
-});
-function calculate(){
- const str=($('testTitle').value+'\n'+$('testText').value).toLocaleLowerCase();
- if(!str.trim())return notify('Ajoute le titre ou la description d’une offre.');
- let total=0;const matches=[];
- for(const g of state.points_positifs.groupes){const hit=g.mots.find(w=>w&&str.includes(w.toLocaleLowerCase()));if(hit){total+=g.poids;matches.push({nom:g.nom,poids:g.poids,hit});}}
- const accepted=total>=12;const result=$('testResult');result.classList.add('show');
- const strict=state.elimination.mots_stricts.find(w=>w&&str.includes(w.toLocaleLowerCase()));
- const soft=state.elimination.mots_souples.find(w=>w&&str.includes(w.toLocaleLowerCase()));
- const b2=state.elimination.b2_marqueurs.some(w=>w&&str.includes(w.toLocaleLowerCase()));
- result.innerHTML=`<div class="result-head"><div><div class="count">Score indicatif</div><div class="bigscore ${accepted?'pass':'fail'}">${total} points <span style="font-size:13px;color:var(--muted);font-weight:600">/ seuil 12</span></div></div><strong class="${accepted?'pass':'fail'}">${accepted?'✓ Score suffisant':'△ Sous le seuil'}</strong></div>
- <div class="progressbar"><div style="width:${Math.min(100,total/Math.max(12,total)*100)}%"></div></div>
- ${strict?'<div class="hint warning">Attention : expression d’exclusion stricte repérée : '+escaped(strict)+'</div>':soft&&!b2?'<div class="hint warning">Attention : exclusion souple possible : '+escaped(soft)+'</div>':''}
- <h4 style="margin:17px 0 6px">Compétences reconnues</h4>
- ${matches.length?matches.map(m=>`<div class="match"><span>${escaped(m.nom)} <span style="color:var(--muted)">(${escaped(m.hit)})</span></span><b>+${m.poids}</b></div>`).join(''):'<p class="helper">Aucune expression reconnue.</p>'}
- <p class="helper">Les groupes à 0 point peuvent être affichés, sans augmenter le score. Score uniquement : ne confirme pas l’éligibilité globale.</p>`;
+  const remote=await getRemote();config=remote.obj;sha=remote.sha;dirty=false;render();
+  $('commit').disabled=true;$('add').disabled=false;$('searchterms').disabled=false;
+  show('Fichier chargé depuis GitHub. Modifie les points, puis clique sur Commit.', 'success');
+ }catch(e){show('Erreur de chargement : '+e.message,'error');}
+ finally{busy=false;$('load').disabled=false;}
 }
-$('testBtn').addEventListener('click',calculate);
-$('testExampleBtn').addEventListener('click',()=>{
- $('testTitle').value='Linux Systemadministrator (m/w/d) — exemple fictif';
- $('testText').value='Administration von Linux-Systemen (RHEL, Ubuntu). Erfahrung mit VMware vSphere, Bash-Skripten, Ansible, Git und GitLab CI/CD von Vorteil. Gute Deutschkenntnisse B2.';
- calculate();
-});
+async function commit(){
+ if(busy||!config||!dirty)return;
+ if(!$('token').value.trim())return show('Ajoute ton jeton GitHub dans le champ avant le commit.','error');
+ if(!config.points_positifs.groupes.every(g=>g.nom&&Number.isInteger(g.poids)&&g.poids>=0&&g.mots.length&&g.mots.every(Boolean)))
+  return show('Erreur : un groupe a un nom, des mots-clés ou des points invalides.','error');
+ if(!confirm('Enregistrer tes modifications dans criteres.json sur GitHub (branche main) ?'))return;
+ busy=true;$('commit').disabled=true;$('load').disabled=true;show('Vérification de la version GitHub…');
+ try{
+  const remote=await getRemote();
+  if(remote.sha!==sha)throw new Error('Le fichier a changé sur GitHub. Recharge-le avant de faire un commit (tes changements ne seront pas écrasés).');
+  const payload={message:'criteres: mise à jour des scores depuis l’éditeur HTML',content:encode64(JSON.stringify(config,null,2)+'\n'),sha,branch};
+  const answer=await request(api,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  sha=answer.content.sha;dirty=false;
+  show('✓ Commit réussi : criteres.json a été mis à jour sur GitHub !','success');
+  const link=document.createElement('a');link.href=answer.commit.html_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' Voir le commit';$('message').append(link);
+ }catch(e){show('Commit impossible : '+e.message,'error');}
+ finally{busy=false;$('commit').disabled=!dirty;$('load').disabled=false;}
+}
+$('load').addEventListener('click',load);
+$('commit').addEventListener('click',commit);
+$('searchterms').addEventListener('change',()=>{if(!config)return;config.recherche.mots_cles=$('searchterms').value.split('\n').map(x=>x.trim()).filter(Boolean);setDirty();});
+$('add').addEventListener('click',()=>{if(!config)return;config.points_positifs.groupes.push({nom:'Nouvelle compétence',poids:0,mots:['nouveau mot-clé']});render();setDirty();});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-renderAll();
+load();
 </script>
 </body>
 </html>
