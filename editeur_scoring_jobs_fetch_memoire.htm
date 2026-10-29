@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jobs_Fetch — Scoring GitHub</title>
+<style>
+*{box-sizing:border-box}body{font:15px/1.5 Arial,sans-serif;max-width:1020px;margin:24px auto;padding:0 16px;color:#243642;background:#f7f9fa}h1{font-size:26px;margin-bottom:4px}p{color:#576a73}header,.panel{background:white;border:1px solid #dce5e9;border-radius:12px;padding:18px;margin-bottom:16px}header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}.buttons{display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid #b7cbd0;background:#fff;border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700}button.primary{background:#16727b;color:white;border-color:#16727b}button:disabled{opacity:.5;cursor:not-allowed}input,textarea{width:100%;border:1px solid #b7cbd0;border-radius:8px;padding:9px;font:inherit}input[type=number]{max-width:75px;text-align:center;font-weight:700}input[type=password]{max-width:430px}.token-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0}.remember-label{display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:normal}.remember-label input{width:auto;margin:0;accent-color:#16727b}.token-actions button{padding:7px 11px}.security-note{font-size:12px;color:#596d77}label{font-weight:700;display:block;margin:8px 0}small{color:#657780}#message{padding:12px;background:#edf4f5;border-radius:8px;white-space:pre-wrap}#message.error{background:#fff0ee;color:#9c3027}#message.success{background:#e8f6ed;color:#116841}#message a{color:inherit}details{border:1px solid #dae5e7;border-radius:10px;margin:8px 0;background:white}summary{cursor:pointer;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:bold}summary span{flex:1}summary input{flex:0 0 75px}summary button{font-size:12px}.inner{border-top:1px solid #dae5e7;padding:12px 14px}.inner textarea{min-height:80px}.heading{display:flex;justify-content:space-between;align-items:center;gap:8px}.heading h2{margin:0;font-size:20px}#groups{margin-top:10px}#searchterms{min-height:165px}a{color:#16727b}@media(max-width:600px){header{display:block}.buttons{margin-top:14px}summary button{padding:5px}}
+
+/* Interface d'ajout/suppression d'expertises */
+#groups details {transition: border-color .15s ease}
+#groups details:hover {border-color:#9db8be}
+#groups summary .skill-score {max-width:75px;flex:0 0 75px}
+#groups summary .remove-skill {flex:0 0 auto;color:#a12e28;border:1px solid #f2c9c4;background:#fff5f4;padding:6px 10px;font-size:13px}
+#groups summary .remove-skill:hover {background:#ffe4e0}
+.heading-right {display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#count {color:#647781;white-space:nowrap}
+.form-help {font-size:13px;color:#637680;margin-top:4px}
+#add-dialog {border:1px solid #c8d9de;border-radius:14px;box-shadow:0 12px 38px #1d374b33;padding:22px;width:min(94vw,525px);max-height:90vh;overflow:auto;color:#243642}
+#add-dialog::backdrop {background:#122a36aa}
+#add-dialog h2 {margin:0 0 10px;font-size:22px}
+#add-dialog label {margin-top:16px}
+#add-dialog input[type=number] {max-width:130px;text-align:left}
+#add-dialog textarea {min-height:115px}
+#add-dialog .dialog-actions {display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+#form-error {color:#a12e28;min-height:20px;margin:5px 0;font-size:13px}
+.empty-hint {padding:18px;border:1px dashed #ccd9dc;border-radius:10px;text-align:center;color:#637780}
+@media(max-width:600px){#groups summary{gap:6px;flex-wrap:wrap}#groups summary .remove-skill{font-size:12px}.heading-right{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>Jobs_Fetch · Éditeur de scoring</h1><small>GitHub : maminezaag / Jobs_Fetch / main / criteres.json</small></div>
+ <div class="buttons"><button id="load">↻ Charger GitHub</button><button id="commit" class="primary" disabled="disabled">✓ Commit sur GitHub</button></div>
+</header>
+<section class="panel">
+ <label for="token">GitHub Fine-grained token (Contents : Read and write)</label>
+ <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+ <div class="token-actions">
+  <label class="remember-label" for="remember"><input type="checkbox" id="remember"> Se souvenir sur cet appareil</label>
+  <button type="button" id="forget">Oublier mon jeton</button>
+  <small id="token-status" aria-live="polite">Jeton non mémorisé</small>
+ </div>
+ <p class="security-note">Active cette option uniquement sur ton ordinateur personnel. Le jeton sera conservé dans ce navigateur (stockage local non chiffré), jamais dans le dépôt GitHub. Évite cette option sur un appareil partagé. Donne au jeton seulement la permission Contents: Read and write pour Jobs_Fetch et une date d'expiration.</p>
+ <div id="message" class="success">Fichier chargé depuis GitHub. Modifie les points, puis clique sur Commit.</div>
+</section>
+<section class="panel">
+ <div class="heading"><h2>Expertises et points</h2><div class="heading-right"><small id="count">27 expertises</small><button type="button" id="add">+ Ajouter une expertise</button></div></div>
+ <p>Ajoute une expertise avec son nom, son nombre de points et ses synonymes. Pour en supprimer une, clique sur « Supprimer » à droite. Les changements ne sont enregistrés qu'après « Commit sur GitHub ».</p>
+ <div id="groups"><details><summary><span>Linux (RedHat/RHEL)</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Linux (RedHat/RHEL)" aria-label="Points pour Linux (RedHat/RHEL)" value="4"><button type="button" class="remove-skill" title="Supprimer Linux (RedHat/RHEL)" aria-label="Supprimer Linux (RedHat/RHEL)">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Linux (RedHat/RHEL)"><label>Mots-clés / synonymes (un par ligne)</label><textarea>RedHat
+Red Hat
+RHEL
+Red Hat Enterprise Linux</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Linux (général)</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Linux (général)" aria-label="Points pour Linux (général)" value="5"><button type="button" class="remove-skill" title="Supprimer Linux (général)" aria-label="Supprimer Linux (général)">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Linux (général)"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Linux</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>CheckMK / Nagios</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour CheckMK / Nagios" aria-label="Points pour CheckMK / Nagios" value="5"><button type="button" class="remove-skill" title="Supprimer CheckMK / Nagios" aria-label="Supprimer CheckMK / Nagios">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="CheckMK / Nagios"><label>Mots-clés / synonymes (un par ligne)</label><textarea>CheckMK
+Check_MK
+Check MK
+Nagios</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Bash / Shell Scripting</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Bash / Shell Scripting" aria-label="Points pour Bash / Shell Scripting" value="5"><button type="button" class="remove-skill" title="Supprimer Bash / Shell Scripting" aria-label="Supprimer Bash / Shell Scripting">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Bash / Shell Scripting"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Bash
+Shell-Skript
+Shellskript
+Shell Scripting
+Shell-Scripting
+Shellskripte</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Proxmox</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Proxmox" aria-label="Points pour Proxmox" value="5"><button type="button" class="remove-skill" title="Supprimer Proxmox" aria-label="Supprimer Proxmox">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Proxmox"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Proxmox
+Proxmox VE</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Puppet</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Puppet" aria-label="Points pour Puppet" value="5"><button type="button" class="remove-skill" title="Supprimer Puppet" aria-label="Supprimer Puppet">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Puppet"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Puppet</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Ubuntu</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Ubuntu" aria-label="Points pour Ubuntu" value="5"><button type="button" class="remove-skill" title="Supprimer Ubuntu" aria-label="Supprimer Ubuntu">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Ubuntu"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Ubuntu</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Zimbra</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Zimbra" aria-label="Points pour Zimbra" value="5"><button type="button" class="remove-skill" title="Supprimer Zimbra" aria-label="Supprimer Zimbra">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Zimbra"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Zimbra</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>IT-Support</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour IT-Support" aria-label="Points pour IT-Support" value="3"><button type="button" class="remove-skill" title="Supprimer IT-Support" aria-label="Supprimer IT-Support">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="IT-Support"><label>Mots-clés / synonymes (un par ligne)</label><textarea>IT-Support
+IT Support
+Anwendersupport
+1st Level Support
+2nd Level Support</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>VMware vSphere / ESXi</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour VMware vSphere / ESXi" aria-label="Points pour VMware vSphere / ESXi" value="5"><button type="button" class="remove-skill" title="Supprimer VMware vSphere / ESXi" aria-label="Supprimer VMware vSphere / ESXi">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="VMware vSphere / ESXi"><label>Mots-clés / synonymes (un par ligne)</label><textarea>vSphere
+VMware vSphere
+VMware ESXi
+ESXi
+VMware</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Ansible</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Ansible" aria-label="Points pour Ansible" value="4"><button type="button" class="remove-skill" title="Supprimer Ansible" aria-label="Supprimer Ansible">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Ansible"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Ansible</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Active Directory / GPO</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Active Directory / GPO" aria-label="Points pour Active Directory / GPO" value="5"><button type="button" class="remove-skill" title="Supprimer Active Directory / GPO" aria-label="Supprimer Active Directory / GPO">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Active Directory / GPO"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Active Directory
+AD-Administration
+GPO
+Gruppenrichtlinien
+Group Policy</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Veeam</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Veeam" aria-label="Points pour Veeam" value="4"><button type="button" class="remove-skill" title="Supprimer Veeam" aria-label="Supprimer Veeam">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Veeam"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Veeam</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Kaspersky Security Center</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Kaspersky Security Center" aria-label="Points pour Kaspersky Security Center" value="4"><button type="button" class="remove-skill" title="Supprimer Kaspersky Security Center" aria-label="Supprimer Kaspersky Security Center">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Kaspersky Security Center"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Kaspersky
+Kaspersky Security Center
+Kaspersky Endpoint Security</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Terraform</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Terraform" aria-label="Points pour Terraform" value="3"><button type="button" class="remove-skill" title="Supprimer Terraform" aria-label="Supprimer Terraform">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Terraform"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Terraform</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Git</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Git" aria-label="Points pour Git" value="3"><button type="button" class="remove-skill" title="Supprimer Git" aria-label="Supprimer Git">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Git"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Git
+GitHub
+GitLab</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Datenbanken</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Datenbanken" aria-label="Points pour Datenbanken" value="3"><button type="button" class="remove-skill" title="Supprimer Datenbanken" aria-label="Supprimer Datenbanken">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Datenbanken"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Oracle
+MySQL
+MariaDB
+PostgreSQL</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Prometheus / Grafana</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Prometheus / Grafana" aria-label="Points pour Prometheus / Grafana" value="3"><button type="button" class="remove-skill" title="Supprimer Prometheus / Grafana" aria-label="Supprimer Prometheus / Grafana">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Prometheus / Grafana"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Prometheus
+Grafana</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Windows Server</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Windows Server" aria-label="Points pour Windows Server" value="5"><button type="button" class="remove-skill" title="Supprimer Windows Server" aria-label="Supprimer Windows Server">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Windows Server"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Windows Server
+Windows-Server
+Windows- und Linux-Server
+Windows Serverlandschaft</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Python</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Python" aria-label="Points pour Python" value="3"><button type="button" class="remove-skill" title="Supprimer Python" aria-label="Supprimer Python">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Python"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Python-Skript
+Python Scripting
+Python</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Docker</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Docker" aria-label="Points pour Docker" value="3"><button type="button" class="remove-skill" title="Supprimer Docker" aria-label="Supprimer Docker">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Docker"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Docker</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Zertifizierungen (RHCSA/AZ-104/LPIC)</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Zertifizierungen (RHCSA/AZ-104/LPIC)" aria-label="Points pour Zertifizierungen (RHCSA/AZ-104/LPIC)" value="3"><button type="button" class="remove-skill" title="Supprimer Zertifizierungen (RHCSA/AZ-104/LPIC)" aria-label="Supprimer Zertifizierungen (RHCSA/AZ-104/LPIC)">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Zertifizierungen (RHCSA/AZ-104/LPIC)"><label>Mots-clés / synonymes (un par ligne)</label><textarea>RHCSA
+Red Hat Certified System Administrator
+AZ-104
+Azure Administrator Associate
+Azure Administrator
+LPIC-1
+LPIC-2
+LPIC1
+LPIC2
+Linux Professional Institute</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Networking</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Networking" aria-label="Points pour Networking" value="4"><button type="button" class="remove-skill" title="Supprimer Networking" aria-label="Supprimer Networking">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Networking"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Networking
+Netzwerktechnik
+Netzwerkadministration
+Netzwerkinfrastruktur
+Netzwerkmanagement
+LAN/WAN</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Firewalling</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Firewalling" aria-label="Points pour Firewalling" value="3"><button type="button" class="remove-skill" title="Supprimer Firewalling" aria-label="Supprimer Firewalling">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Firewalling"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Firewall
+Firewalling</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Storage (NetApp/3PAR)</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Storage (NetApp/3PAR)" aria-label="Points pour Storage (NetApp/3PAR)" value="4"><button type="button" class="remove-skill" title="Supprimer Storage (NetApp/3PAR)" aria-label="Supprimer Storage (NetApp/3PAR)">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Storage (NetApp/3PAR)"><label>Mots-clés / synonymes (un par ligne)</label><textarea>NetApp
+NetApp FAS
+HP 3PAR
+3PAR
+Storage-Management
+SAN
+Speichersysteme</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Kubernetes</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Kubernetes" aria-label="Points pour Kubernetes" value="2"><button type="button" class="remove-skill" title="Supprimer Kubernetes" aria-label="Supprimer Kubernetes">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Kubernetes"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Kubernetes
+k3s</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details><details><summary><span>Homeoffice / Remote / Hybrid</span><input class="skill-score" type="number" min="0" max="100" step="1" title="Points pour Homeoffice / Remote / Hybrid" aria-label="Points pour Homeoffice / Remote / Hybrid" value="3"><button type="button" class="remove-skill" title="Supprimer Homeoffice / Remote / Hybrid" aria-label="Supprimer Homeoffice / Remote / Hybrid">✕ Supprimer</button></summary><div class="inner"><label>Nom de l’expertise</label><input value="Homeoffice / Remote / Hybrid"><label>Mots-clés / synonymes (un par ligne)</label><textarea>Homeoffice
+Home-Office
+Remote
+hybrides Arbeiten
+mobiles Arbeiten
+Telearbeit</textarea><p class="form-help">Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.</p></div></details></div>
+</section>
+<section class="panel">
+ <h2>Mots-clés de recherche</h2>
+ <p>Un mot-clé par ligne. Les autres règles de <code>criteres.json</code> sont conservées.</p>
+ <textarea id="searchterms">Linux Systemadministrator
+IT-Systemadministrator
+IT-Administration und Betreuung
+Netzwerkadministrator
+DevOps Engineer
+IT Support Engineer
+Linux Support
+IT Administrator
+IT Infrastructure Engineer
+Linux Administrator
+Infrastrukturadministrator
+IT-Infrastruktur Administrator
+Systemadministrator Linux
+System Engineer Infrastruktur</textarea>
+</section>
+<dialog id="add-dialog" aria-labelledby="add-title">
+ <form id="add-form" novalidate="">
+  <h2 id="add-title">Ajouter une expertise</h2>
+  <label for="skill-name">Nom de l’expertise</label>
+  <input id="skill-name" maxlength="120" required="" placeholder="Ex. : Microsoft Azure">
+  <label for="skill-score">Points</label>
+  <input id="skill-score" type="number" min="0" max="100" step="1" value="3" required="">
+  <p class="form-help">0 point = détectée sans augmenter le score.</p>
+  <label for="skill-words">Synonymes / mots-clés (un par ligne)</label>
+  <textarea id="skill-words" required="" placeholder="Azure
+Microsoft Azure
+Azure Administrator"></textarea>
+  <div id="form-error" role="alert"></div>
+  <div class="dialog-actions">
+    <button type="button" id="cancel-add">Annuler</button>
+    <button type="submit" class="primary">Ajouter l’expertise</button>
+  </div>
+ </form>
+</dialog>
+<script>
+'use strict';
+const owner='maminezaag', repo='Jobs_Fetch', branch='main', path='criteres.json';
+const api=`https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+const $=id=>document.getElementById(id);
+let config=null,sha=null,dirty=false,busy=false;
+const TOKEN_STORAGE_KEY='Jobs_Fetch:scoring:token:v1';
+function restoreToken(){
+ try {
+  const saved=localStorage.getItem(TOKEN_STORAGE_KEY);
+  if(saved){$('token').value=saved;$('remember').checked=true;}
+ } catch(e){$('token-status').textContent='Stockage local indisponible';}
+ updateTokenStatus();
+}
+function updateTokenStatus(){
+ $('token-status').textContent=$('remember').checked
+  ? 'Jeton mémorisé dans ce navigateur'
+  : 'Jeton non mémorisé';
+}
+function saveTokenPreference(){
+ try{
+  if($('remember').checked && $('token').value.trim()){
+   localStorage.setItem(TOKEN_STORAGE_KEY,$('token').value.trim());
+  }else{
+   localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
+ }catch(e){$('remember').checked=false;$('token-status').textContent='Stockage local indisponible';return;}
+ updateTokenStatus();
+}
+function forgetToken(){
+ $('token').value='';$('remember').checked=false;
+ try{localStorage.removeItem(TOKEN_STORAGE_KEY);}catch(e){}
+ updateTokenStatus();show('Jeton effacé de cette page et du stockage de ce navigateur.');
+}
+function show(msg,type=''){
+ const el=$('message');el.className=type;el.textContent=msg;
+}
+function setDirty(){dirty=true;$('commit').disabled=false;show('Modifications non enregistrées — clique sur « Commit sur GitHub ».');}
+function checkData(o){
+ if(!o||!Array.isArray(o.points_positifs?.groupes)||!Array.isArray(o.recherche?.mots_cles))
+  throw new Error('Structure inattendue de criteres.json');
+}
+function encode64(str){
+ const bytes=new TextEncoder().encode(str);
+ let s='';for(const b of bytes)s+=String.fromCharCode(b);
+ return btoa(s);
+}
+function decode64(str){
+ const bytes=Uint8Array.from(atob(str.replace(/\s/g,'')),c=>c.charCodeAt(0));
+ return new TextDecoder().decode(bytes);
+}
+async function request(url,opts={}){
+ const token=$('token').value.trim();
+ const headers={'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...opts.headers};
+ if(token)headers.Authorization='Bearer '+token;
+ const res=await fetch(url,{...opts,headers,cache:'no-store'});
+ const obj=await res.json().catch(()=>({}));
+ if(!res.ok)throw new Error(`GitHub HTTP ${res.status} : ${obj.message||res.statusText}`);
+ return obj;
+}
+async function getRemote(){
+ const result=await request(api+'?ref='+branch);
+ if(result.type!=='file'||!result.sha||!result.content)throw new Error('Fichier GitHub introuvable ou réponse incomplète.');
+ const obj=JSON.parse(decode64(result.content));checkData(obj);
+ return {obj,sha:result.sha};
+}
+function wordsFromLines(s){
+ return [...new Set(s.split(/\r?\n/).map(x=>x.trim()).filter(Boolean))];
+}
+function groupNameAlreadyExists(n,except=null){
+ return config.points_positifs.groupes.some(g=>g!==except&&g.nom.trim().toLocaleLowerCase('fr')===n.trim().toLocaleLowerCase('fr'));
+}
+function render(){
+ const target=$('groups');target.replaceChildren();
+ const groups=config.points_positifs.groupes;
+ $('count').textContent=groups.length+' expertise'+(groups.length>1?'s':'');
+ if(!groups.length){
+  const empty=document.createElement('div');empty.className='empty-hint';
+  empty.textContent='Aucune expertise pour le moment. Utilise « Ajouter une expertise ».';
+  target.append(empty);
+ }
+ groups.forEach((group,i)=>{
+  const detail=document.createElement('details');
+  const summary=document.createElement('summary');
+  const title=document.createElement('span');title.textContent=group.nom;
+  const score=document.createElement('input');
+  score.className='skill-score';score.type='number';score.min='0';score.max='100';score.step='1';
+  score.value=group.poids;score.title='Points pour '+group.nom;
+  score.setAttribute('aria-label','Points pour '+group.nom);
+  score.addEventListener('click',e=>e.stopPropagation());
+  score.addEventListener('keydown',e=>e.stopPropagation());
+  score.addEventListener('change',()=>{
+   if(score.value.trim()===''){score.value=group.poids;return alert('Saisis un nombre de points.');}
+   const v=Number(score.value);
+   if(!Number.isInteger(v)||v<0||v>100){score.value=group.poids;return alert('Choisis un nombre entre 0 et 100.');}
+   if(group.poids!==v){group.poids=v;setDirty();}
+  });
+  const del=document.createElement('button');del.type='button';del.className='remove-skill';
+  del.textContent='✕ Supprimer';del.title='Supprimer '+group.nom;
+  del.setAttribute('aria-label','Supprimer '+group.nom);
+  del.addEventListener('click',e=>{
+   e.preventDefault();e.stopPropagation();
+   if(confirm('Supprimer définitivement l’expertise « '+group.nom+' » du prochain commit ?')){
+    groups.splice(i,1);render();setDirty();
+   }
+  });
+  del.addEventListener('keydown',e=>e.stopPropagation());
+  summary.append(title,score,del);detail.append(summary);
+  const inner=document.createElement('div');inner.className='inner';
+  const lab=document.createElement('label');lab.textContent='Nom de l’expertise';
+  const name=document.createElement('input');name.value=group.nom;
+  name.addEventListener('input',()=>{
+   group.nom=name.value.trim();title.textContent=group.nom||'(sans nom)';
+   score.setAttribute('aria-label','Points pour '+group.nom);setDirty();
+  });
+  const lab2=document.createElement('label');lab2.textContent='Mots-clés / synonymes (un par ligne)';
+  const words=document.createElement('textarea');words.value=group.mots.join('\n');
+  words.addEventListener('input',()=>{group.mots=wordsFromLines(words.value);setDirty();});
+  const help=document.createElement('p');help.className='form-help';
+  help.textContent='Chaque expertise rapporte ses points au maximum une fois, même si plusieurs synonymes sont présents.';
+  inner.append(lab,name,lab2,words,help);detail.append(inner);target.append(detail);
+ });
+ $('searchterms').value=config.recherche.mots_cles.join('\n');
+}
+function openAddDialog(){
+ if(!config)return;
+ $('add-form').reset();$('form-error').textContent='';
+ $('add-dialog').showModal();$('skill-name').focus();
+}
+function closeAddDialog(){$('add-dialog').close();}
+function addExpertise(e){
+ e.preventDefault();
+ if(!config)return;
+ const nom=$('skill-name').value.trim();
+ const rawScore=$('skill-score').value.trim();
+ const poids=Number(rawScore);
+ const mots=wordsFromLines($('skill-words').value);
+ let error='';
+ if(!nom)error='Saisis le nom de l’expertise.';
+ else if(groupNameAlreadyExists(nom))error='Cette expertise existe déjà.';
+ else if(rawScore===''||!Number.isInteger(poids)||poids<0||poids>100)error='Le score doit être un entier entre 0 et 100.';
+ else if(!mots.length)error='Ajoute au moins un mot-clé ou synonyme.';
+ if(error){$('form-error').textContent=error;return;}
+ config.points_positifs.groupes.push({nom,poids,mots});
+ closeAddDialog();render();setDirty();
+ const last=$('groups').lastElementChild;
+ if(last&&last.tagName==='DETAILS'){last.open=true;last.scrollIntoView({behavior:'smooth',block:'center'});}
+}
+
+async function load(){
+ if(busy)return;
+ if(dirty&&!confirm('Abandonner les modifications non enregistrées ?'))return;
+ busy=true;$('load').disabled=true;show('Lecture depuis GitHub…');
+ try{
+  const remote=await getRemote();config=remote.obj;sha=remote.sha;dirty=false;render();
+  $('commit').disabled=true;$('add').disabled=false;$('searchterms').disabled=false;
+  show('Fichier chargé depuis GitHub. Modifie les points, puis clique sur Commit.', 'success');
+ }catch(e){show('Erreur de chargement : '+e.message,'error');}
+ finally{busy=false;$('load').disabled=false;}
+}
+async function commit(){
+ if(busy||!config||!dirty)return;
+ if(!$('token').value.trim())return show('Ajoute ton jeton GitHub dans le champ avant le commit.','error');
+ if(!config.points_positifs.groupes.every(g=>g.nom&&Number.isInteger(g.poids)&&g.poids>=0&&g.poids<=100&&g.mots.length&&g.mots.every(Boolean)))
+  return show('Erreur : une expertise a un nom, des mots-clés ou des points invalides.','error');
+ const names=config.points_positifs.groupes.map(g=>g.nom.trim().toLocaleLowerCase('fr'));
+ if(new Set(names).size!==names.length)return show('Erreur : deux expertises ont le même nom.','error');
+ if(!confirm('Enregistrer tes modifications dans criteres.json sur GitHub (branche main) ?'))return;
+ busy=true;$('commit').disabled=true;$('load').disabled=true;show('Vérification de la version GitHub…');
+ try{
+  const remote=await getRemote();
+  if(remote.sha!==sha)throw new Error('Le fichier a changé sur GitHub. Recharge-le avant de faire un commit (tes changements ne seront pas écrasés).');
+  const payload={message:'criteres: mise à jour des scores depuis l’éditeur HTML',content:encode64(JSON.stringify(config,null,2)+'\n'),sha,branch};
+  const answer=await request(api,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  sha=answer.content.sha;dirty=false;
+  show('✓ Commit réussi : criteres.json a été mis à jour sur GitHub !','success');
+  const link=document.createElement('a');link.href=answer.commit.html_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=' Voir le commit';$('message').append(link);
+ }catch(e){show('Commit impossible : '+e.message,'error');}
+ finally{busy=false;$('commit').disabled=!dirty;$('load').disabled=false;}
+}
+$('token').addEventListener('input',saveTokenPreference);
+$('remember').addEventListener('change',saveTokenPreference);
+$('forget').addEventListener('click',forgetToken);
+restoreToken();
+$('load').addEventListener('click',load);
+$('commit').addEventListener('click',commit);
+$('searchterms').addEventListener('input',()=>{if(!config)return;config.recherche.mots_cles=wordsFromLines($('searchterms').value);setDirty();});
+$('add').addEventListener('click',openAddDialog);
+$('cancel-add').addEventListener('click',closeAddDialog);
+$('add-form').addEventListener('submit',addExpertise);
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+load();
+</script>
+
+
+</body></html>
