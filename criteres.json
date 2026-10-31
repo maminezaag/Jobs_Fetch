@@ -141,7 +141,7 @@
       },
       {
         "nom": "Puppet",
-        "poids": 5,
+        "poids": 4,
         "mots": [
           "Puppet"
         ]
@@ -162,7 +162,7 @@
       },
       {
         "nom": "IT-Support",
-        "poids": 3,
+        "poids": 4,
         "mots": [
           "IT-Support",
           "IT Support",
@@ -218,7 +218,7 @@
       },
       {
         "nom": "Terraform",
-        "poids": 3,
+        "poids": 2,
         "mots": [
           "Terraform"
         ]
@@ -327,7 +327,7 @@
       },
       {
         "nom": "Kubernetes",
-        "poids": 2,
+        "poids": 1,
         "mots": [
           "Kubernetes",
           "k3s"
