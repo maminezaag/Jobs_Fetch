@@ -479,6 +479,60 @@ def bonus_adequation(titre, branche, noms, cfg):
     return 0, ''
 
 
+
+def offre_promotion_remuneree(titre: str, description: str, regles: dict) -> tuple[bool, str]:
+    """Voie d'alerte documentaire (PAS un avis d'admissibilité).
+
+    Nécessite 1) référence explicite à la préparation d'un doctorat et
+    2) indices concrets d'un CONTRAT SALARIÉ. Pas de filtre ML implicite.
+    La détection fonctionne sur la description individuelle, qui doit ensuite
+    avoir été vérifiée avant l'envoi d'une notification.
+    """
+    if not regles.get('active', False):
+        return False, ''
+    nom = normaliser(titre).casefold()
+    texte = normaliser(description).casefold()
+    titre_doctoral = re.search(
+        r'(?:promotionsstelle|doktorand(?:in)?|doctoral (?:researcher|position|candidate)|'
+        r'phd (?:position|student|researcher)|promotionsprojekt)', nom, re.I)
+    # Un poste de collaborateur scientifique n'implique pas automatiquement une
+    # Promotion : elle doit être annoncée EXPLICITEMENT dans son descriptif.
+    titre_scientifique = re.search(
+        r'wissenschaftlich.{0,30}mitarbeiter|research (?:assistant|associate|fellow)', nom, re.I)
+    promotion_possible = re.search(
+        r'(?:möglichkeit|gelegenheit|perspektive|option|unterstützung).{0,45}promotion|'
+        r'promotion.{0,45}(?:möglich|unterstützt|ausdrücklich)|'
+        r'promotionsmöglichkeit|promotionsperspektive|opportunity to (?:pursue|complete) (?:a )?phd',
+        texte, re.I)
+    if not (titre_doctoral or (titre_scientifique and promotion_possible)):
+        return False, ''
+    # Exclure uniquement quelques disciplines clairement éloignées de l'IT,
+    # lorsque le titre n'évoque AUCUN projet informatique ou IoT.
+    hors_domaine_titre = re.search(
+        r'(?<!\w)(?:literatur(?:wissenschaft)?|sprachwissenschaft|geschichte|'
+        r'geschichtswissenschaft|philosophie|theologie|kunstgeschichte)(?!\w)', nom, re.I)
+    signal_it = re.search(
+        r'(?<!\w)(?:informatik|computer|it[- ]|iot|cyber|security|sicherheit|'
+        r'digital|software|data|daten|technik)(?!\w)', nom, re.I)
+    if hors_domaine_titre and not signal_it:
+        return False, ''
+    # Indices salariaux vérifiables, plus stricts que le simple mot «funded»
+    # (une bourse n'est pas forcément un contrat de travail).
+    tvl_grade = re.search(
+        r'\b(?:e|eg)\s*[- ]?\s*(?:[1-9]|1[0-5])\s*[a-c]?\s*tv[- ]?l\b|'
+        r'\btv[- ]?l\b.{0,35}\b(?:e|eg)\s*[- ]?\s*(?:[1-9]|1[0-5])\b|'
+        r'\bentgeltgruppe\s*(?:[1-9]|1[0-5])\b', texte, re.I)
+    contrat_salarie = re.search(
+        r'(?:vergütet(?:e|er|es|en)?|bezahlt(?:e|er|es|en)?|'
+        r'salaried (?:position|employment)|paid (?:employee|position)|'
+        r'arbeitsvertrag.{0,60}(?:vergütung|tv[- ]?l|gehalt))', texte, re.I)
+    if tvl_grade:
+        return True, 'rémunération tarifaire / grille TV-L indiquée'
+    if contrat_salarie:
+        return True, 'emploi explicitement présenté comme salarié'
+    return False, ''
+
+
 def noter(o, cfg):
     texte = normaliser(o.titre + ' ' + o.texte)
     exclusion = exclure(o.titre, o.texte)
@@ -500,6 +554,8 @@ def noter(o, cfg):
                   and score >= sec.get('seuil_total', 55)
                   and skills >= sec.get('minimum_competences', 10))
     priorite = 'PRIORITAIRE' if primaire else 'A_EXAMINER' if secondaire else 'ECARTEE'
+    promotion_detectee, preuve_paie = offre_promotion_remuneree(
+        o.titre, o.texte, cfg.get('promotion_remuneree', {}))
     # Le score technique reste lisible mais n'est plus suffisant à lui seul.
     # Hors profil => pas d'alerte. Incertain => revue humaine, jamais «prioritaire».
     if adequation['action'] == 'HORS_PROFIL':
@@ -509,7 +565,18 @@ def noter(o, cfg):
         primaire = False
         secondaire = True
         priorite = 'A_EXAMINER'
+    # Circuit indépendant du score habituel : ne PAS déclarer le candidat éligible.
+    # Les exclusions existantes, la zone et HORS_PROFIL restent éliminatoires.
+    promotion_a_examiner = bool(promotion_detectee and valide and not primaire and
+                               adequation['action'] != 'HORS_PROFIL')
+    if promotion_a_examiner:
+        primaire = False
+        secondaire = True
+        priorite = 'PROMOTION_A_EXAMINER'
     motifs = []
+    if promotion_a_examiner:
+        motifs.append('poste doctoral rémunéré : ' + preuve_paie +
+                      ' ; vérifier les prérequis universitaires, le cursus, les compétences obligatoires et la date limite')
     if exclusion: motifs.append(exclusion)
     if adequation['action'] == 'HORS_PROFIL':
         motifs.append('hors spécialité : ' + adequation['specialite'] +
@@ -523,12 +590,15 @@ def noter(o, cfg):
             motifs.append(f"compétences {skills}/{cfg['minimum_competences']}")
         if score < cfg['seuil_total']:
             motifs.append(f"total {score}/{cfg['seuil_total']}")
-    if secondaire: motifs.append('alerte secondaire : vérification humaine recommandée')
+    if secondaire and not promotion_a_examiner:
+        motifs.append('alerte secondaire : vérification humaine recommandée')
     return {'score':score, 'skills':skills, 'lieu':lieu, 'contrat':contrat,
             'conditions':cond, 'localite':typ, 'categorie':classe(o.titre,o.texte),
             'branche':branche, 'bonus_specialite':bonus, 'justification_bonus':justification,
             'competences':trouve, 'exclusion':exclusion, 'adequation':adequation, 'eligible':primaire,
-            'alerte': primaire or secondaire, 'priorite':priorite, 'motifs':motifs}
+            'alerte': primaire or secondaire, 'priorite':priorite,
+            'voie_promotion':promotion_a_examiner, 'preuve_remuneration':preuve_paie if promotion_a_examiner else '',
+            'motifs':motifs}
 
 
 def decision_apres_verification(offre, note):
@@ -543,25 +613,33 @@ def decision_apres_verification(offre, note):
 
 
 def emailer(resultats, destinataire, adresse, mot_de_passe):
-    """Un SEUL e-mail contenant deux rubriques, sans notifications répétées."""
+    """Un SEUL e-mail, avec les Promotionsstellen rémunérées bien séparées."""
     msg = EmailMessage()
+    promotions = [(o,n) for o,n in resultats if n['priorite'] == 'PROMOTION_A_EXAMINER']
     principaux = [(o,n) for o,n in resultats if n['priorite'] == 'PRIORITAIRE']
     secondaires = [(o,n) for o,n in resultats if n['priorite'] == 'A_EXAMINER']
-    msg['Subject'] = (f"University Watcher : {len(principaux)} prioritaires, "
-                      f"{len(secondaires)} à examiner")
+    msg['Subject'] = (f'University Watcher : {len(principaux)} prioritaires, '
+                      f'{len(secondaires)} à examiner' +
+                      (f', {len(promotions)} promotions rémunérées à examiner' if promotions else ''))
     msg['From'] = adresse
     msg['To'] = destinataire
-    lines = ['Résultats universitaires ; les annonces secondaires méritent une vérification humaine.', '']
-    for titre, ensemble in [('PRIORITAIRES (60/100 ET 20/55)', principaux),
-                            ('À EXAMINER (55/100 ET 10/55)', secondaires)]:
-        if not ensemble: continue
+    lines = ['Offres universitaires — vérification humaine indispensable.',
+             "Une alerte doctorale n'atteste PAS que tu remplis les prérequis.", '']
+    groupes = [
+        ('PROMOTIONSSTELLEN RÉMUNÉRÉES — À EXAMINER (sans seuil technique)', promotions),
+        ('AUTRES PRIORITAIRES (60/100 ET 20/55)', principaux),
+        ('AUTRES À EXAMINER (55/100 ET 10/55)', secondaires),
+    ]
+    for titre, ensemble in groupes:
+        if not ensemble:
+            continue
         lines.extend([titre, '-' * len(titre), ''])
         for o,note in ensemble:
             lines.extend([f"{o.titre} — {note['score']}/100",
                           f"{o.source} — {o.ville} — {note['localite']} — {note['categorie']}",
                           f"Compétences {note['skills']}/55 (bonus {note['bonus_specialite']}) ; "
                           f"lieu {note['lieu']}/30 ; contrat {note['contrat']}/15 ({note['conditions']})",
-                          'Correspondances : ' + ', '.join(n for n,_ in note['competences']),
+                          'Correspondances : ' + (', '.join(n for n,_ in note['competences']) or 'aucune'),
                           'Métier principal : ' + note.get('adequation', {}).get('domaine', 'NON_CLASSE'),
                           'Preuves missions : ' + (', '.join((note.get('adequation', {}).get('missions_it', []) +
                             note.get('adequation', {}).get('missions_bpm_iot', []) +
@@ -569,12 +647,12 @@ def emailer(resultats, destinataire, adresse, mot_de_passe):
                           'Prérequis spécialisés à vérifier : ' +
                             (', '.join(note.get('adequation', {}).get('exigences_specialisees', [])[:5]) or 'aucun signalé'),
                           'Vérification : ' + note.get('adequation', {}).get('motif', ''),
+                          'Raison(s) : ' + (' ; '.join(note['motifs']) or 'conditions de score remplies'),
                           f"Annonce : {o.url}", ''])
-    msg.set_content('\n'.join(lines))
+    msg.set_content('\\n'.join(lines))
     with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as smtp:
         smtp.login(adresse, mot_de_passe)
         smtp.send_message(msg)
-
 
 def empreinte(valeur):
     """Empreinte stable du contenu d'une annonce ou des règles de scoring."""
@@ -636,9 +714,10 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({'algorithme': 'v7.2', **{k: cfg.get(k) for k in (
+    regles = empreinte({'algorithme': 'v7.3-promotion-remuneree', **{k: cfg.get(k) for k in (
         'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
-        'alerte_secondaire', 'bonus_specialite', 'adequation_v7')}})
+        'alerte_secondaire', 'bonus_specialite', 'adequation_v7',
+        'promotion_remuneree')}})
     if actualiser:
         if offre.url.split('#')[0] == src['url'].split('#')[0]:
             offre.detail_erreur = 'Le lien renvoie à la liste des annonces'
@@ -733,14 +812,16 @@ def main():
             log.error('Analyse impossible pour %s : %s', offre.url[:130], exc)
             erreurs.append(f'fiche {offre.source}: {exc}')
 
-    qualifiees.sort(key=lambda x: (x[1]['priorite'] == 'PRIORITAIRE', x[1]['score'], x[1]['skills']), reverse=True)
+    # Pour ne pas perdre une Promotionsstelle dans la limite max_offres_email.
+    ordre = {'PROMOTION_A_EXAMINER': 3, 'PRIORITAIRE': 2, 'A_EXAMINER': 1}
+    qualifiees.sort(key=lambda x: (ordre.get(x[1]['priorite'], 0), x[1]['score'], x[1]['skills']), reverse=True)
     nombre = min(len(qualifiees), cfg['max_offres_email'])
     log.info('CACHE: %d réutilisées, %d analyses téléchargées, %d re-notées sur critères modifiés',
              stats['cache réutilisé'], stats['analyse du détail'],
              stats['nouveaux critères : re-scoring du cache'])
     log.info('%d offres à notifier (%d prioritaires, %d secondaires), %d dans e-mail ; %d source(s)/fiche(s) en échec ; %d fiche(s) incomplète(s)',
              len(qualifiees), sum(n['priorite']=='PRIORITAIRE' for _,n in qualifiees),
-             sum(n['priorite']=='A_EXAMINER' for _,n in qualifiees),
+             sum(n['priorite'] in ('A_EXAMINER','PROMOTION_A_EXAMINER') for _,n in qualifiees),
              nombre, len(erreurs), len(incompletes))
     if incompletes:
         log.warning('Attention: %d fiches sans texte complet. Vérifier DETAIL NON VERIFIE.', len(incompletes))

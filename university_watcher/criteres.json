@@ -576,5 +576,16 @@
     "Les annonces ambiguës sont À EXAMINER; les bons emplois IT en laboratoire de physique ne sont pas pénalisés.",
     "Le seuil 60/20 et l’alerte secondaire 55/10 ne changent pas.",
     "Changement de règles = nouveau scoring sur cache V5/V6 sans téléchargement immédiat."
-  ]
+  ],
+  "promotion_remuneree": {
+    "active": true,
+    "_aide": [
+      "Voie distincte du score 60/20 et 55/10 pour les annonces confirmant un doctorat ET un salaire de type TV-L/contrat salarié.",
+      "Décision PROMOTION_A_EXAMINER, jamais PRIORITAIRE ni garantie admissibilité.",
+      "Exclusions linguistiques, postdoc, doctorat déjà acquis, hors zone et spécialité HORS_PROFIL restent applicables.",
+      "Ne pas supposer des compétences de Machine Learning ou cryptographie non attestées.",
+      "Si la rémunération est absente ou non explicite, ne PAS faire passer l'offre par ce circuit.",
+      "La fiche individuelle doit avoir été effectivement vérifiée avant alerte."
+    ]
+  }
 }
