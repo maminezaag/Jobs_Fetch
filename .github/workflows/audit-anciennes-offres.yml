@@ -1,0 +1,46 @@
+name: Audit anciennes offres IT
+
+on:
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Nombre maximal d'offres à réexaminer (300 pour tester, jusqu'à 2000)"
+        required: true
+        default: '300'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  audit-sans-email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Lire le dépôt sans le modifier
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dépendances du collecteur
+        run: pip install -r requirements.txt
+
+      - name: Réexaminer les offres de seen_jobs.json (sans mail)
+        env:
+          AUDIT_LIMIT: ${{ inputs.limite }}
+        run: python audit_anciennes_offres.py --config config.yaml --limit "$AUDIT_LIMIT" --output-dir audit-resultats
+
+      - name: Déposer le rapport Excel téléchargeable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-anciennes-offres
+          path: audit-resultats/
+          if-no-files-found: warn
+          retention-days: 14
