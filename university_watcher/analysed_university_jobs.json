@@ -3553,6 +3553,27 @@
     }
   },
   "pages_laboratoires": {
+    "05292ef48a319780fb29": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Emden/Leer – Labor IT-Sicherheit",
+      "signature_contenu_utile": null,
+      "source": "emden",
+      "url": "https://www.hs-emden-leer.de/studierende/fachbereiche/technik/labore-im-fachbereich-technik/labor-it-sicherheit"
+    },
+    "2220641c71cbf9bf4c08": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Jade Hochschule – KI in Forschung und Transfer",
+      "signature_contenu_utile": null,
+      "source": "jade",
+      "url": "https://www.jade-hs.de/kuenstliche-intelligenz/ki-in-forschung-transfer/"
+    },
+    "49da6141b14e0b9222ab": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Emden/Leer – Industrielle Informatik",
+      "signature_contenu_utile": null,
+      "source": "emden",
+      "url": "https://www.hs-emden-leer.de/forschung/forschungsprofil/forschungsschwerpunkte/schwerpunkte/industrielle-informatik"
+    },
     "6891c8aca78567dfa124": {
       "dernier_controle": "2026-11-01",
       "nom": "Systemsoftware und verteilte Systeme",
@@ -3589,12 +3610,26 @@
       "source": "oldenburg",
       "url": "https://uol.de/informatik/ssi/stellenausschreibungen"
     },
+    "e305a56c4675088b7cdd": {
+      "dernier_controle": "2026-11-01",
+      "nom": "AGRA – Rechnerarchitektur – Jobs",
+      "signature_contenu_utile": null,
+      "source": "bremen",
+      "url": "https://agra.informatik.uni-bremen.de/jobs.php?lang=de"
+    },
     "ee364b81f6da920cfeab": {
       "dernier_controle": "2026-11-01",
       "nom": "Softwaretechnik",
       "signature_contenu_utile": null,
       "source": "oldenburg",
       "url": "https://uol.de/se"
+    },
+    "f238a71bb9668ed03a28": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Jade Hochschule – Kooperative Promotion",
+      "signature_contenu_utile": null,
+      "source": "jade",
+      "url": "https://www.jade-hs.de/forschen-kooperieren/forschen/promovieren/"
     },
     "f4fdce1ac5d3be8116d7": {
       "dernier_controle": "2026-11-01",
