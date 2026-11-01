@@ -20,10 +20,10 @@ Sheet), puis un e-mail récapitulatif est envoyé pour les offres qualifiées.
 
 OFFRES AVEC FRANÇAIS (criteres.json > francais, ajout du 14.10.2026) :
 recherches supplémentaires nationales + détection du français dans le texte de
-TOUTES les offres. Une offre qui demande le français passe le seuil
-automatiquement, n'est jamais écartée pour la distance, mais reste éliminée si
-elle exige un allemand C1/C2/natif. Elle apparaît dans une section à part de
-l'e-mail.
+TOUTES les offres. Une annonce demandant le français conserve la dérogation
+au seuil et au rayon de 70 km SI elle concerne un métier IT pertinent et si
+son lieu est bien en Allemagne. Les exigences d'allemand C1/C2/natif restent
+éliminatoires. Les offres françaises apparaissent dans une section dédiée.
 
 Fichiers utilisés
 ------------------
@@ -44,6 +44,9 @@ from __future__ import annotations
 import argparse
 import base64
 import csv
+import hashlib
+import unicodedata
+from difflib import SequenceMatcher
 import io
 import json
 import logging
@@ -110,6 +113,7 @@ class JobResult:
     penalite_metier: int = 0
     bonus_metier: int = 0
     metier_cible: bool = False
+    priorite_metier: str = "À examiner"
     statut_teletravail: str = "aucun"
     localisations: list[dict[str, Any]] = field(default_factory=list)
     motifs_adequation: list[str] = field(default_factory=list)
@@ -163,6 +167,7 @@ def load_config(path: Path) -> dict[str, Any]:
     cfg["criteres"]["points_positifs"] = criteres_data.get("points_positifs", {}).get("groupes", [])
     cfg["criteres"]["francais"] = criteres_data.get("francais", {})
     cfg["criteres"]["adequation_metier"] = criteres_data.get("adequation_metier", {})
+    cfg["criteres"]["priorites_metier"] = criteres_data.get("priorites_metier", {})
 
     return cfg
 
@@ -557,8 +562,11 @@ def classify_source(job: JobResult, cfg: dict[str, Any]) -> None:
     job.statut_teletravail = statut_teletravail(f"{job.title}\n{job.description}")
     if local:
         job.source = "locale"
-    elif job.francais:
-        job.source = "francais"  # exception existante, conservée
+    elif job.francais and _lieu_francais_allemagne(job):
+        job.source = "francais"  # exception nationale EN ALLEMAGNE uniquement
+    elif job.francais and not _lieu_francais_allemagne(job):
+        job.source = "hors_zone"
+        job.matched_elimination.append("offre en français : localisation allemande non vérifiée")
     elif job.statut_teletravail == "total":
         job.source = "remote"
     else:
@@ -697,6 +705,201 @@ def _adequation_titre(job: JobResult, crit: dict[str, Any], points_techniques: i
     return 0, False
 
 
+# --------------------------------------------------------------------------
+# Métier : priorité indépendante des points, et validation des offres en français
+# --------------------------------------------------------------------------
+
+def _priorite_metier(job: JobResult, crit: dict[str, Any]) -> str:
+    """Classe le métier, pas les technologies listées dans la description.
+
+    Une annonce Python Developer peut avoir 15 points grâce à Linux/Python,
+    sans devenir un poste d'administration système.
+    """
+    regles = crit.get("priorites_metier", {}) or {}
+    titre = job.title
+    if any(_expression_presente(m, titre) for m in regles.get("tres_adapte", [])):
+        return "Très adapté"
+    if any(_expression_presente(m, titre) for m in regles.get("adapte", [])):
+        return "Adapté"
+    return "À examiner"
+
+
+def _metier_francais_pertinent(job: JobResult, crit: dict[str, Any]) -> bool:
+    """Le français ne doit PAS transformer un poste SAP fonctionnel en poste IT.
+
+    Les rôles de support/terrain sont conservés ; les rôles génériques (Field
+    Engineer, System Engineer...) doivent présenter un contexte IT explicite.
+    Une mention '1st Level Support' dans la description d'un consultant SAP
+    ne suffit pas à valider son INTITULÉ de consultant fonctionnel.
+    """
+    t = job.title
+    if re.search(r"\b(?:sap|s/4\s*hana|s/4)\b", t, re.I) and re.search(
+        r"\b(?:consultant|berater|beratung|fi|co|service)\b", t, re.I
+    ) and not re.search(r"\b(?:basis[- ]?administrator|systemadministrator)\b", t, re.I):
+        return False
+    # Les titres purement génériques doivent également être confirmés par
+    # leur description, même s'ils entrent dans une famille « adaptée ».
+    titre_ambigu = ("field engineer", "system engineer", "service engineer", "technical engineer",
+                    "it consultant", "it-berater", "cloud engineer", "devops engineer",
+                    "support engineer", "technical consultant")
+    est_ambigu = any(_expression_presente(m, t) for m in titre_ambigu)
+    est_explicitement_it = any(_expression_presente(m, t) for m in
+                               ("IT System Engineer", "IT-System Engineer", "IT Field Engineer",
+                                "IT Support Engineer"))
+    if est_ambigu and not est_explicitement_it:
+        indices = ("linux", "windows server", "active directory", "server hardware",
+                   "it infrastructure", "it-infrastruktur", "rechenzentrum",
+                   "datacenter", "vmware", "network infrastructure", "it services",
+                   "microsoft 365", "entra id", "intune", "azure", "linux server",
+                   "kubernetes", "it betrieb", "it-betrieb", "exchange online")
+        texte = f"{job.employer} {job.description}"
+        return any(_expression_presente(m, texte) for m in indices)
+    if job.priorite_metier in ("Très adapté", "Adapté"):
+        return True
+    # Rôle très éloigné : programmer, SAP Functional Consultant, vente...
+    return False
+
+
+# --------------------------------------------------------------------------
+# Déduplication prudente entre PLUSIEURS références BA d'une même annonce
+# --------------------------------------------------------------------------
+
+def _ascii_texte(v: str) -> str:
+    v = unicodedata.normalize("NFKD", (v or "").casefold())
+    v = "".join(c for c in v if not unicodedata.combining(c))
+    return v.replace("ß", "ss")
+
+
+def _norm_entreprise_doublon(nom: str) -> str:
+    n = _ascii_texte(nom)
+    n = re.sub(r"\b(?:gmbh|ag|kg|se|mbh|ug|co|gbr|e\s*v)\b", " ", n)
+    return " ".join(re.findall(r"[a-z0-9]+", n))
+
+
+def _norm_ville_doublon(ville: str) -> str:
+    v = _ascii_texte(ville)
+    v = re.sub(r"\([^)]*\)", " ", v)
+    v = " ".join(re.findall(r"[a-z0-9]+", v))
+    return {"munich": "munchen", "muenchen": "munchen", "munchen": "munchen",
+            "bremen city": "bremen", "oldenburg oldb": "oldenburg"}.get(v, v)
+
+
+def _norm_titre_doublon(titre: str, ville: str = "") -> str:
+    t = _ascii_texte(titre)
+    t = re.sub(r"\(\s*(?:m\s*/\s*w\s*/\s*d|w\s*/\s*m\s*/\s*d|m\s*/\s*f\s*/\s*d|m\s*/\s*w)\s*\)", " ", t)
+    t = re.sub(r"\b(?:m\s*/\s*w\s*/\s*d|w\s*/\s*m\s*/\s*d)\b", " ", t)
+    t = " ".join(re.findall(r"[a-z0-9]+", t))
+    # La ville est parfois ajoutée au titre, ex. « ..., Bochum ».
+    v = _norm_ville_doublon(ville)
+    if v and t.endswith(" " + v):
+        t = t[:-(len(v) + 1)]
+    t = re.sub(r"\bfur\b", " ", t)
+    return " ".join(t.split())
+
+
+def _description_tokens(description: str) -> set[str]:
+    t = re.sub(r"<[^>]*>", " ", description or "")
+    return {mot for mot in re.findall(r"[a-z0-9]{4,}", _ascii_texte(t))
+            if mot not in {"sowie", "einer", "einem", "einen", "unsere", "werden", "wurde", "durch", "the", "with"}}
+
+
+def _hash_description(job: JobResult) -> str:
+    mots = sorted(_description_tokens(job.description))
+    return hashlib.sha256(" ".join(mots).encode("utf-8")).hexdigest()
+
+
+def _date_proche(a: str, b: str, jours: int = 14) -> bool:
+    try:
+        return abs((datetime.fromisoformat(a[:10]) - datetime.fromisoformat(b[:10])).days) <= jours
+    except (ValueError, TypeError):
+        return False
+
+
+def _sont_memes_annonces(a: JobResult, b: JobResult) -> bool:
+    if a.refnr == b.refnr:
+        return True
+    if not a.employer or not b.employer or _norm_entreprise_doublon(a.employer) != _norm_entreprise_doublon(b.employer):
+        return False
+    if not a.ort or not b.ort or _norm_ville_doublon(a.ort) != _norm_ville_doublon(b.ort):
+        return False
+    t1, t2 = _norm_titre_doublon(a.title, a.ort), _norm_titre_doublon(b.title, b.ort)
+    if min(len(t1), len(t2)) < 10 or SequenceMatcher(None, t1, t2).ratio() < .89:
+        return False
+    if not _date_proche(a.published, b.published):
+        return False
+    # Deux postes distincts peuvent partager un titre. Exiger aussi un
+    # recoupement fort de leurs descriptions évite de les fusionner par erreur.
+    mots_a, mots_b = _description_tokens(a.description), _description_tokens(b.description)
+    if len(mots_a) < 8 or len(mots_b) < 8:
+        return False
+    return len(mots_a & mots_b) / len(mots_a | mots_b) >= .64
+
+
+def _dedupliquer_qualifies(jobs: list[JobResult]) -> tuple[list[JobResult], list[JobResult]]:
+    uniques: list[JobResult] = []
+    doublons: list[JobResult] = []
+    for j in sorted(jobs, key=lambda x: (x.score, x.refnr), reverse=True):
+        if any(_sont_memes_annonces(j, precedent) for precedent in uniques):
+            doublons.append(j)
+        else:
+            uniques.append(j)
+    return uniques, doublons
+
+
+def _empreinte_notification(job: JobResult) -> dict[str, str]:
+    return {"employeur": _norm_entreprise_doublon(job.employer),
+            "ville": _norm_ville_doublon(job.ort),
+            "titre": _norm_titre_doublon(job.title, job.ort),
+            "description_sha256": _hash_description(job),
+            "date": job.published[:10],
+            "reference": job.refnr}
+
+
+def _deja_notifie_autre_reference(job: JobResult, anciennes: list[dict[str, str]]) -> bool:
+    """Historique nouveau format : ne se fonde jamais sur les simples 'vus',
+    qui contiennent aussi des offres rejetées et non notifiées.
+    """
+    now = _empreinte_notification(job)
+    return any(old.get("reference") != job.refnr and
+               old.get("employeur") == now["employeur"] and
+               old.get("ville") == now["ville"] and
+               old.get("titre") == now["titre"] and
+               old.get("description_sha256") == now["description_sha256"] and
+               _date_proche(old.get("date", ""), now["date"], 21)
+               for old in anciennes)
+
+
+def _lieu_francais_allemagne(job: JobResult) -> bool:
+    """Pas de dérogation nationale pour un poste en Suisse/Autriche.
+
+    La présence d'un code postal allemand ou d'un Land allemand identifiable
+    suffit. Sans indication fiable, le lieu est 'à vérifier' et non notifié.
+    """
+    regions = {"BADEN_WUERTTEMBERG", "BAYERN", "BERLIN", "BRANDENBURG", "BREMEN",
+               "HAMBURG", "HESSEN", "MECKLENBURG_VORPOMMERN", "NIEDERSACHSEN",
+               "NORDRHEIN_WESTFALEN", "RHEINLAND_PFALZ", "SAARLAND", "SACHSEN",
+               "SACHSEN_ANHALT", "SCHLESWIG_HOLSTEIN", "THUERINGEN"}
+    lieux = job.localisations or [{"adresse": {"plz": job.plz, "ort": job.ort, "region": job.region}}]
+    for loc in lieux:
+        a = (loc or {}).get("adresse") or {}
+        plz = str(a.get("plz") or job.plz or "").strip()
+        region = str(a.get("region") or job.region or "").upper().replace("-", "_").replace(" ", "_")
+        ville = str(a.get("ort") or job.ort or "")
+        pays = str(a.get("land") or a.get("staat") or a.get("country") or "").lower()
+        if pays and any(s in pays for s in ("schweiz", "switzerland", "suisse", "austria", "osterreich", "österreich")):
+            continue
+        if pays and any(s in pays for s in ("deutschland", "germany", "allemagne")):
+            return True
+        if re.fullmatch(r"\d{5}", plz) or region in regions:
+            return True
+        if not plz and _norm_ville_doublon(ville) in {
+            "berlin", "hamburg", "bremen", "oldenburg", "hannover", "munchen",
+            "koln", "frankfurt am main", "stuttgart", "dresden", "leipzig",
+            "dusseldorf", "dortmund", "essen", "bonn", "wetzlar"}:
+            return True
+    return False
+
+
 def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
     """Score technique + bonus métier, pénalité DevOps ; allemand uniquement."""
     crit = cfg["criteres"]
@@ -741,9 +944,12 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
     if motif and penalite:
         job.motifs_adequation.append(motif)
     job.score = max(0, score + bonus - penalite)
+    job.priorite_metier = _priorite_metier(job, crit)
     if job.francais:
         job.matched_positive.insert(0, f"Français ({'/'.join(mots_fr[:3])})")
 
+    if job.francais and not _metier_francais_pertinent(job, crit):
+        job.matched_elimination.append("français présent, mais métier hors IT ciblée")
     if job.via_francais_seul:
         mots_titre = francais.get("titre_doit_contenir", []) or []
         if mots_titre and not any(_mot_dans_titre(m, job.title) for m in mots_titre):
@@ -830,6 +1036,7 @@ def _lignes_offre(j: JobResult) -> list[str]:
     return [
         f"● {j.title} — {j.employer}{avertissement}",
         f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}",
+        f"  Priorité métier : {j.priorite_metier}",
         f"  Score : {j.score} points (technique {j.score_brut}, "
         f"bonus métier +{j.bonus_metier}, pénalité -{j.penalite_metier})" +
         f" | Compétences : {', '.join(j.matched_positive) or '-'}",
@@ -840,8 +1047,10 @@ def _lignes_offre(j: JobResult) -> list[str]:
 
 
 def build_email_body(jobs: list[JobResult]) -> str:
-    fr = sorted([j for j in jobs if j.francais], key=lambda x: x.score, reverse=True)
-    autres = sorted([j for j in jobs if not j.francais], key=lambda x: x.score, reverse=True)
+    rang = {"Très adapté": 0, "Adapté": 1, "À examiner": 2}
+    critere = lambda j: (rang.get(j.priorite_metier, 2), -j.score, j.title)
+    fr = sorted([j for j in jobs if j.francais], key=critere)
+    autres = sorted([j for j in jobs if not j.francais], key=critere)
     lines = [f"{len(jobs)} nouvelle(s) offre(s) correspondant à tes critères :", ""]
     if fr:
         lines += [f"🇫🇷 OFFRES AVEC FRANÇAIS ({len(fr)}) — toute l'Allemagne", "=" * 50, ""]
@@ -976,16 +1185,28 @@ def main() -> None:
         time.sleep(REQUEST_DELAY_S)
 
     seuil = int(cfg["criteres"].get("seuil_points", 10))
-    # une offre avec français passe le seuil automatiquement (si elle n'est pas éliminée)
+    # Le français reste une exception au seuil, seulement pour un métier IT pertinent et un lieu allemand.
     seuil_cible = int(cfg["criteres"].get("seuil_points_cibles", 5))
     qualifies = [j for j in results if not j.eliminated and (
         j.score >= seuil or j.francais or (
             j.metier_cible and not j.penalite_metier and j.score >= seuil_cible
         )
     )]
+    # Deux références BA peuvent désigner une seule annonce. Ne fusionner que
+    # titre + entreprise + ville + date + description fortement compatibles.
+    qualifies, doublons_run = _dedupliquer_qualifies(qualifies)
+    if doublons_run:
+        logger.info("Doublons même annonce / autre référence BA (run courant) : %d", len(doublons_run))
+    deja_notifies = state.get("notifications", [])
+    doublons_historiques = [j for j in qualifies if _deja_notifie_autre_reference(j, deja_notifies)]
+    if doublons_historiques:
+        logger.info("Doublons d'annonces déjà notifiées (autre référence BA) : %d", len(doublons_historiques))
+    qualifies = [j for j in qualifies if j not in doublons_historiques]
     eliminees = [j for j in results if j.eliminated]
     references_qualifiees = {j.refnr for j in qualifies}
-    sous_le_seuil = [j for j in results if j.refnr not in references_qualifiees and not j.eliminated]
+    references_doublons = {j.refnr for j in doublons_run + doublons_historiques}
+    sous_le_seuil = [j for j in results if j.refnr not in references_qualifiees
+                     and j.refnr not in references_doublons and not j.eliminated]
 
     if qualifies:
         entreprises_recentes = load_recent_companies(cfg, session)
@@ -1007,7 +1228,16 @@ def main() -> None:
         logger.info("  ○ %s — %s (%d pts, sous le seuil de %d) [%s] %s", j.title, j.employer, j.score, seuil, j.source, j.url)
 
     if qualifies and not args.dry_run:
-        if not send_email(cfg, qualifies):
+        if send_email(cfg, qualifies):
+            # Ce registre contient seulement les offres réellement envoyées.
+            # Il complète 'vus' sans changer son format ni rejouer l'historique.
+            nouvelles = [_empreinte_notification(j) for j in qualifies]
+            state.setdefault("notifications", []).extend(nouvelles)
+            # Purge prudente des très anciens enregistrements (sans toucher vus).
+            today = datetime.now(timezone.utc).date()
+            state["notifications"] = [n for n in state["notifications"]
+                if n.get("date") and _date_proche(n.get("date"), today.isoformat(), 60)]
+        else:
             # Sans confirmation SMTP, ces offres doivent rester disponibles
             # pour une nouvelle notification lors de la prochaine exécution.
             for j in qualifies:

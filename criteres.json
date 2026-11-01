@@ -8,7 +8,10 @@
     "Les synonymes d'un même groupe ne rapportent des points qu'une seule fois.",
     "Les offres avec un intitulé de métier ciblé peuvent être notifiées dès seuil_points_cibles, même si l'annonce décrit peu de technologies.",
     "Pour le hors-zone, seules les mentions explicites de télétravail 100% sont valides (exception français conservée).",
-    "Les exigences C1/B2 sont prises en compte pour la langue allemande, et non pour l'anglais ou le français."
+    "Les exigences C1/B2 sont prises en compte pour la langue allemande, et non pour l'anglais ou le français.",
+    "Les annonces avec français doivent aussi concerner le support, les systèmes, les opérations ou l'infrastructure IT et être en Allemagne.",
+    "La priorité métier affichée dans l'email est indépendante du score : Très adapté / Adapté / À examiner.",
+    "Les doublons d'annonces BA ayant plusieurs références sont écartés avec prudence sans modifier les références historiques."
   ],
   "recherche": {
     "_aide": "Mots-clés de recherche envoyés à l'API Jobsuche dans toute l'Allemagne.",
@@ -423,10 +426,10 @@
   },
   "francais": {
     "_aide": [
-      "Les offres IT demandant le français sont recherchées dans toute l'Allemagne.",
-      "Les recherches français ignorent le filtre domaine mais exigent un titre IT.",
-      "Les offres demandant le français passent automatiquement le seuil et la distance.",
-      "L'exclusion allemand C1/C2/natif continue de s'appliquer selon les règles du script."
+      "Les annonces avec français restent accessibles dans TOUTE l'Allemagne (pas en Suisse), sans limite de 70 km.",
+      "Le français ne suffit pas : l'intitulé du poste doit concerner le métier IT (support, systèmes, réseaux, infrastructure, exploitation).",
+      "Un consultant SAP fonctionnel n'est pas validé par une simple mention de support dans sa description.",
+      "Les exigences allemand C1/C2/natif restent éliminatoires."
     ],
     "mots_cles": [
       "IT Support Französisch",
@@ -610,5 +613,77 @@
         "Systemtechniker"
       ]
     }
+  },
+  "priorites_metier": {
+    "_aide": [
+      "Cette étiquette métier ne modifie ni le score ni le seuil : elle sert à hiérarchiser le mail.",
+      "Le français reste national en Allemagne seulement pour les métiers IT pertinents.",
+      "Un rôle de développement pur reste visible si son score atteint 12, mais « À examiner »."
+    ],
+    "tres_adapte": [
+      "Systemadministrator",
+      "Systemadministration",
+      "Linux Administrator",
+      "Windows Administrator",
+      "IT-Administrator",
+      "IT Administrator",
+      "IT Operations",
+      "Head of IT Operations",
+      "Plattform Engineer",
+      "Platform Engineer",
+      "Datacenter Engineer",
+      "Data Center Engineer",
+      "Linux Engineer",
+      "IT-Infrastruktur",
+      "IT Infrastructure",
+      "IT-Systembetreuer",
+      "Microsoft 365 Administrator",
+      "M365 Administrator",
+      "Azure Administrator",
+      "Cloud Administrator",
+      "Netzwerkadministrator",
+      "Network Administrator",
+      "IT-System Engineer",
+      "IT System Engineer",
+      "Infrastructure Engineer",
+      "Infrastrukturadministrator",
+      "Netzwerk Ingenieur",
+      "Netzwerkingenieur"
+    ],
+    "adapte": [
+      "IT Support",
+      "IT-Support",
+      "IT Supporter",
+      "2nd Level Support",
+      "Second Level Support",
+      "Helpdesk",
+      "Help Desk",
+      "Service Desk",
+      "Fachinformatiker",
+      "Systemintegration",
+      "IT Servicetechniker",
+      "IT Service Technician",
+      "Network Engineer",
+      "Netzwerk Ingenieur",
+      "IAM",
+      "Security Operations",
+      "Field Engineer",
+      "IT Operations Coordinator",
+      "System Engineer",
+      "Systemtechniker",
+      "Workplace Engineer",
+      "Client Management",
+      "IT Engineer",
+      "IT Service Management",
+      "Application Support",
+      "IT Consultant",
+      "IT-Berater",
+      "DevOps Engineer",
+      "Cloud Engineer",
+      "Support Engineer",
+      "Technical Consultant",
+      "Microsoft 365 Consultant",
+      "SAP Basis Administrator"
+    ]
   }
 }
