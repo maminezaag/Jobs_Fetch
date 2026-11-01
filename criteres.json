@@ -5,7 +5,10 @@
     "Recherche nationale par mot-clé puis classification locale, remote ou hors_zone.",
     "Les offres locales sont à moins de rayon_km de lieu_reference.",
     "Les offres éloignées sans télétravail sont écartées, sauf exception liée au français.",
-    "Les synonymes d'un même groupe ne rapportent des points qu'une seule fois."
+    "Les synonymes d'un même groupe ne rapportent des points qu'une seule fois.",
+    "Les offres avec un intitulé de métier ciblé peuvent être notifiées dès seuil_points_cibles, même si l'annonce décrit peu de technologies.",
+    "Pour le hors-zone, seules les mentions explicites de télétravail 100% sont valides (exception français conservée).",
+    "Les exigences C1/B2 sont prises en compte pour la langue allemande, et non pour l'anglais ou le français."
   ],
   "recherche": {
     "_aide": "Mots-clés de recherche envoyés à l'API Jobsuche dans toute l'Allemagne.",
@@ -23,7 +26,19 @@
       "Infrastrukturadministrator",
       "IT-Infrastruktur Administrator",
       "Systemadministrator Linux",
-      "System Engineer Infrastruktur"
+      "System Engineer Infrastruktur",
+      "Windows Administrator",
+      "Microsoft 365 Administrator",
+      "M365 Administrator",
+      "Azure Administrator",
+      "IT Operations",
+      "IT-Systembetreuer",
+      "Fachinformatiker Systemintegration",
+      "IT Servicetechniker",
+      "Windows Systemadministrator",
+      "IT Operations Engineer",
+      "IT-Betrieb",
+      "2nd Level Support"
     ],
     "lieu_reference": {
       "_aide": "Centre-ville utilisé pour le calcul de distance.",
@@ -344,6 +359,65 @@
           "mobiles Arbeiten",
           "Telearbeit"
         ]
+      },
+      {
+        "nom": "Microsoft 365 / Office 365",
+        "poids": 5,
+        "mots": [
+          "Microsoft 365",
+          "Microsoft365",
+          "M365",
+          "Office 365",
+          "O365",
+          "Microsoft 365 Administration"
+        ]
+      },
+      {
+        "nom": "Microsoft Entra ID",
+        "poids": 4,
+        "mots": [
+          "Entra ID",
+          "Microsoft Entra",
+          "Azure AD",
+          "Azure Active Directory"
+        ]
+      },
+      {
+        "nom": "Microsoft Intune",
+        "poids": 4,
+        "mots": [
+          "Intune",
+          "Microsoft Endpoint Manager",
+          "Endpoint Manager"
+        ]
+      },
+      {
+        "nom": "Exchange Online",
+        "poids": 4,
+        "mots": [
+          "Exchange Online",
+          "Microsoft Exchange",
+          "Exchange Server"
+        ]
+      },
+      {
+        "nom": "PowerShell",
+        "poids": 4,
+        "mots": [
+          "PowerShell",
+          "PowerShell-Skripting",
+          "PowerShell Scripting"
+        ]
+      },
+      {
+        "nom": "Microsoft Azure",
+        "poids": 3,
+        "mots": [
+          "Azure",
+          "Azure Portal",
+          "Azure Cloud",
+          "Azure IaaS"
+        ]
       }
     ]
   },
@@ -493,6 +567,47 @@
         "Pluspunkt",
         "wäre schön",
         "desirable"
+      ]
+    },
+    "titres_prioritaires": {
+      "_aide": "Priorité aux intitulés directement adaptés au profil IT, même si la description est courte. Les titres ambigus ont besoin d'au moins 4 points de technologies IT. Le seuil spécial est dans config.yaml.",
+      "actif": true,
+      "bonus_fort": 5,
+      "bonus_ambigu": 3,
+      "mots_forts": [
+        "Systemadministrator",
+        "Systemadministration",
+        "Linux Administrator",
+        "Windows Administrator",
+        "IT-Administrator",
+        "IT Administrator",
+        "Microsoft 365 Administrator",
+        "M365 Administrator",
+        "Azure Administrator",
+        "Cloud Administrator",
+        "IT Operations",
+        "IT-Systembetreuer",
+        "IT-System Engineer",
+        "IT System Engineer",
+        "IT-Support",
+        "IT Support",
+        "2nd Level Support",
+        "Second Level Support",
+        "Netzwerkadministrator",
+        "Network Administrator",
+        "IT-Infrastruktur",
+        "IT Infrastructure",
+        "Fachinformatiker Systemintegration",
+        "IT Servicetechniker"
+      ],
+      "mots_avec_competence": [
+        "System Engineer",
+        "Infrastructure Engineer",
+        "Infrastruktur Engineer",
+        "Technical Operations",
+        "DevOps Engineer",
+        "Infrastructure Administrator",
+        "Systemtechniker"
       ]
     }
   }

@@ -12,12 +12,15 @@ criteres:
   # (relatif à l'emplacement de ce config.yaml, ou chemin absolu).
   fichier: "criteres.json"
 
-  # Score minimum (somme des poids des compétences trouvées dans criteres.json)
+  # Score minimum (compétences + bonus de titre - éventuelle pénalité)
   # pour qu'une offre déclenche une notification par e-mail.
   # Repère avec le barème actuel (5/4/3/2) : 2 compétences de niveau 1
   # (ex. Linux + Proxmox) = 10 pts. Valeur de départ : 12.
   # → à ajuster librement selon que tu reçois trop ou pas assez d'offres.
   seuil_points: 12
+  # Offres dont le TITRE correspond directement au métier IT : seuil réduit.
+  # Un bonus métier est ajouté au score ; aucun bonus pour un simple mot de description.
+  seuil_points_cibles: 5
 
 email:
   # Serveur SMTP Gmail (valeurs par défaut correctes pour Gmail, à changer

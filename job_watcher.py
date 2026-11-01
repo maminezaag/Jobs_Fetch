@@ -10,7 +10,7 @@ puis chaque offre trouvée est classifiée a posteriori :
 
     - "locale"    si ses coordonnées GPS sont à moins de rayon_km du point
                   de référence (voir criteres.json > recherche.lieu_reference)
-    - "remote"    sinon, si l'annonce mentionne Homeoffice/Remote/etc.
+    - "remote"    sinon, SEULEMENT si l'annonce confirme 100% télétravail.
     - "hors_zone" sinon — l'offre est alors ÉCARTÉE (ni accessible en trajet,
                   ni télétravaillable)
 
@@ -29,12 +29,13 @@ Fichiers utilisés
 ------------------
 - config.yaml    : configuration TECHNIQUE (chemins, e-mail, seuil)
 - criteres.json  : configuration MÉTIER (mots-clés, élimination, points)
-- seen_jobs.json : historique des offres déjà notifiées (auto-généré)
+- seen_jobs.json : historique des offres déjà analysées (auto-généré)
 
 Utilisation
 -----------
     python job_watcher.py --config config.yaml
     python job_watcher.py --config config.yaml --dry-run
+    python job_watcher.py --config config.yaml --dry-run --review-seen
     python job_watcher.py --config config.yaml --reset
 """
 
@@ -107,6 +108,10 @@ class JobResult:
     score: int = 0
     score_brut: int = 0
     penalite_metier: int = 0
+    bonus_metier: int = 0
+    metier_cible: bool = False
+    statut_teletravail: str = "aucun"
+    localisations: list[dict[str, Any]] = field(default_factory=list)
     motifs_adequation: list[str] = field(default_factory=list)
     matched_positive: list[str] = field(default_factory=list)
     matched_elimination: list[str] = field(default_factory=list)
@@ -423,36 +428,145 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def classify_source(job: JobResult, cfg: dict[str, Any]) -> None:
-    """Détermine job.source ('locale' / 'remote' / 'hors_zone'), APPELÉE
-    APRÈS evaluate() car elle réutilise job.matched_positive pour savoir si
-    le groupe de points 'Homeoffice / Remote / Hybrid' a été détecté (une
-    seule liste de synonymes remote à maintenir, dans criteres.json).
+# Une déclaration de télétravail PARTIEL n'autorise PAS un poste éloigné.
+# Les mentions « Remote-Support » désignent une technique de support, pas
+# nécessairement la possibilité de travailler depuis Oldenburg.
+_RE_TELETRAVAIL_TOTAL = [
+    r"\b100\s*%\s*(?:remote|home[ -]?office|mobiles? arbeiten|telearbeit)\b",
+    r"\b(?:remote|home[ -]?office|telearbeit)\s*(?:zu\s*)?100\s*%\b",
+    r"\b(?:fully|completely|entirely|full)\s+remote\b",
+    r"\bfull[ -]remote\b",
+    r"\b(?:vollständig|komplett|ausschließlich|rein)\s+(?:remote|im home[ -]?office)\b",
+    r"\b(?:remote|home[ -]?office)\s+(?:deutschlandweit|bundesweit|innerhalb deutschlands)\b",
+    r"\b(?:deutschlandweit|bundesweit)\s+(?:remote|home[ -]?office)\b",
+    r"\b(?:ortsunabhängig|ortsunabhaengig)\s+(?:arbeiten|tätigkeit|arbeit)\b",
+    r"\bwork\s+from\s+anywhere\s+in\s+germany\b",
+]
+_RE_TELETRAVAIL_PARTIEL = re.compile(
+    r"(?<!\w)(?:home[ -]?office|remote(?:[ -]?work)?|hybrid(?:es)?|mobiles arbeiten|mobile arbeit|telearbeit)(?!\w)",
+    re.IGNORECASE,
+)
+_RE_TELETRAVAIL_NEGATIF = re.compile(
+    r"\b(?:kein|keine|keinen|ohne|nicht|no)\s+(?:home[ -]?office|remote|telearbeit)\b"
+    r"|\b(?:home[ -]?office|remote)\s+(?:nicht möglich|ausgeschlossen|not available)\b",
+    re.IGNORECASE,
+)
+_RE_TELETRAVAIL_LIMITES = re.compile(
+    r"\b(?:[1-4]|ein(?:e|en|em)?|zwei|drei|vier)\s*"
+    r"(?:tage?|days?)\s*(?:pro|per|in der|in a)?\s*(?:woche|week)?\s*"
+    r"(?:im\s*)?(?:home[ -]?office|remote)\b"
+    r"|\b(?:home[ -]?office|remote)\s*(?:an|für|bis zu|up to)\s*"
+    r"(?:[1-4]|ein(?:e|en)?|zwei|drei|vier)\s*(?:tage?|days?)\b",
+    re.IGNORECASE,
+)
 
-    Si ni proche ni remote : l'offre est ajoutée à matched_elimination —
-    inatteignable en trajet ET non télétravaillable, donc inutile à notifier.
-    """
+_RE_PRESENCE_OBLIGATOIRE = re.compile(
+    r"\b(?:[1-4]|ein(?:e|en|em)?|zwei|drei|vier)\s+(?:tage?|days?)"
+    r"(?:\s+(?:pro|per)\s+(?:woche|week))?\s+(?:vor\s+ort|im\s+büro|onsite|in\s+the\s+office)\b"
+    r"|\b(?:regelmäßige|regelmaessige|wöchentliche|woechentliche)\s+präsenz\b",
+    re.IGNORECASE,
+)
+
+
+def statut_teletravail(texte: str) -> str:
+    """'total', 'partiel' ou 'aucun'. Seul 'total' autorise le hors-zone."""
+    # La ponctuation HTML ne doit pas relier des mots sans séparateur.
+    t = re.sub(r"<[^>]*>", " ", texte or "")
+    # Remote-Support décrit une opération sur un PC distant, non le lieu de travail.
+    t = re.sub(r"\bremote[ -]?support\b", " support_technique ", t, flags=re.I)
+    if _RE_TELETRAVAIL_NEGATIF.search(t):
+        # Un négatif absolu prévaut par sécurité sur une mention contradictoire.
+        return "aucun"
+    if _RE_TELETRAVAIL_LIMITES.search(t) or _RE_PRESENCE_OBLIGATOIRE.search(t):
+        return "partiel"
+    if any(re.search(p, t, re.IGNORECASE) for p in _RE_TELETRAVAIL_TOTAL):
+        return "total"
+    return "partiel" if _RE_TELETRAVAIL_PARTIEL.search(t) else "aucun"
+
+
+# Repli contrôlé pour les annonces sans latitude/longitude.
+# Seules des villes locales avec codes postaux cohérents sont acceptées.
+# Pour une ville inconnue, on ne devine pas : pas de validation automatique.
+_VILLES_PROCHES: dict[str, tuple[str, ...]] = {
+    "oldenburg": ("26",),
+    "bremen": ("28",),
+    "delmenhorst": ("277",),
+    "hude": ("27798",),
+    "bad zwischenahn": ("26160",),
+    "westerstede": ("26655",),
+    "sandkrug": ("26209",),
+    "hatten": ("26209",),
+    "brake": ("26919",),
+    "berne": ("27804",),
+    "rastede": ("26180",),
+    "wardenbug": ("26203",),
+    "wardenburg": ("26203",),
+    "edewecht": ("26188",),
+    "elsfleth": ("26931",),
+    "ganderkesee": ("27777",),
+    "wildeshausen": ("27793",),
+    "varel": ("26316",),
+    "wilhelmshaven": ("263",),
+    "leer": ("26789",),
+}
+
+
+def _localisation_proche_sans_gps(ort: str, plz: str) -> bool:
+    ville = re.sub(r"\s*\([^)]*\)", "", ort or "").strip().lower()
+    ville = ville.replace("oldenburg (oldb)", "oldenburg")
+    prefixes = _VILLES_PROCHES.get(ville)
+    return bool(prefixes and str(plz or "").strip().startswith(prefixes))
+
+
+def _flottant(valeur: Any) -> float | None:
+    try:
+        return float(valeur) if valeur not in (None, "") else None
+    except (ValueError, TypeError):
+        return None
+
+
+def classify_source(job: JobResult, cfg: dict[str, Any]) -> None:
+    """Évalue tous les lieux. Hors rayon : uniquement 100% remote ou français."""
     recherche = cfg["criteres"]["recherche"]
     ref = recherche.get("lieu_reference", {})
-    rayon_km = recherche.get("rayon_km", 60)
+    rayon_km = float(recherche.get("rayon_km", 70))
+    ref_lat, ref_lon = _flottant(ref.get("latitude")), _flottant(ref.get("longitude"))
 
-    distance_km: float | None = None
-    if job.latitude is not None and job.longitude is not None and ref.get("latitude") is not None:
-        distance_km = haversine_km(job.latitude, job.longitude, ref["latitude"], ref["longitude"])
+    local = False
+    distances = []
+    lieux = job.localisations or [{
+        "breite": job.latitude, "laenge": job.longitude,
+        "adresse": {"ort": job.ort, "plz": job.plz},
+    }]
+    for loc in lieux:
+        adresse = loc.get("adresse") or {}
+        lat, lon = _flottant(loc.get("breite")), _flottant(loc.get("laenge"))
+        dist = haversine_km(lat, lon, ref_lat, ref_lon) if None not in (lat, lon, ref_lat, ref_lon) else None
+        if dist is not None:
+            distances.append(dist)
+        if (dist is not None and dist <= rayon_km) or (
+            dist is None and _localisation_proche_sans_gps(adresse.get("ort", ""), adresse.get("plz", ""))
+        ):
+            local = True
+            # Signaler l'emplacement local réellement disponible plutôt que
+            # la première ville (éventuellement très éloignée).
+            job.ort = adresse.get("ort") or job.ort
+            job.plz = str(adresse.get("plz") or job.plz)
+            break
 
-    remote_detecte = any(m.startswith("Homeoffice / Remote / Hybrid") for m in job.matched_positive)
-
-    if distance_km is not None and distance_km <= rayon_km:
+    job.statut_teletravail = statut_teletravail(f"{job.title}\n{job.description}")
+    if local:
         job.source = "locale"
     elif job.francais:
-        # offre avec français : toute l'Allemagne, jamais écartée pour la distance
-        job.source = "francais"
-    elif remote_detecte:
+        job.source = "francais"  # exception existante, conservée
+    elif job.statut_teletravail == "total":
         job.source = "remote"
     else:
         job.source = "hors_zone"
-        motif = f"hors zone ({distance_km:.0f} km)" if distance_km is not None else "lieu inconnu"
-        job.matched_elimination.append(f"{motif} et non taggé remote")
+        distance = f"{min(distances):.0f} km" if distances else "lieu sans GPS non reconnu"
+        job.matched_elimination.append(
+            f"hors zone ({distance}) ; télétravail {job.statut_teletravail}, pas de 100% remote confirmé"
+        )
 
 
 # --------------------------------------------------------------------------
@@ -510,60 +624,126 @@ def _penalite_devops_cicd(job: JobResult, crit: dict[str, Any]) -> tuple[int, st
                       else "DevOps avec compétence CI/CD exigée")
 
 
+# On associe C1/B2 à la langue ALLEMANDE, jamais à English/French.
+# Des niveaux isolés (« mindestens C1 ») sont volontairement insuffisants
+# pour éliminer : ils pourraient qualifier une langue différente.
+_RE_DEUTSCH = re.compile(
+    r"\b(?:deutsch(?:e|en|er|es|em)?(?:\s*(?:sprach)?kenntnisse)?|german(?:\s+language)?)\b",
+    re.IGNORECASE,
+)
+_RE_AUTRE_LANGUE = re.compile(
+    r"\b(?:englisch|english|französisch|franzoesisch|french|spanisch|spanish)\b",
+    re.IGNORECASE,
+)
+_RE_NIVEAU_FORT = re.compile(r"(?<!\w)(?:C1|C2)(?!\w)", re.IGNORECASE)
+_RE_NIVEAU_B2 = re.compile(r"(?<!\w)(?:B2|B1|A2)(?!\w)", re.IGNORECASE)
+_RE_MUTTERSPRACHE = re.compile(r"\b(?:muttersprach\w*|native(?:[- ]?level)?|mother tongue)\b", re.IGNORECASE)
+_RE_VERHANDLUNGSSICHER = re.compile(r"\bverhandlungssicher\w*\b", re.IGNORECASE)
+
+
+def _niveaux_allemands(texte: str) -> tuple[list[str], list[str], bool]:
+    """Associe chaque niveau à la mention de langue la plus proche.
+
+    "Englisch C1 und Deutsch B2" ne doit JAMAIS entraîner un rejet allemand.
+    "Deutsch C1 und Englisch B2" doit être rejeté.
+    """
+    t = re.sub(r"</(?:li|p|div|h[1-6])>|<br\s*/?>", "\n", texte or "", flags=re.I)
+    t = re.sub(r"<[^>]+>", " ", t)
+    clauses = re.split(r"[\n\r;,.]+", t)
+    strict: list[str] = []
+    souple: list[str] = []
+    b2 = False
+    for clause in clauses:
+        mentions = [(m.start(), m.end(), "de") for m in _RE_DEUTSCH.finditer(clause)]
+        mentions.extend((m.start(), m.end(), "autre") for m in _RE_AUTRE_LANGUE.finditer(clause))
+        if not mentions:
+            continue
+        for rx, etiquette in [
+            (_RE_NIVEAU_FORT, "fort"),
+            (_RE_MUTTERSPRACHE, "natif"),
+            (_RE_VERHANDLUNGSSICHER, "souple"),
+            (_RE_NIVEAU_B2, "b2"),
+        ]:
+            for m in rx.finditer(clause):
+                # Distance dans le texte entre deux spans, et non entre leurs centres.
+                nearest = min(mentions, key=lambda x: max(x[0] - m.end(), m.start() - x[1], 0))
+                distance = max(nearest[0] - m.end(), m.start() - nearest[1], 0)
+                if nearest[2] != "de" or distance > 65:
+                    continue
+                if etiquette == "fort" and "allemand C1/C2" not in strict:
+                    strict.append("allemand C1/C2")
+                elif etiquette == "natif" and "allemand niveau natif" not in strict:
+                    strict.append("allemand niveau natif")
+                elif etiquette == "souple" and "allemand verhandlungssicher" not in souple:
+                    souple.append("allemand verhandlungssicher")
+                elif etiquette == "b2":
+                    b2 = True
+    return strict, souple, b2
+
+
+def _adequation_titre(job: JobResult, crit: dict[str, Any], points_techniques: int) -> tuple[int, bool]:
+    regle = (crit.get("adequation_metier", {}) or {}).get("titres_prioritaires", {}) or {}
+    if not regle.get("actif", False):
+        return 0, False
+    titre = job.title
+    fortes = regle.get("mots_forts", [])
+    ambigus = regle.get("mots_avec_competence", [])
+    if any(_expression_presente(mot, titre) for mot in fortes):
+        return max(0, int(regle.get("bonus_fort", 5))), True
+    # Un « System Engineer » hors informatique avec zéro compétence IT ne
+    # doit pas gagner artificiellement la priorité métier.
+    if points_techniques >= 4 and any(_expression_presente(mot, titre) for mot in ambigus):
+        return max(0, int(regle.get("bonus_ambigu", 3))), True
+    return 0, False
+
+
 def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
-    """Applique les critères d'élimination (avec règle B2, voir criteres.json)
-    puis calcule le score de points positifs.
-
-    RÈGLE B2 : si l'annonce mentionne explicitement B2 comme niveau accepté
-    (b2_marqueurs), les critères d'élimination "souples" (formulations vagues
-    type 'verhandlungssicheres Deutsch') sont neutralisés — seuls les critères
-    "stricts" (C1/C2 explicite, niveau natif) éliminent encore l'offre.
-
-    RÈGLE POINTS : chaque groupe de points_positifs est accordé UNE SEULE FOIS
-    même si plusieurs synonymes du groupe apparaissent (voir criteres.json)."""
+    """Score technique + bonus métier, pénalité DevOps ; allemand uniquement."""
     crit = cfg["criteres"]
     haystack = f"{job.title}\n{job.description}"
-
-    # --- français (criteres.json > francais)
     francais = crit.get("francais", {}) or {}
     mots_fr = [m for m in francais.get("mots_detection", []) if _expression_presente(m, haystack)]
     job.francais = bool(mots_fr)
 
-    matched_stricte = [kw for kw in crit.get("elimination_stricte", []) if _expression_presente(kw, haystack)]
-    matched_souple = [kw for kw in crit.get("elimination_souple", []) if _expression_presente(kw, haystack)]
-    b2_present = any(_expression_presente(m, haystack) for m in crit.get("b2_marqueurs", []))
+    matched_stricte, matched_souple, allemand_b2 = _niveaux_allemands(haystack)
+    job.matched_elimination = matched_stricte + ([] if allemand_b2 else matched_souple)
 
-    if job.francais:
-        # Sur une offre française, 'Niveau C1' / 'mindestens C1' seuls visent souvent le FRANÇAIS :
-        # on n'élimine que sur les expressions qui nomment explicitement l'allemand.
-        matched_stricte = [kw for kw in matched_stricte if "deutsch" in kw.lower()]
-        matched_souple = [kw for kw in matched_souple if "deutsch" in kw.lower()]
-
-    if b2_present:
-        job.matched_elimination = matched_stricte
-    else:
-        job.matched_elimination = matched_stricte + matched_souple
+    # Les titres d'architectes spécialisés ne sont pas adaptés au profil,
+    # même lorsque leurs descriptions énumèrent des technologies familières.
+    if re.search(r"(?<!\w)(?:architect|architekt)(?:e|en|in|innen)?(?!\w)", job.title, re.I):
+        job.matched_elimination.append("poste d'architecte (titre hors cible)")
 
     score = 0
+    teletravail = statut_teletravail(haystack)
     for groupe in crit.get("points_positifs", []) or []:
         nom = groupe.get("nom", "?")
         poids = int(groupe.get("poids", 0))
-        mots = groupe.get("mots", []) or []
-        synonymes_trouves = [m for m in mots if _expression_presente(m, haystack)]
+        if nom == "Homeoffice / Remote / Hybrid":
+            synonymes_trouves = [teletravail] if teletravail != "aucun" else []
+        else:
+            synonymes_trouves = [m for m in (groupe.get("mots", []) or []) if _expression_presente(m, haystack)]
         if synonymes_trouves:
             score += poids
             job.matched_positive.append(f"{nom} ({'/'.join(synonymes_trouves)})")
 
     job.score_brut = score
+    poids_teletravail = next((int(g.get("poids", 0)) for g in crit.get("points_positifs", [])
+                             if g.get("nom") == "Homeoffice / Remote / Hybrid"), 0)
+    bonus, cible = _adequation_titre(
+        job, crit, score - (poids_teletravail if teletravail != "aucun" else 0)
+    )
+    job.bonus_metier = bonus
+    job.metier_cible = cible
+    if bonus:
+        job.motifs_adequation.append(f"titre de métier ciblé (+{bonus})")
     penalite, motif = _penalite_devops_cicd(job, crit)
     job.penalite_metier = penalite
     if motif and penalite:
         job.motifs_adequation.append(motif)
-    job.score = max(0, score - penalite)
+    job.score = max(0, score + bonus - penalite)
     if job.francais:
         job.matched_positive.insert(0, f"Français ({'/'.join(mots_fr[:3])})")
 
-    # Offre trouvée UNIQUEMENT par les recherches "français" : le titre doit être un poste IT
     if job.via_francais_seul:
         mots_titre = francais.get("titre_doit_contenir", []) or []
         if mots_titre and not any(_mot_dans_titre(m, job.title) for m in mots_titre):
@@ -650,11 +830,10 @@ def _lignes_offre(j: JobResult) -> list[str]:
     return [
         f"● {j.title} — {j.employer}{avertissement}",
         f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}",
-        f"  Score : {j.score} points" +
-        (f" (score brut {j.score_brut}, adéquation métier -{j.penalite_metier})"
-         if j.penalite_metier else "") +
+        f"  Score : {j.score} points (technique {j.score_brut}, "
+        f"bonus métier +{j.bonus_metier}, pénalité -{j.penalite_metier})" +
         f" | Compétences : {', '.join(j.matched_positive) or '-'}",
-        f"  Publié le : {j.published}",
+        f"  Publié le : {j.published} | Télétravail : {j.statut_teletravail}",
         f"  Lien : {j.url}",
         "",
     ]
@@ -725,12 +904,18 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--config", type=Path, default=Path("config.yaml"))
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--reset", action="store_true")
+    p.add_argument("--review-seen", action="store_true", help="Réévalue une sélection d'offres vues sans notification ni écriture.")
+    p.add_argument("--review-limit", type=int, default=150, help="Nombre maximal d'offres déjà vues à réexaminer (défaut 150).")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+    if args.review_seen and not args.dry_run:
+        raise SystemExit("--review-seen exige --dry-run : aucun ancien e-mail ne sera renvoyé.")
+    if args.review_limit < 1:
+        raise SystemExit("--review-limit doit être >= 1.")
     if args.dry_run and args.reset:
         raise SystemExit("--dry-run et --reset ne peuvent pas être combinés (protection de seen_jobs.json).")
     st_path = resolve_path(args.config, cfg["etat"].get("fichier", "seen_jobs.json"))
@@ -744,14 +929,22 @@ def main() -> None:
 
     session = requests.Session()
     raw_offers = search_jobs(cfg, session)
-    new_offers = [o for o in raw_offers if o.get("referenznummer") not in state["vus"]]
-    logger.info("Nouvelles offres depuis le dernier passage : %d", len(new_offers))
+    if args.review_seen:
+        # L'ancien historique n'indique pas si une offre a été NOTIFIÉE ou
+        # REJETÉE. Toujours aperçu uniquement, jamais de réenvoi automatique.
+        candidates = [o for o in raw_offers if o.get("referenznummer") in state["vus"]]
+        candidates.sort(key=lambda o: str(state["vus"].get(o.get("referenznummer"), "")), reverse=True)
+        new_offers = candidates[:args.review_limit]
+        logger.info("Réexamen sans notification : %d offres de l'archive parmi %d encore visibles dans l'API.", len(new_offers), len(candidates))
+    else:
+        new_offers = [o for o in raw_offers if o.get("referenznummer") not in state["vus"]]
+        logger.info("Nouvelles offres depuis le dernier passage : %d", len(new_offers))
 
     results: list[JobResult] = []
     for o in new_offers:
         lokalisations = o.get("stellenlokationen") or [{}]
         loc0 = lokalisations[0] or {}
-        adresse = loc0.get("adresse", {})
+        adresse = loc0.get("adresse") or {}
         job = JobResult(
             refnr=o.get("referenznummer", ""),
             title=o.get("stellenangebotsTitel") or o.get("hauptberuf", ""),
@@ -764,6 +957,7 @@ def main() -> None:
             latitude=loc0.get("breite"),
             longitude=loc0.get("laenge"),
             via_francais_seul=bool(o.get("_via_francais_seul")),
+            localisations=lokalisations,
         )
         job.description = fetch_description(session, job.refnr)
         if not job.description.strip():
@@ -777,14 +971,21 @@ def main() -> None:
         classify_source(job, cfg)  # doit venir APRÈS evaluate() (utilise matched_positive)
         results.append(job)
 
-        state["vus"][job.refnr] = datetime.now(timezone.utc).isoformat()
+        if not args.review_seen:
+            state["vus"][job.refnr] = datetime.now(timezone.utc).isoformat()
         time.sleep(REQUEST_DELAY_S)
 
     seuil = int(cfg["criteres"].get("seuil_points", 10))
     # une offre avec français passe le seuil automatiquement (si elle n'est pas éliminée)
-    qualifies = [j for j in results if not j.eliminated and (j.score >= seuil or j.francais)]
+    seuil_cible = int(cfg["criteres"].get("seuil_points_cibles", 5))
+    qualifies = [j for j in results if not j.eliminated and (
+        j.score >= seuil or j.francais or (
+            j.metier_cible and not j.penalite_metier and j.score >= seuil_cible
+        )
+    )]
     eliminees = [j for j in results if j.eliminated]
-    sous_le_seuil = [j for j in results if not j.eliminated and j.score < seuil and not j.francais]
+    references_qualifiees = {j.refnr for j in qualifies}
+    sous_le_seuil = [j for j in results if j.refnr not in references_qualifiees and not j.eliminated]
 
     if qualifies:
         entreprises_recentes = load_recent_companies(cfg, session)
@@ -820,7 +1021,8 @@ def main() -> None:
         print(build_email_body(qualifies))
 
     if args.dry_run:
-        logger.info("Mode dry-run : seen_jobs.json laissé intact.")
+        logger.info("Mode dry-run : seen_jobs.json laissé intact. %s",
+                    "Le réexamen ne permet pas de distinguer les annonces auparavant envoyées." if args.review_seen else "")
     else:
         save_state(st_path, state)
 
