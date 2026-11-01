@@ -703,5 +703,15 @@
       "Zimbra",
       "Kaspersky Security Center"
     ]
+  },
+  "recherche_it_revue_humaine": {
+    "actif": true,
+    "_aide": [
+      "Signaler pour REVUE HUMAINE des offres de recherche rémunérées rattachées à l’informatique (ou exigeant un diplôme informatique), même sous les seuils normaux.",
+      "Ne pas assimiler cette voie à une possibilité de doctorat : celle-ci doit être annoncée explicitement.",
+      "Le candidat peut ne pas posséder les connaissances spécialisées obligatoires, par exemple en Energieinformatik.",
+      "Exclusions existantes (postdoc, doctorat déjà exigé, langue C1 obligatoire, Ausbildung, hors zone / hors profil) conservées.",
+      "L’alerte dépend de la vérification de la fiche individuelle ; pas de notification sur une page générale de laboratoire."
+    ]
   }
 }

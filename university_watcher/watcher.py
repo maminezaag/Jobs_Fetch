@@ -533,6 +533,13 @@ def exclure(titre, texte):
         return "formation/stage/emploi étudiant"
     if re.search(r"(?:abgeschlossen[ea-z]*|erfolgreich abgeschlossen[ea-z]*|bereits erworben[ea-z]*)\s+(?:wissenschaftlich[ea-z]*\s+)?(?:promotion|doktorgrad)", s):
         return "doctorat déjà obtenu exigé"
+    # Les annonces peuvent écrire « Master und Promotion » comme deux
+    # qualifications obligatoires, sans « abgeschlossene Promotion ».
+    m_prerequis = re.search(r"(?:ihr profil|einstellungsvoraussetzungen|voraussetzungen|requirements)(.{0,900})", s)
+    if m_prerequis and re.search(
+            r"(?:master|diplom|hochschulabschluss).{0,65}\bund\s+(?:eine\s+)?promotion\b",
+            m_prerequis.group(1)):
+        return "doctorat déjà obtenu exigé"
     if re.search(r"\b(?:postdoc|post-doc|postdoctoral|post-doctoral|postdoktorand\w*)\b", titre.casefold()):
         return "postdoctorat"
     for niveau in ("c1", "c2"):
@@ -606,6 +613,71 @@ def poste_it_elargi_a_examiner(titre, description, cfg):
     if total < regles.get('minimum_competences_description', 3):
         return False, ''
     return True, ', '.join(n for n, _ in preuves[:4])
+
+
+
+def recherche_it_revue_humaine(titre, description, cfg):
+    """Alerte de découverte pour recherche IT rémunérée, sans score minimum.
+
+    Ne prétend NI que le candidat remplit les exigences obligatoires NI que
+    la fiche offre une possibilité de Promotion. La description intégrale
+    doit être vérifiée par le circuit général avant notification.
+    """
+    regles = cfg.get('recherche_it_revue_humaine', {})
+    if not regles.get('actif', False):
+        return False, ''
+    titre_normalise = normaliser(titre)
+    if not re.search(r'(?:wissenschaftlich.{0,18}mitarbeiter|'
+                 r'research (?:associate|assistant|fellow|scientist)|'
+                 r'doktorand|doctoral researcher|phd researcher)', titre_normalise, re.I):
+        return False, ''
+    texte = normaliser(description)
+    # Ne pas interpréter le texte institutionnel générique au pied des pages
+    # comme une preuve de pertinence de la fiche elle-même.
+    en_tete = texte[:1100]
+    infos_profil = re.search(
+        r'(?:ihr profil|voraussetzungen|einstellungsvoraussetzungen|requirements)'
+        r'(.{0,950})', texte, re.I)
+    profil = infos_profil.group(1) if infos_profil else ''
+    departement_it = re.search(
+        r'(?:department (?:für|of) informatik|'
+        r'fachbereich\s*3\s*[-–:]?\s*mathematik\s*/\s*informatik|'
+        r'institut (?:für|of) informatik|'
+        r'fakultät\s*ii\b.{0,85}informatik|'
+        r'department of computer science|faculty of computer science)',
+        en_tete, re.I)
+    diplome_it = re.search(
+        r'(?:studium|master|diplom|degree|hochschulabschluss|university degree)'
+        r'.{0,140}(?:wirtschaftsinformatik|informatik|computer science|'
+        r'information systems|software engineering)', profil, re.I)
+    theme_it_titre = re.search(
+        r'(?:wirtschaftsinformatik|informatik|computer[- ]science|'
+        r'cybersecurity|it[- ]sicherheit|software|cloud|iot|'
+        r'information systems|digitalisierte energiesysteme|'
+        r'verteilte systeme|automatisierung|computing|'
+        r'human[- ]computer interaction|trustworthy ai)',
+        titre_normalise, re.I)
+    if not (departement_it or diplome_it or theme_it_titre):
+        return False, ''
+    # Le signal salarial doit venir de la fiche, et non d'une invitation
+    # générale de laboratoire ou de la description d'une bourse non salariée.
+    remuneration = re.search(
+        r'(?:\bvergütung\b.{0,60}\b(?:e|eg)\s*\d{1,2}\b|'
+        r'\bentgelt(?:-\s*/\s*besoldungs)?gruppe\s*(?:e|eg)?\s*\d{1,2}\b|'
+        r'\b(?:e|eg)\s*\d{1,2}\s*tv[- ]?l\b|'
+        r'\btv[- ]?l\b.{0,35}\b(?:e|eg)\s*\d{1,2}\b)',
+        texte[:1800], re.I)
+    if not remuneration:
+        return False, ''
+    indices = []
+    if departement_it:
+        indices.append('département / faculté informatique')
+    if diplome_it:
+        indices.append('diplôme informatique cité dans les exigences')
+    if theme_it_titre:
+        indices.append('thème informatique dans le titre')
+    return True, ', '.join(indices)
+
 
 
 def points_competence(groupe, texte):
@@ -779,7 +851,29 @@ def noter(o, cfg):
         priorite = 'A_EXAMINER'
     else:
         it_elargi = False
+    # Voie supplémentaire : poste de recherche rémunéré dans un domaine
+    # informatique, même si le score est faible et sans Promotion annoncée.
+    recherche_it, preuve_recherche_it = recherche_it_revue_humaine(o.titre, o.texte, cfg)
+    recherche_it = bool(recherche_it and valide and
+                        adequation['action'] != 'HORS_PROFIL' and
+                        not primaire and not promotion_a_examiner and not it_elargi)
+    if recherche_it:
+        secondaire = True
+        priorite = 'RECHERCHE_IT_A_VERIFIER'
     motifs = []
+    if recherche_it:
+        motifs.append('RECOMMANDATION : vérification humaine de la recherche IT rémunérée (' +
+                      preuve_recherche_it +
+                      ') ; les connaissances spécialisées obligatoires peuvent manquer ; '
+                      'possibilité de doctorat NON confirmée')
+        # Mettre en évidence un prérequis obligatoire signalé par l'annonce.
+        obligation = re.search(
+            r'[^.!?]{0,160}(?:nachweislich\s+vorkenntnisse|'
+            r'vorkenntnisse[^.!?]{0,100}erforderlich)[^.!?]{0,110}',
+            normaliser(o.texte), re.I)
+        if obligation:
+            motifs.append('PRÉREQUIS OBLIGATOIRE À VÉRIFIER : ' +
+                          normaliser(obligation.group(0))[:250])
     if it_elargi:
         motifs.append('intitulé IT compatible ; compétences vérifiées dans les missions : ' + preuves_it +
                       ' ; contrôle humain des exigences obligatoires')
@@ -799,7 +893,7 @@ def noter(o, cfg):
             motifs.append(f"compétences {skills}/{cfg['minimum_competences']}")
         if score < cfg['seuil_total']:
             motifs.append(f"total {score}/{cfg['seuil_total']}")
-    if secondaire and not promotion_a_examiner:
+    if secondaire and not promotion_a_examiner and not recherche_it:
         motifs.append('alerte secondaire : vérification humaine recommandée')
     return {'score':score, 'skills':skills, 'lieu':lieu, 'contrat':contrat,
             'conditions':cond, 'localite':typ, 'categorie':classe(o.titre,o.texte),
@@ -959,16 +1053,21 @@ def emailer(resultats, destinataire, adresse, mot_de_passe, laboratoires=None):
     promotions = [(o,n) for o,n in resultats if n['priorite'] == 'PROMOTION_A_EXAMINER']
     principaux = [(o,n) for o,n in resultats if n['priorite'] == 'PRIORITAIRE']
     secondaires = [(o,n) for o,n in resultats if n['priorite'] == 'A_EXAMINER']
+    recherches_it = [(o,n) for o,n in resultats if n['priorite'] == 'RECHERCHE_IT_A_VERIFIER']
     msg['Subject'] = (f'University Watcher : {len(principaux)} prioritaires, '
                       f'{len(secondaires)} à examiner' +
                       (f', {len(promotions)} promotions rémunérées à examiner' if promotions else '') +
+                      (f', {len(recherches_it)} recherches IT à vérifier' if recherches_it else '') +
                       (f', {len(laboratoires)} pages de laboratoires' if laboratoires else ''))
     msg['From'] = adresse
     msg['To'] = destinataire
     lines = ['Offres universitaires — vérification humaine indispensable.',
-             "Une alerte doctorale n'atteste PAS que tu remplis les prérequis.", '']
+             "Une alerte doctorale n'atteste PAS que tu remplis les prérequis.",
+             "Les postes « RECHERCHE IT À VÉRIFIER » peuvent exiger des connaissances "
+             "spécialisées ABSENTES de ton profil ; ils n'offrent pas nécessairement une Promotion.", '']
     groupes = [
         ('PROMOTIONSSTELLEN RÉMUNÉRÉES — À EXAMINER (sans seuil technique)', promotions),
+        ('RECHERCHE INFORMATIQUE RÉMUNÉRÉE — VÉRIFICATION HUMAINE RECOMMANDÉE', recherches_it),
         ('AUTRES PRIORITAIRES (60/100 ET 20/55)', principaux),
         ('AUTRES À EXAMINER (55/100 ET 10/55)', secondaires),
     ]
@@ -1064,10 +1163,10 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({'algorithme': 'v7.4-promotion-remuneree-pertinence-domaine', **{k: cfg.get(k) for k in (
+    regles = empreinte({'algorithme': 'v7.5-recherche-it-revue-humaine', **{k: cfg.get(k) for k in (
         'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
         'alerte_secondaire', 'bonus_specialite', 'adequation_v7',
-        'promotion_remuneree')}})
+        'promotion_remuneree', 'intitules_it_elargis', 'recherche_it_revue_humaine')}})
     if actualiser:
         if offre.url.split('#')[0] == src['url'].split('#')[0]:
             offre.detail_erreur = 'Le lien renvoie à la liste des annonces'
@@ -1209,7 +1308,8 @@ def main():
              pages_lab_verifiees, len(alertes_lab), len(erreurs_lab))
 
     # Pour ne pas perdre une Promotionsstelle dans la limite max_offres_email.
-    ordre = {'PROMOTION_A_EXAMINER': 3, 'PRIORITAIRE': 2, 'A_EXAMINER': 1}
+    ordre = {'PROMOTION_A_EXAMINER': 4, 'PRIORITAIRE': 3,
+             'RECHERCHE_IT_A_VERIFIER': 2, 'A_EXAMINER': 1}
     qualifiees.sort(key=lambda x: (ordre.get(x[1]['priorite'], 0), x[1]['score'], x[1]['skills']), reverse=True)
     nombre = min(len(qualifiees), cfg['max_offres_email'])
     alertes_lab = alertes_lab[:max(0, int(cfg.get('pages_laboratoires', {}).get('max_alertes_email', 10)))]
@@ -1218,7 +1318,7 @@ def main():
              stats['nouveaux critères : re-scoring du cache'])
     log.info('%d offres à notifier (%d prioritaires, %d secondaires), %d dans e-mail ; %d source(s)/fiche(s) en échec ; %d fiche(s) incomplète(s)',
              len(qualifiees), sum(n['priorite']=='PRIORITAIRE' for _,n in qualifiees),
-             sum(n['priorite'] in ('A_EXAMINER','PROMOTION_A_EXAMINER') for _,n in qualifiees),
+             sum(n['priorite'] in ('A_EXAMINER','PROMOTION_A_EXAMINER','RECHERCHE_IT_A_VERIFIER') for _,n in qualifiees),
              nombre, len(erreurs), len(incompletes))
     if incompletes:
         log.warning('Attention: %d fiches sans texte complet. Vérifier DETAIL NON VERIFIE.', len(incompletes))
