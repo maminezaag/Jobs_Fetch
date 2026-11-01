@@ -11,7 +11,8 @@
     "Les exigences C1/B2 sont prises en compte pour la langue allemande, et non pour l'anglais ou le français.",
     "Les annonces avec français doivent aussi concerner le support, les systèmes, les opérations ou l'infrastructure IT et être en Allemagne.",
     "La priorité métier affichée dans l'email est indépendante du score : Très adapté / Adapté / À examiner.",
-    "Les doublons d'annonces BA ayant plusieurs références sont écartés avec prudence sans modifier les références historiques."
+    "Les doublons d'annonces BA ayant plusieurs références sont écartés avec prudence sans modifier les références historiques.",
+    "Les spécialités Virtualisierung/VMware, Citrix, Storage/Backup peuvent bénéficier du bonus métier, sans baisser le seuil général."
   ],
   "recherche": {
     "_aide": "Mots-clés de recherche envoyés à l'API Jobsuche dans toute l'Allemagne.",
@@ -41,7 +42,16 @@
       "Windows Systemadministrator",
       "IT Operations Engineer",
       "IT-Betrieb",
-      "2nd Level Support"
+      "2nd Level Support",
+      "VMware Administrator",
+      "VMware Specialist",
+      "Virtualisierung VMware",
+      "Citrix Administrator",
+      "Citrix Infrastruktur",
+      "Storage Administrator",
+      "Storage Backup",
+      "Backup Administrator",
+      "IT-Anwendungsbetreuer"
     ],
     "lieu_reference": {
       "_aide": "Centre-ville utilisé pour le calcul de distance.",
@@ -573,7 +583,7 @@
       ]
     },
     "titres_prioritaires": {
-      "_aide": "Priorité aux intitulés directement adaptés au profil IT, même si la description est courte. Les titres ambigus ont besoin d'au moins 4 points de technologies IT. Le seuil spécial est dans config.yaml.",
+      "_aide": "Les intitulés cœur IT ont un bonus métier. Les spécialités de virtualisation, Citrix et stockage/sauvegarde sont reconnues même avec une description courte ; les intitulés génériques exigent une preuve technique. IT-Anwendungsbetreuer reste conditionnel aux compétences IT détectées.",
       "actif": true,
       "bonus_fort": 5,
       "bonus_ambigu": 3,
@@ -610,8 +620,111 @@
         "Technical Operations",
         "DevOps Engineer",
         "Infrastructure Administrator",
-        "Systemtechniker"
-      ]
+        "Systemtechniker",
+        "IT-Anwendungsbetreuer",
+        "IT Anwendungsbetreuer",
+        "Application Administrator"
+      ],
+      "specialites_infrastructure": {
+        "_aide": [
+          "Liste ciblée : pas de bonus universel pour les mots Engineer, Specialist, Support.",
+          "Les titres explicitement IT sont reconnus avec le bonus métier de +5.",
+          "Les titres plus génériques exigent au moins 3 points techniques OU un terme IT dans le titre.",
+          "Les exclusions de zone, télétravail et allemand C1 demeurent prioritaires."
+        ],
+        "actif": true,
+        "bonus": 5,
+        "min_points_tech": 3,
+        "titres_explicites": [
+          "VMware Administrator",
+          "VMware Specialist",
+          "VMware Engineer",
+          "vSphere Administrator",
+          "ESXi Administrator",
+          "Citrix Administrator",
+          "Citrix Engineer",
+          "Citrix-Infrastruktur",
+          "Citrix Infrastruktur",
+          "Citrix Infrastructure",
+          "Nutanix Administrator",
+          "Nutanix Engineer",
+          "Storage & Backup",
+          "Storage and Backup",
+          "Storage und Backup",
+          "Storage-Backup",
+          "Storage Administrator",
+          "Storage Engineer",
+          "Backup Administrator",
+          "Backup Engineer",
+          "Veeam Administrator",
+          "NetApp Administrator",
+          "Datensicherung Administrator",
+          "Backup-Administrator"
+        ],
+        "titres_a_confirmer": [
+          "Virtualisierung",
+          "Virtualization",
+          "Storage Specialist",
+          "Backup Specialist",
+          "Virtualization Specialist",
+          "Virtualisierungs-Spezialist",
+          "IT-Speicherinfrastruktur"
+        ],
+        "indices_titre_it": [
+          "VMware",
+          "vSphere",
+          "ESXi",
+          "Citrix",
+          "Nutanix",
+          "Veeam",
+          "NetApp",
+          "Linux",
+          "Windows Server",
+          "IT-Infrastruktur",
+          "Rechenzentrum",
+          "Datacenter",
+          "SAN",
+          "NAS"
+        ]
+      },
+      "anwendungsbetreuung": {
+        "_aide": "Bonus conditionnel à des tâches ou systèmes informatiques identifiables, sans accepter automatiquement tous les postes Anwendungsbetreuer.",
+        "actif": true,
+        "bonus": 5,
+        "min_points_tech": 4,
+        "titres": [
+          "IT-Anwendungsbetreuer",
+          "IT Anwendungsbetreuer"
+        ],
+        "indices_titre": [
+          "IT-Systeme",
+          "IT-Anwendungen",
+          "IT-Infrastruktur",
+          "Client-Server",
+          "IT-Systembetrieb",
+          "Anwendungsadministration",
+          "Softwarebetrieb",
+          "IT-Systembetreuung"
+        ],
+        "indices_description": [
+          "IT-Systeme",
+          "IT-Systemen",
+          "IT-Anwendungen",
+          "Windows Server",
+          "Active Directory",
+          "Linux",
+          "Systemadministration",
+          "Anwendungsadministration",
+          "Softwareinstallation",
+          "Softwarebetrieb",
+          "IT-Infrastruktur",
+          "Schnittstellenverwaltung",
+          "Applikationsbetrieb",
+          "Serververwaltung",
+          "Fehleranalyse",
+          "Konfiguration von Anwendungen"
+        ]
+      }
     }
   },
   "priorites_metier": {
@@ -648,7 +761,24 @@
       "Infrastructure Engineer",
       "Infrastrukturadministrator",
       "Netzwerk Ingenieur",
-      "Netzwerkingenieur"
+      "Netzwerkingenieur",
+      "VMware Administrator",
+      "VMware Specialist",
+      "VMware Engineer",
+      "Virtualisierung",
+      "Virtualization",
+      "Citrix Administrator",
+      "Citrix-Infrastruktur",
+      "Citrix Infrastruktur",
+      "Citrix Engineer",
+      "Nutanix Administrator",
+      "Storage & Backup",
+      "Storage Administrator",
+      "Storage Engineer",
+      "Backup Administrator",
+      "Backup Engineer",
+      "Veeam Administrator",
+      "NetApp Administrator"
     ],
     "adapte": [
       "IT Support",
@@ -683,7 +813,10 @@
       "Support Engineer",
       "Technical Consultant",
       "Microsoft 365 Consultant",
-      "SAP Basis Administrator"
+      "SAP Basis Administrator",
+      "IT-Anwendungsbetreuer",
+      "IT Anwendungsbetreuer",
+      "Application Administrator"
     ]
   }
 }

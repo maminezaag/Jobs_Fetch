@@ -698,6 +698,39 @@ def _adequation_titre(job: JobResult, crit: dict[str, Any], points_techniques: i
     ambigus = regle.get("mots_avec_competence", [])
     if any(_expression_presente(mot, titre) for mot in fortes):
         return max(0, int(regle.get("bonus_fort", 5))), True
+
+    # Virtualisation, Citrix et stockage/sauvegarde : des métiers explicitement
+    # adaptés qui peuvent être peu détaillés dans les annonces de la BA.
+    # Ne pas accorder ce bonus à un simple terme générique dans un domaine non IT.
+    specialites = regle.get("specialites_infrastructure", {}) or {}
+    if specialites.get("actif", False):
+        directs = specialites.get("titres_explicites", []) or []
+        contextuels = specialites.get("titres_a_confirmer", []) or []
+        if any(_expression_presente(mot, titre) for mot in directs):
+            return max(0, int(specialites.get("bonus", 5))), True
+        if any(_expression_presente(mot, titre) for mot in contextuels):
+            preuve_titre = any(_expression_presente(mot, titre)
+                               for mot in specialites.get("indices_titre_it", []))
+            preuve_description = points_techniques >= int(specialites.get("min_points_tech", 3))
+            if preuve_titre or preuve_description:
+                return max(0, int(specialites.get("bonus", 5))), True
+
+    # IT-Anwendungsbetreuer : le titre est IT, mais les missions peuvent être
+    # purement fonctionnelles. Accorder le bonus seulement si le contexte
+    # confirme des systèmes / applications / tâches techniques.
+    applications = regle.get("anwendungsbetreuung", {}) or {}
+    if applications.get("actif", False) and any(
+        _expression_presente(mot, titre)
+        for mot in applications.get("titres", [])
+    ):
+        confirme_titre = any(_expression_presente(mot, titre)
+                            for mot in applications.get("indices_titre", []))
+        confirme_description = any(_expression_presente(mot, job.description)
+                                  for mot in applications.get("indices_description", []))
+        if confirme_titre or confirme_description or points_techniques >= int(
+                applications.get("min_points_tech", 4)):
+            return max(0, int(applications.get("bonus", 5))), True
+
     # Un « System Engineer » hors informatique avec zéro compétence IT ne
     # doit pas gagner artificiellement la priorité métier.
     if points_techniques >= 4 and any(_expression_presente(mot, titre) for mot in ambigus):
