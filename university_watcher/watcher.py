@@ -79,7 +79,10 @@ class Collecteur:
         self.last_request = 0.0
         self.robots = {}
 
-    def get(self, url):
+    def get(self, url, *, timeout=None):
+        # Le délai personnalisé est réservé aux contrôles des laboratoires ;
+        # les collecteurs d'offres officielles gardent leur fonctionnement.
+        timeout = TIMEOUT if timeout is None else timeout
         u = urlparse(url)
         if u.scheme not in {"http", "https"}:
             raise RuntimeError("URL non HTTP(S)")
@@ -87,7 +90,7 @@ class Collecteur:
         if host not in self.robots:
             rp = RobotFileParser()
             try:
-                res = self.session.get(host + "/robots.txt", timeout=TIMEOUT)
+                res = self.session.get(host + "/robots.txt", timeout=timeout)
                 if res.status_code == 200:
                     rp.parse(res.text.splitlines())
                     self.robots[host] = rp
@@ -102,12 +105,41 @@ class Collecteur:
             raise RuntimeError(f"Collecte interdite par robots.txt : {url}")
         pause = float(self.config.get("delai_requetes_secondes", 1.5))
         time.sleep(max(0, pause - (time.monotonic() - self.last_request)))
-        resp = self.session.get(url, timeout=TIMEOUT)
+        resp = self.session.get(url, timeout=timeout)
         self.last_request = time.monotonic()
         resp.raise_for_status()
         if len(resp.content) > 5_000_000:
             raise RuntimeError("Document supérieur à 5 Mo")
         return resp
+
+    def get_laboratoire(self, url):
+        """Relance une requête de laboratoire seulement en cas d'erreur transitoire.
+
+        Le contrôle robots.txt et la vérification SSL restent obligatoires.
+        On n'ignore jamais une interdiction, un 403 ou une erreur de certificat.
+        """
+        section = self.config.get('pages_laboratoires', {})
+        timeout = min(60, max(TIMEOUT, float(section.get('timeout_secondes', 35))))
+        essais = min(2, max(0, int(section.get('reessais_erreurs_transitoires', 1))))
+        pause = min(15, max(0, float(section.get('pause_reessai_secondes', 2))))
+        for numero in range(essais + 1):
+            try:
+                return self.get(url, timeout=timeout)
+            except (requests.RequestException, RuntimeError) as exc:
+                erreur = str(exc).casefold()
+                # Erreurs de certificat, interdictions robots.txt et 4xx ordinaires
+                # ne doivent JAMAIS être contournées par une autre méthode.
+                transitoire = bool(re.search(
+                    r'timed?\s*out|timeout|\b(?:408|429|500|502|503|504)\b|'
+                    r'connection (?:reset|aborted|refused|broken)|'
+                    r'remote end closed|temporar(?:y|ily)', erreur))
+                if ('ssl' in erreur or 'certificate' in erreur or
+                        'collecte interdite' in erreur or not transitoire or
+                        numero >= essais):
+                    raise
+                log.warning('LAB requête temporairement indisponible : %s ; '
+                            'nouvelle tentative %d/%d', url, numero + 1, essais)
+                time.sleep(pause)
 
     def page_text(self, url):
         resp = self.get(url)
@@ -773,7 +805,9 @@ def analyser_pages_laboratoires(collector, cfg, cache, selection_sources=None):
         url = conf['url']
         nom = conf['nom']
         try:
-            response = collector.get(url)
+            # Les faux collecteurs des tests peuvent exposer uniquement get().
+            lecteur = getattr(collector, 'get_laboratoire', None) or collector.get
+            response = lecteur(url)
             if 'pdf' in response.headers.get('Content-Type', '').lower():
                 raise RuntimeError('format PDF non pris en charge dans la veille des pages')
             extraits = extraits_recrutement_laboratoire(response.text)

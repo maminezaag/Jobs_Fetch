@@ -596,7 +596,8 @@
       "La première exécution signale aussi les invitations déjà publiées (une seule fois).",
       "Ne pas confondre invitation à candidater et poste salarié actuellement ouvert.",
       "Les notifications sont mémorisées dans analysed_university_jobs.json, sans créer de fichier supplémentaire.",
-      "Les pages non accessibles sont consignées, sans supprimer leur historique."
+      "Les pages non accessibles sont consignées, sans supprimer leur historique.",
+      "Un timeout ou HTTP 502 déclenche une unique nouvelle tentative, sans ignorer robots.txt ni désactiver SSL."
     ],
     "pages": [
       {
@@ -627,7 +628,7 @@
       {
         "source": "bremen",
         "nom": "AGRA – Rechnerarchitektur – Jobs",
-        "url": "https://www.riskom.uni-bremen.de/jobs.php?lang=de"
+        "url": "https://agra.informatik.uni-bremen.de/jobs.php?lang=de"
       },
       {
         "source": "bremen",
@@ -642,12 +643,12 @@
       {
         "source": "jade",
         "nom": "Jade Hochschule – Kooperative Promotion",
-        "url": "https://m.jade-hs.de/forschen-kooperieren/forschen/promovieren/"
+        "url": "https://www.jade-hs.de/forschen-kooperieren/forschen/promovieren/"
       },
       {
         "source": "jade",
         "nom": "Jade Hochschule – KI in Forschung und Transfer",
-        "url": "https://m.jade-hs.de/kuenstliche-intelligenz/ki-in-forschung-transfer/"
+        "url": "https://www.jade-hs.de/kuenstliche-intelligenz/ki-in-forschung-transfer/"
       },
       {
         "source": "emden",
@@ -659,6 +660,9 @@
         "nom": "Emden/Leer – Industrielle Informatik",
         "url": "https://www.hs-emden-leer.de/forschung/forschungsprofil/forschungsschwerpunkte/schwerpunkte/industrielle-informatik"
       }
-    ]
+    ],
+    "timeout_secondes": 35,
+    "reessais_erreurs_transitoires": 1,
+    "pause_reessai_secondes": 2
   }
 }
