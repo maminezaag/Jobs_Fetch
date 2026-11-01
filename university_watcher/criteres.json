@@ -587,5 +587,78 @@
       "Si la rémunération est absente ou non explicite, ne PAS faire passer l'offre par ce circuit.",
       "La fiche individuelle doit avoir été effectivement vérifiée avant alerte."
     ]
+  },
+  "pages_laboratoires": {
+    "active": true,
+    "max_alertes_email": 10,
+    "_aide": [
+      "Liste fixe, sans découverte automatique, consultée à chaque exécution.",
+      "La première exécution signale aussi les invitations déjà publiées (une seule fois).",
+      "Ne pas confondre invitation à candidater et poste salarié actuellement ouvert.",
+      "Les notifications sont mémorisées dans analysed_university_jobs.json, sans créer de fichier supplémentaire.",
+      "Les pages non accessibles sont consignées, sans supprimer leur historique."
+    ],
+    "pages": [
+      {
+        "source": "oldenburg",
+        "nom": "SSI – Safety-Security-Interaction – Stellenausschreibungen",
+        "url": "https://uol.de/informatik/ssi/stellenausschreibungen"
+      },
+      {
+        "source": "oldenburg",
+        "nom": "Informatik – Abteilungen und Einrichtungen",
+        "url": "https://uol.de/informatik/department/abteilungen-und-einrichtungen"
+      },
+      {
+        "source": "oldenburg",
+        "nom": "Systemsoftware und verteilte Systeme",
+        "url": "https://uol.de/svs"
+      },
+      {
+        "source": "oldenburg",
+        "nom": "Informationssysteme",
+        "url": "https://uol.de/is"
+      },
+      {
+        "source": "oldenburg",
+        "nom": "Softwaretechnik",
+        "url": "https://uol.de/se"
+      },
+      {
+        "source": "bremen",
+        "nom": "AGRA – Rechnerarchitektur – Jobs",
+        "url": "https://www.riskom.uni-bremen.de/jobs.php?lang=de"
+      },
+      {
+        "source": "bremen",
+        "nom": "FB3 Informatik – Arbeitsgruppen",
+        "url": "https://www.uni-bremen.de/fb3/forschung/informatik/arbeitsgruppen/"
+      },
+      {
+        "source": "bremen",
+        "nom": "Betriebssysteme und verteilte Systeme",
+        "url": "https://www.uni-bremen.de/agbs/"
+      },
+      {
+        "source": "jade",
+        "nom": "Jade Hochschule – Kooperative Promotion",
+        "url": "https://m.jade-hs.de/forschen-kooperieren/forschen/promovieren/"
+      },
+      {
+        "source": "jade",
+        "nom": "Jade Hochschule – KI in Forschung und Transfer",
+        "url": "https://m.jade-hs.de/kuenstliche-intelligenz/ki-in-forschung-transfer/"
+      },
+      {
+        "source": "emden",
+        "nom": "Emden/Leer – Labor IT-Sicherheit",
+        "url": "https://www.hs-emden-leer.de/studierende/fachbereiche/technik/labore-im-fachbereich-technik/labor-it-sicherheit"
+      },
+      {
+        "source": "emden",
+        "nom": "Emden/Leer – Industrielle Informatik",
+        "url": "https://www.hs-emden-leer.de/forschung/forschungsprofil/forschungsschwerpunkte/schwerpunkte/industrielle-informatik"
+      }
+    ]
   }
 }

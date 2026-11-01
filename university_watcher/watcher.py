@@ -673,15 +673,146 @@ def decision_apres_verification(offre, note):
     return note
 
 
-def emailer(resultats, destinataire, adresse, mot_de_passe):
+# --- Surveillance complémentaire des pages publiques de laboratoires ---
+# Une page de laboratoire n'est PAS automatiquement une offre d'emploi :
+# elle est consultée, puis seuls les appels explicites à candidatures sont signalés.
+
+def extraits_recrutement_laboratoire(html_source):
+    """Renvoie les passages de recrutement, en ignorant menus et pages d'information.
+
+    Ne classe pas un programme de bourses ou une page de formation doctorale
+    comme emploi rémunéré ; l'existence d'un salaire est vérifiée séparément.
+    """
+    soup = BeautifulSoup(html_source, 'html.parser')
+    for el in soup.select('script, style, nav, footer, header, aside, form, noscript, '
+                          '.breadcrumb, .breadcrumbs, .sidebar, .menu, .navigation'):
+        el.decompose()
+    root = (soup.select_one('main') or soup.select_one('article') or
+            soup.select_one('#content') or soup.select_one('.main-content') or soup.body or soup)
+    blocs = []
+    # Ne pas inclure les menus/encarts, ni les titres isolés du type « Promotions ».
+    for el in root.select('p, li'):
+        contenu = normaliser(el.get_text(' ', strip=True))
+        if 45 <= len(contenu) <= 2800 and contenu not in blocs:
+            blocs.append(contenu)
+    # Quelques sites construisent leur contenu dans un seul bloc sans <p>.
+    if not blocs:
+        texte = normaliser(root.get_text(' ', strip=True))
+        if 80 < len(texte) <= 2000:
+            blocs = [texte]
+    passage_total = ' '.join(blocs).casefold()
+    extraits = []
+    for bloc in blocs:
+        t = bloc.casefold()
+        # Un véritable poste doctoral ouvert aux débutants, ou un recrutement
+        # explicite pour une activité scientifique avec possibilité de thèse.
+        promo = bool(re.search(
+            r'promotionsstelle|promotionsmöglichkeit|promotionsperspektive|'
+            r'promotion.{0,60}(?:interessiert|interesse|möglich|gegeben)|'
+            r'(?:doktorand|doctoral researcher|phd position|phd candidate)', t, re.I))
+        embauche = bool(re.search(
+            r'wir suchen|gesucht|zu besetzen|stellenangebot|stellenausschreibung|'
+            r'offene stelle|vacanc(?:y|ies)|we are hiring|we are looking for|'
+            r'bewerben sie sich|bewerbungen.{0,65}(?:willkommen|gerne gesehen)|'
+            r'initiativbewerbung', t, re.I))
+        poste_recherche = bool(re.search(
+            r'wissenschaftlich.{0,25}mitarbeit|research (?:associate|assistant|fellow)|'
+            r'phd position|doctoral researcher|promotionsstelle', t, re.I))
+        # Certaines pages (Jade) décrivent des modalités de bourses, sans
+        # publier d'appel à candidatures ; jamais d'alerte sur cette seule base.
+        if not (embauche and (promo or poste_recherche)):
+            continue
+        if re.search(r'postdoc|postdoctoral|post-doc|habilitation', t, re.I) and not re.search(
+                r'promotionsstelle|doktorand|phd position|promotionsmöglichkeit|promotion.{0,45}interessiert', t):
+            continue
+        if re.search(r'studentische hilfskr[aä]fte|student assistants?', t) and not (promo or poste_recherche):
+            continue
+        # Pour les candidatures spontanées, une invitation générale dans une
+        # AG d'informatique est recevable si elle évoque la carrière scientifique.
+        if 'initiativbewerbung' in t and not (promo or poste_recherche):
+            if re.search(r'promotion|wissenschaftlich|academic career', passage_total):
+                extraits.append(bloc)
+        else:
+            extraits.append(bloc)
+    # Cas AGRA : annonce « eine Stelle ... zu besetzen » suivie dans le
+    # paragraphe suivant de « Die Möglichkeit zur Promotion ist gegeben ».
+    # Déjà détecté comme poste de recherche ; conserver l'extrait le plus précis.
+    return extraits[:4]
+
+
+def statut_laboratoire(extraits):
+    """Aucune preuve de salaire = financement NON confirmé."""
+    texte = ' '.join(extraits).casefold()
+    preuve_paie = re.search(
+        r'(?:e|eg)\s*13\s*tv[- ]?l|tv[- ]?l\s*(?:e|eg)\s*13|'
+        r'\b(?:bezahlte|vergütete|salaried) stelle\b|'
+        r'\barbeitsvertrag\b.{0,40}\bvergütung\b', texte)
+    if preuve_paie:
+        return 'Poste salarié annoncé — conditions et éligibilité à vérifier'
+    if re.search(r'stelle.{0,80}(?:wissenschaftlich|research)|wissenschaftlich.{0,40}stelle', texte):
+        return 'Poste scientifique évoqué — rémunération à confirmer'
+    return 'Invitation à candidater — aucune Stelle rémunérée confirmée'
+
+
+def analyser_pages_laboratoires(collector, cfg, cache, selection_sources=None):
+    """Vérifie CHAQUE page à chaque exécution, sans découverte automatique.
+
+    L'état est dans analysed_university_jobs.json, déjà commité par le workflow.
+    Un appel identique est signalé une fois ; nouvelle formulation / opportunité
+    de recrutement => nouvelle alerte. Échec HTTP => l'état reste intact.
+    """
+    section = cfg.get('pages_laboratoires', {})
+    if not section.get('active', False):
+        return [], [], 0
+    pages = cache.setdefault('pages_laboratoires', {})
+    alertes, erreurs, compte = [], [], 0
+    for conf in section.get('pages', []):
+        source = conf['source']
+        if selection_sources and source not in selection_sources:
+            continue
+        url = conf['url']
+        nom = conf['nom']
+        try:
+            response = collector.get(url)
+            if 'pdf' in response.headers.get('Content-Type', '').lower():
+                raise RuntimeError('format PDF non pris en charge dans la veille des pages')
+            extraits = extraits_recrutement_laboratoire(response.text)
+            compte += 1
+            identifiant = empreinte(url)[:20]
+            ancien = pages.get(identifiant, {})
+            signature = empreinte(extraits) if extraits else None
+            entree = dict(ancien)
+            entree.update({'url': url, 'nom': nom, 'source': source,
+                           'dernier_controle': date.today().isoformat(),
+                           'signature_contenu_utile': signature})
+            pages[identifiant] = entree
+            if not extraits:
+                log.info('LAB OK %s — aucun appel explicite détecté — %s', source, nom)
+            elif signature != ancien.get('derniere_signature_notifiee'):
+                alerte = {'id': identifiant, 'nom': nom, 'source': source, 'url': url,
+                          'passages': extraits, 'statut': statut_laboratoire(extraits),
+                          'signature': signature}
+                alertes.append(alerte)
+                log.info('LAB NOUVELLE OPPORTUNITÉ À EXAMINER %s — %s', source, nom)
+            else:
+                log.info('LAB DÉJÀ SIGNALÉ %s — %s', source, nom)
+        except Exception as exc:
+            log.warning('LAB NON VÉRIFIÉ %s — %s : %s', source, url, exc)
+            erreurs.append(f'laboratoire {nom}: {exc}')
+    return alertes, erreurs, compte
+
+
+def emailer(resultats, destinataire, adresse, mot_de_passe, laboratoires=None):
     """Un SEUL e-mail, avec les Promotionsstellen rémunérées bien séparées."""
+    laboratoires = laboratoires or []
     msg = EmailMessage()
     promotions = [(o,n) for o,n in resultats if n['priorite'] == 'PROMOTION_A_EXAMINER']
     principaux = [(o,n) for o,n in resultats if n['priorite'] == 'PRIORITAIRE']
     secondaires = [(o,n) for o,n in resultats if n['priorite'] == 'A_EXAMINER']
     msg['Subject'] = (f'University Watcher : {len(principaux)} prioritaires, '
                       f'{len(secondaires)} à examiner' +
-                      (f', {len(promotions)} promotions rémunérées à examiner' if promotions else ''))
+                      (f', {len(promotions)} promotions rémunérées à examiner' if promotions else '') +
+                      (f', {len(laboratoires)} pages de laboratoires' if laboratoires else ''))
     msg['From'] = adresse
     msg['To'] = destinataire
     lines = ['Offres universitaires — vérification humaine indispensable.',
@@ -710,7 +841,15 @@ def emailer(resultats, destinataire, adresse, mot_de_passe):
                           'Vérification : ' + note.get('adequation', {}).get('motif', ''),
                           'Raison(s) : ' + (' ; '.join(note['motifs']) or 'conditions de score remplies'),
                           f"Annonce : {o.url}", ''])
-    msg.set_content('\\n'.join(lines))
+    if laboratoires:
+        titre = 'PAGES DES LABORATOIRES — CONTACT OU POSTE À VÉRIFIER'
+        lines.extend([titre, '-' * len(titre),
+                      'Ce ne sont PAS nécessairement des emplois vacants ou rémunérés.', ''])
+        for lab in laboratoires:
+            lines.extend([lab['nom'] + ' (' + lab['source'] + ')', lab['statut'],
+                          'Extrait : ' + ' | '.join(lab['passages'])[:1100],
+                          'Page : ' + lab['url'], ''])
+    msg.set_content('\n'.join(lines))
     with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as smtp:
         smtp.login(adresse, mot_de_passe)
         smtp.send_message(msg)
@@ -908,10 +1047,22 @@ def main():
             log.error('Analyse impossible pour %s : %s', offre.url[:130], exc)
             erreurs.append(f'fiche {offre.source}: {exc}')
 
+    # Pages permanentes des laboratoires : consultation à CHAQUE exécution.
+    # Ce circuit est séparé de la notation et de l'historique des offres.
+    alertes_lab, erreurs_lab, pages_lab_verifiees = analyser_pages_laboratoires(
+        collector, cfg, cache, args.sources)
+    erreurs.extend(erreurs_lab)
+    if erreurs_lab:
+        print(f'::warning title=University Watcher - laboratoires::'
+              f'{len(erreurs_lab)} page(s) de laboratoires non vérifiée(s) ; consulter les logs.', flush=True)
+    log.info('LABS: %d pages vérifiées, %d nouvelle(s) invitation(s), %d page(s) inaccessible(s)',
+             pages_lab_verifiees, len(alertes_lab), len(erreurs_lab))
+
     # Pour ne pas perdre une Promotionsstelle dans la limite max_offres_email.
     ordre = {'PROMOTION_A_EXAMINER': 3, 'PRIORITAIRE': 2, 'A_EXAMINER': 1}
     qualifiees.sort(key=lambda x: (ordre.get(x[1]['priorite'], 0), x[1]['score'], x[1]['skills']), reverse=True)
     nombre = min(len(qualifiees), cfg['max_offres_email'])
+    alertes_lab = alertes_lab[:max(0, int(cfg.get('pages_laboratoires', {}).get('max_alertes_email', 10)))]
     log.info('CACHE: %d réutilisées, %d analyses téléchargées, %d re-notées sur critères modifiés',
              stats['cache réutilisé'], stats['analyse du détail'],
              stats['nouveaux critères : re-scoring du cache'])
@@ -925,6 +1076,8 @@ def main():
     if args.dry_run:
         for offre, note in qualifiees[:nombre]:
             print(f"{note['priorite']} {note['score']:>3}/100 [{offre.source}] {offre.titre}: {offre.url}")
+        for lab in alertes_lab:
+            print(f"LAB À EXAMINER [{lab['source']}] {lab['nom']}: {lab['url']}")
         compte_rendu_sources(sources_ok, sources_ko, erreurs)
         return 2 if not sources_ok else 0
 
@@ -940,7 +1093,7 @@ def main():
 
     # En cas d'échec de SMTP, conserver quand même les évaluations dans le cache
     # afin de pouvoir retenter l'e-mail au prochain passage sans re-télécharger.
-    if nombre:
+    if nombre or alertes_lab:
         secrets = ('GMAIL_ADDRESS', 'GMAIL_APP_PASSWORD', 'GMAIL_TO')
         if not all(os.getenv(k) for k in secrets):
             log.error('Secrets manquants : %s', ', '.join(k for k in secrets if not os.getenv(k)))
@@ -948,12 +1101,14 @@ def main():
             return 1
         try:
             emailer(qualifiees[:nombre], os.environ['GMAIL_TO'], os.environ['GMAIL_ADDRESS'],
-                    os.environ['GMAIL_APP_PASSWORD'])
+                    os.environ['GMAIL_APP_PASSWORD'], alertes_lab)
         except Exception:
             sauvegarder_json(historiques, cache)
             raise
         seen.update(offre.identifiant for offre, _ in qualifiees[:nombre])
-        log.info('Notification envoyée ; historique des notifications actualisé')
+        for lab in alertes_lab:
+            cache['pages_laboratoires'][lab['id']]['derniere_signature_notifiee'] = lab['signature']
+        log.info('Notification envoyée ; historique des notifications actualisé (offres et laboratoires)')
     sauvegarder_json(historiques, cache)
     sauvegarder_json(etat, sorted(seen))
     compte_rendu_sources(sources_ok, sources_ko, erreurs)
