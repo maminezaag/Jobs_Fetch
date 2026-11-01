@@ -173,6 +173,8 @@ class Collecteur:
         """
         soup = BeautifulSoup(self.get(src["url"]).text, "html.parser")
         offres = []
+        lignes_identifiees = 0
+        lignes_expirees = 0
         for row in soup.select("table tr"):
             cells = row.find_all(["td", "th"], recursive=False)
             if len(cells) < 3:
@@ -181,10 +183,12 @@ class Collecteur:
             # V 07/26, F&T 05/26 etc. (la regex originale ratait F&T).
             if not re.fullmatch(r"[A-Z]{1,6}(?:&[A-Z]{1,6})?\s+\d{1,3}/\d{2}", reference, re.I):
                 continue
+            lignes_identifiees += 1
             m = re.search(r"\b(\d{1,2}\.\d{1,2}\.\d{4})\b", txt(cells[2]))
             if m:
                 try:
                     if datetime.strptime(m.group(1), "%d.%m.%Y").date() < date.today():
+                        lignes_expirees += 1
                         log.info("jade: offre expirée écartée : %s (%s)", reference, m.group(1))
                         continue
                 except ValueError:
@@ -198,7 +202,27 @@ class Collecteur:
             titre = normaliser(txt(cells[1]))[:220]
             ville = ville_depuis_texte(txt(row), src["ville_defaut"])
             offres.append(Offre("jade", titre, link, ville, normaliser(txt(row))))
-        return offres
+        if offres:
+            return offres
+        # Zéro n'est fiable que si le portail confirme lui-même l'absence
+        # d'offres OU si des références ont bien été trouvées et toutes ont expiré.
+        # Ne jamais transformer une modification du HTML ou une erreur JS en « 0 ».
+        if lignes_identifiees and lignes_expirees == lignes_identifiees:
+            log.info("jade: %d annonce(s) reconnue(s), toutes expirées ; 0 offre active vérifiée", lignes_identifiees)
+            return []
+        texte_page = normaliser(txt(soup)).casefold()
+        absent = re.search(
+            r"(?:keine|derzeit keine|aktuell keine|zurzeit keine)\s+"
+            r"(?:offenen?\s+|aktuellen?\s+)?"
+            r"(?:stellenangebote|stellen|ausschreibungen|jobs)|"
+            r"(?:es sind|sind derzeit|sind aktuell)\s+keine\s+(?:stellen|stellenangebote)\s+(?:verf[uü]gbar|ausgeschrieben)",
+            texte_page, re.I)
+        if absent and re.search(r"tarifbesch[aä]ftigt|stellenangebot|stellen[a-z]*ausschreibung", texte_page, re.I):
+            log.info("jade: absence d'offres explicitement indiquée sur le portail ; 0 offre vérifiée")
+            return []
+        raise RuntimeError(
+            f"Jade: liste non vérifiable (références reconnues={lignes_identifiees}, "
+            f"expirées={lignes_expirees}); HTML possiblement modifié. Ne pas interpréter comme 0.")
 
     @staticmethod
     def coveto_offres_depuis_html(html_source, source_url):
@@ -329,7 +353,7 @@ class Collecteur:
         if cle not in methods:
             raise ValueError(f"Source inconnue: {cle}")
         items = methods[cle](src)
-        if not items and cle in {"oldenburg", "bremen", "jade"}:
+        if not items and cle in {"oldenburg", "bremen"}:
             raise RuntimeError("0 offre détectée sur un portail normalement actif : extraction à vérifier")
         return items
 
@@ -396,7 +420,7 @@ def exclure(titre, texte):
         return "formation/stage/emploi étudiant"
     if re.search(r"(?:abgeschlossen[ea-z]*|erfolgreich abgeschlossen[ea-z]*|bereits erworben[ea-z]*)\s+(?:wissenschaftlich[ea-z]*\s+)?(?:promotion|doktorgrad)", s):
         return "doctorat déjà obtenu exigé"
-    if re.search(r"\b(?:postdoc|post-doc|postdoktorand)\b", titre.casefold()):
+    if re.search(r"\b(?:postdoc|post-doc|postdoctoral|post-doctoral|postdoktorand\w*)\b", titre.casefold()):
         return "postdoctorat"
     for niveau in ("c1", "c2"):
         for match in niveau_associe_a_allemand(s, niveau):
@@ -516,6 +540,43 @@ def offre_promotion_remuneree(titre: str, description: str, regles: dict) -> tup
         r'digital|software|data|daten|technik)(?!\w)', nom, re.I)
     if hors_domaine_titre and not signal_it:
         return False, ''
+    # Filtre de pertinence pour une PREMIÈRE thèse en informatique.
+    # Le simple couple « Doktorand + TV-L » ne suffit pas : les annonces
+    # de biologie, droit, histoire, pédagogie, etc. doivent rester écartées.
+    # On n'attribue au candidat AUCUNE compétence ML sur cette base.
+    domaine_hors_it = re.search(
+        r'(?:biolog(?:ie|y|isch)|biochim|chemie|chemistry|paleocean|paläo|geo(?:chemie|logie)|'
+        r'geochemistry|isotope|rechtswissenschaft|\brechts?\b|law|jurist|'
+        r'pädagogik|didaktik|sportwissenschaft|religions|theolog|'
+        r'ophthalmolog|augenheilkunde|medizinisch|medical|'
+        r'linguistik|sprachwissenschaft|literaturwissenschaft|history|geschichte|'
+        r'politik|economic law|wirtschaftswissenschaft|business law)', nom, re.I)
+    domaine_informatique = re.search(
+        r'(?:informatik|computer[ -]science|computer[ -]interaction|'
+        r'information(?:s)?system|information technology|\bit[ -]sicherheit\b|'
+        r'cybersecurity|cybersicherheit|\bsecurity\b|'
+        r'\biot\b|internet of things|software|programmierung|'
+        r'trustworthy[ -]ai|artificial intelligence|künstliche intelligenz|'
+        r'machine learning|\bki[- ]forschung\b|\bbpmn?\b|'
+        r'cloud|linux|netzwerksicherheit|datenbanksystem|'
+        r'automatisierung|automatisierte systeme)', nom, re.I)
+    # Un domaine extérieur explicitement nommé ne devient pas IT sous prétexte
+    # qu'une discipline utilise également des données ou des logiciels.
+    if domaine_hors_it and not domaine_informatique:
+        return False, ''
+    if not domaine_informatique:
+        # Titres vagues : la fiche doit exiger EXPLICITEMENT un diplôme
+        # d'informatique / systèmes d'information, pas seulement parler de
+        # traitement de données dans les tâches générales.
+        master_it_obligatoire = re.search(
+            r'(?:einstellungsvoraussetzungen|ihr profil|anforderungsprofil|'
+            r'qualifications|requirements|vorausgesetzt|erforderlich)'
+            r'.{0,500}?(?:abgeschlossen\w* studium|hochschulabschluss|'
+            r'master(?:abschluss|studium| degree)?|degree in)'
+            r'.{0,140}?(?:informatik|computer science|information systems|'
+            r'wirtschaftsinformatik|it-sicherheit|cybersecurity)', texte, re.I)
+        if not master_it_obligatoire:
+            return False, ''
     # Indices salariaux vérifiables, plus stricts que le simple mot «funded»
     # (une bourse n'est pas forcément un contrat de travail).
     tvl_grade = re.search(
@@ -714,7 +775,7 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     entree.update({'url': offre.url, 'source': offre.source, 'titre': offre.titre,
                    'ville': offre.ville, 'signature_liste': signature_liste(offre),
                    'derniere_presence': aujourd_hui.isoformat()})
-    regles = empreinte({'algorithme': 'v7.3-promotion-remuneree', **{k: cfg.get(k) for k in (
+    regles = empreinte({'algorithme': 'v7.4-promotion-remuneree-pertinence-domaine', **{k: cfg.get(k) for k in (
         'competences', 'minimum_competences', 'seuil_total', 'plafond_competences',
         'alerte_secondaire', 'bonus_specialite', 'adequation_v7',
         'promotion_remuneree')}})
@@ -756,6 +817,37 @@ def analyser_une_offre(offre, collector, src, ancien, cfg, aujourd_hui=None):
     return note, entree, situation
 
 
+def compte_rendu_sources(sources_ok, sources_ko, erreurs):
+    """Signale explicitement les sources dégradées dans GitHub Actions.
+
+    Échec général seulement si TOUTES les sources sont en panne. Une panne
+    isolée ne doit plus rendre rouge un run qui a analysé les autres sources,
+    mais ne doit pas non plus être présentée comme une collecte complète.
+    """
+    if sources_ko:
+        message = "Sources non vérifiées : " + ", ".join(sources_ko)
+        log.warning("SURVEILLANCE PARTIELLE — %s", message)
+        # Annotation visible sur la page du run GitHub Actions, même en sortie 0.
+        print(f"::warning title=University Watcher - surveillance partielle::{message}", flush=True)
+    rapport = os.getenv('GITHUB_STEP_SUMMARY')
+    if rapport:
+        lignes = ["## University Watcher — bilan des sources", "",
+                  f"- Sources vérifiées : {', '.join(sources_ok) or 'aucune'}",
+                  f"- Sources non vérifiées : {', '.join(sources_ko) or 'aucune'}",
+                  ""]
+        if erreurs:
+            lignes.append("### Anomalies (une source non vérifiée n'est pas un résultat vide)")
+            lignes.extend("- " + str(e).replace('\n', ' ')[:300] for e in erreurs)
+        if sources_ko:
+            lignes.extend(["", "**Surveillance partielle.** Les sources non vérifiées doivent être réparées ; "
+                           "les autres offres ont été traitées."])
+        try:
+            with open(rapport, 'a', encoding='utf-8') as file:
+                file.write('\n'.join(lignes) + '\n')
+        except OSError as exc:
+            log.warning('Impossible de rédiger le résumé GitHub Actions : %s', exc)
+
+
 def main():
     ap = argparse.ArgumentParser(description='Offres universitaires : scoring + e-mail + cache')
     ap.add_argument('--dry-run', action='store_true', help='analyse sans envoyer ni enregistrer')
@@ -768,11 +860,14 @@ def main():
     cache = charger_analyses(historiques)
     collector = Collecteur(cfg)
     offres, erreurs = {}, []
+    sources_ok = []
+    sources_ko = []
     for key, src in cfg['sources'].items():
         if args.sources and key not in args.sources:
             continue
         try:
             items = collector.collect(key, src)
+            sources_ok.append(key)
             log.info('%s: %d offres brutes', key, len(items))
             for item in items:
                 if not item.url.startswith('http'):
@@ -781,8 +876,9 @@ def main():
                     continue
                 offres[item.identifiant] = (item, src)
         except Exception as exc:
-            log.error('Source %s non analysée : %s', key, exc)
+            log.warning('Source %s NON VÉRIFIÉE : %s', key, exc)
             erreurs.append(f'{key}: {exc}')
+            sources_ko.append(key)
 
     qualifiees = []
     stats = {'cache réutilisé': 0, 'analyse du détail': 0,
@@ -829,9 +925,8 @@ def main():
     if args.dry_run:
         for offre, note in qualifiees[:nombre]:
             print(f"{note['priorite']} {note['score']:>3}/100 [{offre.source}] {offre.titre}: {offre.url}")
-        if erreurs:
-            return 2
-        return 0
+        compte_rendu_sources(sources_ok, sources_ko, erreurs)
+        return 2 if not sources_ok else 0
 
     # Garder le cache pour 90 jours après disparition des annonces.
     limite = date.today() - timedelta(days=90)
@@ -861,8 +956,9 @@ def main():
         log.info('Notification envoyée ; historique des notifications actualisé')
     sauvegarder_json(historiques, cache)
     sauvegarder_json(etat, sorted(seen))
-    if erreurs:
-        print('ATTENTION : sources non vérifiées : ' + ' | '.join(erreurs), file=sys.stderr)
+    compte_rendu_sources(sources_ok, sources_ko, erreurs)
+    if not sources_ok:
+        log.error('Aucune source vérifiée : échec global de la surveillance')
         return 2
     return 0
 
