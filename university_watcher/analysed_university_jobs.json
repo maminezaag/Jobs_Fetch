@@ -3552,5 +3552,57 @@
       "ville": "Oldenburg"
     }
   },
+  "pages_laboratoires": {
+    "6891c8aca78567dfa124": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Systemsoftware und verteilte Systeme",
+      "signature_contenu_utile": null,
+      "source": "oldenburg",
+      "url": "https://uol.de/svs"
+    },
+    "9bc245230d1ab20f3dcd": {
+      "dernier_controle": "2026-11-01",
+      "nom": "FB3 Informatik – Arbeitsgruppen",
+      "signature_contenu_utile": null,
+      "source": "bremen",
+      "url": "https://www.uni-bremen.de/fb3/forschung/informatik/arbeitsgruppen/"
+    },
+    "a389b776d137ae47569a": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Informatik – Abteilungen und Einrichtungen",
+      "signature_contenu_utile": null,
+      "source": "oldenburg",
+      "url": "https://uol.de/informatik/department/abteilungen-und-einrichtungen"
+    },
+    "a70ef5c72a993b8fd48e": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Informationssysteme",
+      "signature_contenu_utile": null,
+      "source": "oldenburg",
+      "url": "https://uol.de/is"
+    },
+    "ace1565833c3d69c3566": {
+      "dernier_controle": "2026-11-01",
+      "derniere_signature_notifiee": "cb1da605dd424e6d2e8d624b71aee622898c25fff518bfb3e8edc3cde6336038",
+      "nom": "SSI – Safety-Security-Interaction – Stellenausschreibungen",
+      "signature_contenu_utile": "cb1da605dd424e6d2e8d624b71aee622898c25fff518bfb3e8edc3cde6336038",
+      "source": "oldenburg",
+      "url": "https://uol.de/informatik/ssi/stellenausschreibungen"
+    },
+    "ee364b81f6da920cfeab": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Softwaretechnik",
+      "signature_contenu_utile": null,
+      "source": "oldenburg",
+      "url": "https://uol.de/se"
+    },
+    "f4fdce1ac5d3be8116d7": {
+      "dernier_controle": "2026-11-01",
+      "nom": "Betriebssysteme und verteilte Systeme",
+      "signature_contenu_utile": null,
+      "source": "bremen",
+      "url": "https://www.uni-bremen.de/agbs/"
+    }
+  },
   "version": 1
 }
