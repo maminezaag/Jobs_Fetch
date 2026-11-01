@@ -103,6 +103,50 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(len(table), 1)
         self.assertEqual(len(m._archive_read()), 1)
 
+    def test_duplicate_munich_muenchen_identity_management(self):
+        ba = [{"firma": "My Humancapital GmbH", "titel":
+               "IT-Systemadministrator Identity & Access Management (m/w/d)", "ort": "München"}]
+        job = make_job("iam", title="IT-Systemadministrator Identity & Access Management (m/w/d)",
+                       company="MY Humancapital GmbH", location="Munich")
+        table = self.run_collect(Session([listing(job)]), ba)
+        self.assertEqual(len(table), 1)  # en-tête uniquement
+
+    def test_duplicate_munich_muenchen_web_apps(self):
+        ba = [{"firma": "My Humancapital GmbH", "titel":
+               "IT-Systemadministrator Web & Applikationen (m/w/d)", "ort": "München"}]
+        job = make_job("apps", title="IT-Systemadministrator Web & Applikationen (m/w/d)",
+                       company="MY Humancapital GmbH", location="Munich, Germany")
+        table = self.run_collect(Session([listing(job)]), ba)
+        self.assertEqual(len(table), 1)
+
+    def test_duplicate_title_appends_city_bochum(self):
+        ba = [{"firma": "think about IT GmbH", "titel":
+               "Senior IT-Administrator (m/w/d), Bochum", "ort": "Bochum"}]
+        job = make_job("senior", title="Senior IT Administrator (m/w/d)",
+                       company="think about IT GmbH", location="Bochum")
+        table = self.run_collect(Session([listing(job)]), ba)
+        self.assertEqual(len(table), 1)
+
+    def test_different_specialization_same_city_kept(self):
+        ba = [{"firma": "My Humancapital GmbH", "titel":
+               "IT-Systemadministrator Identity & Access Management (m/w/d)", "ort": "München"}]
+        job = make_job("apps", title="IT-Systemadministrator Web & Applikationen (m/w/d)",
+                       company="MY Humancapital GmbH", location="Munich")
+        table = self.run_collect(Session([listing(job)]), ba)
+        self.assertEqual(len(table), 2)  # deux rôles vraiment distincts
+
+    def test_title_city_other_city_not_merged(self):
+        ba = [{"firma": "think about IT GmbH", "titel":
+               "Senior IT-Administrator (m/w/d), Bochum", "ort": "Bochum"}]
+        job = make_job("senior", title="Senior IT Administrator (m/w/d)",
+                       company="think about IT GmbH", location="Berlin")
+        table = self.run_collect(Session([listing(job)]), ba)
+        self.assertEqual(len(table), 2)
+
+    def test_no_false_city_substring_match(self):
+        self.assertFalse(m._city_compatible("Essen", "Grossen"))
+        self.assertEqual(m._city_normalized("Köln"), m._city_normalized("Cologne, Germany"))
+
     def test_distinct_city_not_filtered_as_ba_duplicate(self):
         ba = [{"firma": "Beispiel GmbH", "titel": "IT-Systemadministrator", "ort": "Hamburg"}]
         table = self.run_collect(Session([listing(make_job())]), ba)

@@ -204,12 +204,57 @@ def _page(session, base_url: str, num: int, seconds: int, retries: int) -> dict:
     raise RuntimeError(f"API Arbeitnow page {num} : {last}")
 
 
+# Orthographes alternatives courantes entre l'API BA et Arbeitnow.
+# Cette table est volontairement courte : une équivalence trop large pourrait
+# masquer deux postes réellement distincts.
+_CITY_ALIASES = {
+    "munich": "munchen",
+    "muenchen": "munchen",
+    "cologne": "koln",
+    "koeln": "koln",
+    "nuremberg": "nurnberg",
+    "nuernberg": "nurnberg",
+    "hanover": "hannover",
+    "duesseldorf": "dusseldorf",
+    "dusseldorf": "dusseldorf",
+    "frankfurt am main": "frankfurt am main",
+}
+
+
+def _city_normalized(value: object) -> str:
+    """Uniformise les variantes allemand/anglais des villes, sans géocodage."""
+    text = _norm(value)
+    for alias, canonical in sorted(_CITY_ALIASES.items(), key=lambda item: -len(item[0])):
+        text = re.sub(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", canonical, text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _city_compatible(ba_city: str, arbeitnow_location: str) -> bool:
+    """Comparer les noms de villes entiers, éventuellement entourés de région/pays."""
+    if not ba_city or not arbeitnow_location:
+        return True  # comportement historique : ville inconnue, si titre/entreprise concordent
+    return (ba_city == arbeitnow_location
+            or re.search(r"(?<!\w)" + re.escape(ba_city) + r"(?!\w)", arbeitnow_location) is not None
+            or re.search(r"(?<!\w)" + re.escape(arbeitnow_location) + r"(?!\w)", ba_city) is not None)
+
+
+def _title_without_trailing_city(title: str, city: str) -> str:
+    """Retire UNIQUEMENT une ville explicite en fin de titre, après normalisation.
+
+    Exemple : «Senior IT-Administrator (m/w/d), Bochum» devient
+    «senior it administrator». La spécialisation du métier reste intacte.
+    """
+    if city and title.endswith(" " + city):
+        return title[:-(len(city) + 1)].strip()
+    return title
+
+
 def _ba_index(ba_archive) -> dict[str, list[tuple[str, str]]]:
     index: dict[str, list[tuple[str, str]]] = {}
     for j in ba_archive:
         firm = _norm(j.get("firma"))
         title = _norm(j.get("titel"))
-        city = _norm(j.get("ort"))
+        city = _city_normalized(j.get("ort"))
         if firm and title:
             index.setdefault(firm, []).append((title, city))
     return index
@@ -218,14 +263,19 @@ def _ba_index(ba_archive) -> dict[str, list[tuple[str, str]]]:
 def _in_ba(job: dict, index: dict) -> bool:
     firm = _norm(job["firma"])
     title = _norm(job["titel"])
-    location = _norm(job["location"])
+    location = _city_normalized(job["location"])
     if not firm or not title:
         return False
     for other_title, other_city in index.get(firm, []):
-        if (title == other_title or SequenceMatcher(None, title, other_title).ratio() >= 0.90):
-            # Même annonce au même lieu (ou lieu non renseigné, dédoublonnage prudent).
-            if not other_city or not location or other_city in location or location in other_city:
-                return True
+        if not _city_compatible(other_city, location):
+            continue
+        # On enlève les villes terminales SEULEMENT après avoir vérifié
+        # le lieu ; cela évite de fusionner des annonces de villes différentes.
+        normalized_title = _title_without_trailing_city(title, location)
+        normalized_ba_title = _title_without_trailing_city(other_title, other_city)
+        if (normalized_title == normalized_ba_title
+                or SequenceMatcher(None, normalized_title, normalized_ba_title).ratio() >= 0.90):
+            return True
     return False
 
 
