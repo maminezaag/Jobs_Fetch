@@ -1,0 +1,9 @@
+{
+  "_description": "Arbeitnow en complément de stat_jobs. Sans clé API, un seul nouvel onglet dans le même Google Sheets.",
+  "source_url": "https://www.arbeitnow.com/api/job-board-api",
+  "max_pages": 12,
+  "timeout_seconds": 35,
+  "retries": 3,
+  "pause_seconds": 0.5,
+  "max_rows_sheet": 1500
+}
