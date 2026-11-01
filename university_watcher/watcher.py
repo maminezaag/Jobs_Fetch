@@ -158,28 +158,109 @@ class Collecteur:
             raise RuntimeError(f"Description individuelle absente/trop courte ({len(contenu)} caractères)")
         return contenu
 
-    def collect_oldenburg(self, src):
-        resp = self.get(src["url"])
-        try:
-            root = ET.fromstring(resp.content)
-        except ET.ParseError as exc:
-            raise RuntimeError("Le RSS d'Oldenburg n'est pas du XML valide") from exc
+    @staticmethod
+    def oldenburg_jobnummer(url):
+        """Identifiant stable des fiches UOL, y compris les liens avec slug."""
+        path = urlparse(url).path.rstrip('/')
+        m = re.search(r"/job(?:/[^/]*?-)?(\d{3,6})(?:en)?$", path, re.I)
+        if not m:
+            m = re.search(r"/job(\d{3,6})(?:en)?$", path, re.I)
+        return m.group(1) if m else None
+
+    @staticmethod
+    def oldenburg_liste_html(html_source, page_url, aujourd_hui=None):
+        """Toutes les annonces /jobs, indépendamment du titre ou de la catégorie RSS.
+
+        Une annonce sans date lisible est conservée pour examen. Une date limite
+        explicitement passée exclut la fiche. Les titres viennent des liens d'annonce.
+        """
+        aujourd_hui = aujourd_hui or date.today()
+        soup = BeautifulSoup(html_source, 'html.parser')
         offres = []
-        entries = root.findall(".//item")
-        if not entries:
-            # RSS Atom, si l'institution change de format
-            entries = root.findall(".//{http://www.w3.org/2005/Atom}entry")
-        for item in entries:
-            title = (item.findtext("title") or item.findtext("{http://www.w3.org/2005/Atom}title") or "").strip()
-            link = item.findtext("link") or ""
-            if not link:
-                node = item.find("{http://www.w3.org/2005/Atom}link")
-                if node is not None:
-                    link = node.get("href", "")
-            description = item.findtext("description") or item.findtext("{http://www.w3.org/2005/Atom}summary") or ""
-            if title and link:
-                offres.append(Offre("oldenburg", title, urljoin(src["url"], link), "Oldenburg", normaliser(BeautifulSoup(description, "html.parser").get_text(" "))))
+        for heading in soup.find_all(['h2', 'h3', 'h4']):
+            a = heading.find('a', href=True)
+            if a is None:
+                continue
+            link = urljoin(page_url, a['href'])
+            if urlparse(link).hostname not in {'uol.de', 'www.uol.de'}:
+                continue
+            numero = Collecteur.oldenburg_jobnummer(link)
+            if not numero:
+                continue
+            title = normaliser(txt(a))
+            if not title:
+                continue
+            # Contenu visible après l'en-tête, jusqu'au prochain titre d'annonce.
+            parties = []
+            for sibling in heading.next_siblings:
+                if getattr(sibling, 'name', None) in {'h2', 'h3', 'h4'}:
+                    break
+                parties.append(txt(sibling) if getattr(sibling, 'name', None) else str(sibling))
+                if sum(map(len, parties)) > 2500:
+                    break
+            descriptif = normaliser(' '.join(parties))
+            m = re.search(r"Bewerbungsfrist\s*:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})", descriptif, re.I)
+            if m:
+                try:
+                    limite = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+                    if limite < aujourd_hui:
+                        continue
+                except ValueError:
+                    pass
+            offres.append(Offre('oldenburg', title, link, 'Oldenburg', descriptif))
         return offres
+
+    def collect_oldenburg(self, src):
+        """Compare le flux RSS et le portail global, avec secours si l'un échoue."""
+        rss_url = src['url']
+        portail_url = src.get('url_portail', 'https://uol.de/jobs')
+        rss_offres, portail_offres, erreurs = [], [], []
+        try:
+            resp = self.get(rss_url)
+            root = ET.fromstring(resp.content)
+            entries = root.findall('.//item')
+            if not entries:
+                entries = root.findall('.//{http://www.w3.org/2005/Atom}entry')
+            for item in entries:
+                title = (item.findtext('title') or item.findtext('{http://www.w3.org/2005/Atom}title') or '').strip()
+                link = item.findtext('link') or ''
+                if not link:
+                    node = item.find('{http://www.w3.org/2005/Atom}link')
+                    if node is not None:
+                        link = node.get('href', '')
+                description = item.findtext('description') or item.findtext('{http://www.w3.org/2005/Atom}summary') or ''
+                if title and link:
+                    rss_offres.append(Offre('oldenburg', title, urljoin(rss_url, link), 'Oldenburg',
+                                            normaliser(BeautifulSoup(description, 'html.parser').get_text(' '))))
+            log.info('OLDENBURG RSS: %d annonces', len(rss_offres))
+        except Exception as exc:
+            erreurs.append('RSS: ' + str(exc))
+            log.warning('OLDENBURG RSS NON VÉRIFIÉ: %s', exc)
+        try:
+            resp = self.get(portail_url)
+            portail_offres = self.oldenburg_liste_html(resp.text, resp.url)
+            # Un portail sans aucune fiche détectée peut signaler un changement HTML.
+            if not portail_offres:
+                raise RuntimeError('aucune annonce active reconnue; vérifier la structure ou les dates')
+            log.info('OLDENBURG PORTAIL: %d annonces non expirées', len(portail_offres))
+        except Exception as exc:
+            erreurs.append('Portail: ' + str(exc))
+            log.warning('OLDENBURG PORTAIL NON VÉRIFIÉ: %s', exc)
+        if not rss_offres and not portail_offres:
+            raise RuntimeError('RSS et portail indisponibles: ' + '; '.join(erreurs))
+        # Le RSS conserve la priorité pour préserver l'URL et les historiques existants.
+        fusion, par_numero = {}, {}
+        for offre in rss_offres + portail_offres:
+            numero = self.oldenburg_jobnummer(offre.url)
+            cle = 'job:' + numero if numero else 'url:' + offre.url.split('#')[0].rstrip('/')
+            if cle in fusion:
+                if offre.texte and offre.texte not in fusion[cle].texte:
+                    fusion[cle].texte = (fusion[cle].texte + ' ' + offre.texte).strip()
+            else:
+                fusion[cle] = offre
+        log.info('OLDENBURG FUSION: %d annonces uniques (RSS=%d, portail=%d)',
+                 len(fusion), len(rss_offres), len(portail_offres))
+        return list(fusion.values())
 
     def collect_bremen(self, src):
         soup = BeautifulSoup(self.get(src["url"]).text, "html.parser")

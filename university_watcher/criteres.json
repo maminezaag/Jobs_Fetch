@@ -8,7 +8,8 @@
     "oldenburg": {
       "nom": "Universität Oldenburg",
       "ville_defaut": "Oldenburg",
-      "url": "https://uol.de/jobs/rss?kat=wm"
+      "url": "https://uol.de/jobs/rss?kat=wm",
+      "url_portail": "https://uol.de/jobs"
     },
     "bremen": {
       "nom": "Universität Bremen",
