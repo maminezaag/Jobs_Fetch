@@ -190,6 +190,87 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(len(m._archive_read()), 2)
 
+    def test_hypersonica_five_non_it_engineering_roles_excluded_from_api(self):
+        # Le contenu de l'annonce prime sur l'entreprise ; ne pas bloquer Hypersonica.
+        samples = [
+            ("Seeker System Engineer", "Design seekers, missile guidance and avionics systems."),
+            ("Ground Segment System Engineer", "Design telemetry ground segment and flight control equipment."),
+            ("Flight Control System Engineer", "Design aircraft flight control and guidance systems."),
+            ("Communication System Engineer", "Design RF communications, ground segment telemetry and vehicle avionics."),
+            ("Avionics System Engineer", "Develop flight avionics and spacecraft electronics."),
+        ]
+        jobs = [make_job(str(i), title=title, company="Hypersonica", location="Munich",
+                         description=desc) for i, (title, desc) in enumerate(samples)]
+        table = self.run_collect(Session([listing(*jobs)]))
+        self.assertEqual(len(table), 1)
+        self.assertFalse(m._archive_read())  # les nouvelles faux-positives ne sont pas archivées
+
+    def test_hypersonica_real_it_admin_is_retained(self):
+        job = make_job("it", title="IT-Systemadministrator Linux", company="Hypersonica",
+                       location="Munich", description="Administration Linux Server, VMware, AD. Aerospace company.")
+        table = self.run_collect(Session([listing(job)]))
+        self.assertEqual(len(table), 2)
+        self.assertEqual(table[1][2], "Hypersonica")
+
+    def test_system_engineer_citrix_kept_even_at_aerospace_company(self):
+        job = make_job("citrix", title="System Engineer Citrix", company="Hypersonica",
+                       location="Munich", description="VMware Horizon, Windows Server, aviation company.")
+        table = self.run_collect(Session([listing(job)]))
+        self.assertEqual(len(table), 2)
+
+    def test_ground_segment_system_engineer_real_it_admin_retained(self):
+        job = make_job("groundit", title="Ground Segment System Engineer", company="Satellite IT GmbH",
+                       location="Munich", description="Administration Windows Server, VMware and IT infrastructure.")
+        table = self.run_collect(Session([listing(job)]))
+        self.assertEqual(len(table), 2)
+
+    def test_communication_system_engineer_it_description_is_retained(self):
+        job = make_job("itnetwork", title="Communication System Engineer", company="Autre GmbH",
+                       location="Munich", description="Administration Windows Server and IT infrastructure in datacenter.")
+        table = self.run_collect(Session([listing(job)]))
+        self.assertEqual(len(table), 2)
+
+    def test_generic_system_engineer_aerospace_filtered(self):
+        job = make_job("space", title="System Engineer (ISOS Host)", company="Exploration GmbH",
+                       location="Munich", description="Spacecraft command and control, avionics telemetry and launch vehicle.")
+        table = self.run_collect(Session([listing(job)]))
+        self.assertEqual(len(table), 1)
+
+    def test_archived_non_it_removed_from_sheet_not_from_archive(self):
+        # Cas décisif pour le fichier existant : les cinq offres avaient déjà
+        # été sauvegardées. On conserve l'archive mais on recalcule l'onglet.
+        samples = [
+            ("Seeker System Engineer", "Missile seeker, telemetry, avionics"),
+            ("Ground Segment System Engineer", "Ground segment, flight control and launch vehicle"),
+            ("Flight Control System Engineer", "Flight control and avionics"),
+            ("Communication System Engineer", "RF communications, telemetry and avionics"),
+            ("Avionics System Engineer", "Avionics satellite mission"),
+        ]
+        archive = []
+        for i, (title, desc) in enumerate(samples):
+            job = m._convert(make_job(str(i), title=title, company="Hypersonica",
+                                      description=desc, location="Munich"), BA_CONFIG, TODAY)
+            # Simuler l'ancien code qui classait ces postes Cœur IT.
+            archive.append({"refnr": "arbeitnow:old" + str(i), "titel": title,
+                            "firma": "Hypersonica", "location": "Munich", "datum": "2026-10-31",
+                            "text": desc, "remote": False, "url": "https://www.arbeitnow.com/jobs/" + str(i),
+                            "segment": "Cœur IT", "premiere_vue": "2026-11-01"})
+        archive.append({"refnr": "arbeitnow:realIT", "titel": "IT-Systemadministrator Linux",
+                        "firma": "Hypersonica", "location": "Munich", "datum": "2026-10-31",
+                        "text": "Administration von Linux Servern und VMware.", "remote": False,
+                        "url": "https://www.arbeitnow.com/jobs/realIT", "segment": "Cœur IT",
+                        "premiere_vue": "2026-11-01"})
+        (m.ROOT / "archive" / "2026-11.jsonl").write_text(
+            "".join(json.dumps(x) + "\n" for x in archive), encoding="utf-8")
+        rows = self.run_collect(Session([listing()]))
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1][1], "IT-Systemadministrator Linux")
+        self.assertEqual(len(m._archive_read()), 6)
+
+    def test_five_hypersonica_without_company_blacklist(self):
+        self.assertIsNone(m._segment("Avionics System Engineer", BA_CONFIG, "Avionics system"))
+        self.assertEqual(m._segment("IT-Systemadministrator Linux", BA_CONFIG, "Aerospace company"), "Cœur IT")
+
     def test_formula_injection_escaped(self):
         rows = self.run_collect(Session([listing(make_job(company='=HYPERLINK("x","bad")'))]))
         self.assertTrue(rows[1][2].startswith("'="))

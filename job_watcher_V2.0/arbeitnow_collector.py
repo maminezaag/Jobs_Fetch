@@ -84,6 +84,75 @@ LOCAL = re.compile(
 POSTCODE = re.compile(r"(?<!\d)\d{5}(?!\d)")
 
 
+# Un titre « System Engineer » peut désigner une mission IT ou de l'ingénierie
+# avionique, industrielle ou électronique. Ne JAMAIS exclure une entreprise :
+# seuls le titre et la description de chaque annonce déterminent le filtre.
+# Les mots vagues (system, software, communication, network, Linux seul...) ne
+# suffisent PAS à prouver qu'il s'agit d'administration informatique.
+_CLEAR_INFRA_TITLE = re.compile(
+    r"\b(?:it[\s/-]*(?:system|support|admin|infrastruktur|infrastructure|"
+    r"service|techniker|engineer|betrieb|operations|netzwerk|network|"
+    r"specialist|spezialist|mitarbeiter)|"
+    r"edv[\s/-]*(?:admin|techniker|system|support)|"
+    r"(?:system|linux|windows|netzwerk|network|infrastruktur|infrastructure|"
+    r"cloud|kubernetes|microsoft\s*365|azure)[\s/-]*administ\w*|"
+    r"(?:citrix|vmware|active\s+directory|windows\s+server|microsoft\s*365|"
+    r"exchange\s+online|vdi|help[\s/-]*desk|service[\s/-]*desk)|"
+    r"devops|site[\s/-]*reliability|platform[\s/-]*engineer|"
+    r"linux[\s/-]*(?:support|engineer|system)|systemintegration)\b", re.I,
+)
+# Spécialités d'ingénierie aéronautique/embarquée explicites dans le TITRE.
+_NON_IT_SPECIALTY_TITLE = re.compile(
+    r"\b(?:avionics?|flight[\s/-]*control|flight[\s/-]*dynamics|"
+    r"seeker|guidance[\s/-]*(?:and[\s/-]*)?navigation|"
+    r"embedded[\s/-]*hardware|aircraft[\s/-]*control|"
+    r"aerospace[\s/-]*systems?|missile[\s/-]*systems?)\b", re.I,
+)
+# Pour les titres ambigus (« Communication System Engineer », « System
+# Engineer »), la DESCRIPTION doit clairement situer le poste hors IT.
+_NON_IT_DOMAIN = re.compile(
+    r"\b(?:avionic\w*|aeronautic\w*|aerospace|aircraft|spacecraft|"
+    r"satellite\w*|launch[\s/-]*vehicle|flight[\s/-]*control|"
+    r"flight[\s/-]*test|seeker\w*|missile\w*|ground[\s/-]*segment|"
+    r"ground[\s/-]*station|telemetry|telemetrie|radar|"
+    r"radio[\s/-]*frequency|rf[\s/-]*communication|"
+    r"antenna\w*|payload\s+system|command[\s&/-]*control|"
+    r"embedded[\s/-]*hardware|fahrzeugtechnik|luftfahrt|flugregelung)\b", re.I,
+)
+# Exigences précises d'exploitation IT. Un simple « Linux » ou « software »
+# n'est pas discriminant : on les trouve aussi en ingénierie aéronautique.
+_INFRA_ADMIN_DESCRIPTION = re.compile(
+    r"\b(?:windows[\s/-]*server|active[\s/-]*directory|"
+    r"group[\s/-]*policy|vmware[\s/-]*(?:vsphere|esxi|horizon)|"
+    r"hyper[\s/-]*v|microsoft[\s/-]*365|exchange[\s/-]*online|"
+    r"server[\s/-]*administration|system[\s/-]*administration|"
+    r"netzwerkadministration|systemadministration|"
+    r"(?:linux|windows)[\s/-]*server\w*|"
+    r"(?:administration|management|operation|betrieb|betreuung)[\s\w/-]{0,45}"
+    r"(?:it[\s/-]*infrastruktur|it[\s/-]*infrastructure|"
+    r"server\w*|rechenzentren|datacenter|data[\s/-]*center)|"
+    r"(?:server\w*|it[\s/-]*infrastruktur|it[\s/-]*infrastructure)"
+    r"[\s\w/-]{0,45}(?:administration|management|betrieb|betreuung))\b", re.I,
+)
+
+
+def _is_non_it_engineering(title: str, description: str) -> bool:
+    """Exclut uniquement les missions d'ingénierie non liées aux opérations IT.
+
+    Une annonce IT explicite, même dans une entreprise aéronautique, est gardée.
+    Pour « System Engineer » générique, on utilise les preuves de la description.
+    """
+    if _CLEAR_INFRA_TITLE.search(title):
+        return False
+    if _NON_IT_SPECIALTY_TITLE.search(title):
+        return True
+    # « Ground Segment » et « Communication System Engineer » exigent une
+    # lecture du descriptif : un poste d'exploitation IT reste admissible.
+    domain_hits = len({m.casefold() for m in _NON_IT_DOMAIN.findall(description)})
+    infra_evidence = bool(_INFRA_ADMIN_DESCRIPTION.search(description))
+    return domain_hits >= 2 and not infra_evidence
+
+
 def _text(value: object) -> str:
     text = str(value or "")
     text = re.sub(r"<[^>]*>", " ", text)
@@ -123,10 +192,12 @@ def _germany(location: str, description: str) -> bool:
                           r"deutschlandweit|germany-wide)\b", description, re.I))
 
 
-def _segment(title: str, ba_config: dict) -> str | None:
+def _segment(title: str, ba_config: dict, description: str = "") -> str | None:
     if not IT_TITLE.search(title):
         return None
     if any(re.search(p, title, re.I) for p in ba_config.get("titres_exclus", [])):
+        return None
+    if _is_non_it_engineering(title, description):
         return None
     if any(re.search(p, title, re.I) for p in ba_config.get("titres_marche_force", [])):
         return "Marché voisin"
@@ -137,11 +208,11 @@ def _segment(title: str, ba_config: dict) -> str | None:
 
 def _convert(raw: dict, ba_config: dict, today: str) -> dict | None:
     title = str(raw.get("title") or "").strip()
-    segment = _segment(title, ba_config)
+    description = _text(raw.get("description"))
+    segment = _segment(title, ba_config, description)
     if not segment:
         return None
     location = str(raw.get("location") or "").strip()
-    description = _text(raw.get("description"))
     company = str(raw.get("company_name") or "").strip()
     url = str(raw.get("url") or "").strip()
     slug = str(raw.get("slug") or "").strip()
@@ -328,7 +399,18 @@ def _make_sheet(jobs: list[dict], ba_archive, ba_config: dict, expressions,
                 sprache: dict, themes, today: str, language_func, max_rows: int,
                 stats: dict, error: str) -> dict:
     cutoff = (date.fromisoformat(today) - timedelta(days=int(ba_config.get("periode_jours", 90)))).isoformat()
-    relevant = [j for j in jobs if j.get("datum", "") >= cutoff]
+    # IMPORTANT : retraiter AUSSI les annonces DÉJÀ archivées. Sans cela les
+    # cinq faux-positifs historiques continueraient à apparaître dans l'Excel.
+    # Ne jamais modifier/supprimer l'archive : filtrage uniquement à l'affichage.
+    period_jobs = [j for j in jobs if j.get("datum", "") >= cutoff]
+    relevant = []
+    filtered_non_it = 0
+    for j in period_jobs:
+        segment = _segment(j.get("titel", ""), ba_config, j.get("text", ""))
+        if segment is None:
+            filtered_non_it += 1
+            continue
+        relevant.append({**j, "segment": segment})
     relevant.sort(key=lambda x: (x["datum"], x["firma"]), reverse=True)
     index = _ba_index(ba_archive)
     seen = set()
@@ -360,11 +442,12 @@ def _make_sheet(jobs: list[dict], ba_archive, ba_config: dict, expressions,
             j["url"], j["premiere_vue"], j["segment"],
             "Non retrouvé dans archive BA", j["refnr"]
         )])
-    stats.update({"periode": len(relevant), "duplicate_ba": duplicate_ba,
+    stats.update({"periode": len(relevant), "filtered_non_it": filtered_non_it,
+                  "duplicate_ba": duplicate_ba,
                   "duplicate_internes": duplicate_own, "not_found_ba": len(retained),
                   "shown": len(table)-1, "truncated": max(0, len(retained)-max_rows)})
-    LOG.info("Arbeitnow : %s offres de la période ; %s doublons BA, %s internes ; %s non retrouvées dans BA ; %s lignes ajoutées%s",
-             len(relevant), duplicate_ba, duplicate_own, len(retained), len(table)-1,
+    LOG.info("Arbeitnow : %s offres IT de la période ; %s annonces hors IT retirées ; %s doublons BA, %s internes ; %s non retrouvées dans BA ; %s lignes ajoutées%s",
+             len(relevant), filtered_non_it, duplicate_ba, duplicate_own, len(retained), len(table)-1,
              f" (attention, {stats['truncated']} supplémentaires hors limite d'affichage)" if stats["truncated"] else "")
     if error:
         LOG.warning("Arbeitnow : données archivées utilisées après erreur API : %s", error)
