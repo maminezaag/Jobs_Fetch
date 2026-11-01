@@ -1034,6 +1034,31 @@ def main(argv=None, session=None):
 
     tab = construire_tableaux(uniques, cfg, themes, aujourdhui, debut, debut_archive, themes_cfg.get("groupes"),
                               analyse, profils, themes_cfg.get("onglets"))
+
+    # Arbeitnow : source d'observation entièrement séparée du collecteur principal.
+    # On ajoute UNE feuille au tableau existant, sans modifier les onglets / statistiques BA.
+    # Le nom du dossier a été choisi par l'utilisateur : "job_watcher_V2.0".
+    source_dir = os.path.join(os.path.dirname(BASE_DIR), "job_watcher_V2.0")
+    try:
+        if source_dir not in sys.path:
+            sys.path.insert(0, source_dir)
+        from arbeitnow_collector import collecter_onglet
+        ajout = collecter_onglet(cfg_ba=cfg, ba_archive=archive.values(),
+                                expressions=expressions, sprache=sprache,
+                                themes=themes, today=aujourdhui,
+                                classer_langue_fn=classer_langue)
+        tab.update(ajout)
+        log.info("Arbeitnow : feuille 'offre arbeitsnow' ajoutée au MÊME Google Sheets")
+    except Exception as e:  # noqa: BLE001 - l'observatoire BA continue en cas de panne Arbeitnow
+        log.warning("Arbeitnow indisponible (%s) : feuille vide créée ; statistiques BA intactes", e)
+        tab["offre arbeitsnow"] = {
+            "values": [["Date publication", "Titre du poste", "Entreprise", "Ville / lieu",
+                        "Zone (indicative)", "Mention de langue", "Justification langue",
+                        "Technologies détectées", "Télétravail (API)", "Lien vers l'offre",
+                        "Première détection", "Segment IT", "Comparaison BA", "Identifiant Arbeitnow"]],
+            "gras": [0], "freeze": 1,
+        }
+
     sauvegarder_local(tab)
 
     uniques = [o for o in uniques if o.get("est_domaine")]   # mêmes règles que les onglets C1/B2
