@@ -426,5 +426,74 @@
       "proficiency in French",
       "French skills"
     ]
+  },
+  "adequation_metier": {
+    "_aide": [
+      "Affiner la priorité des postes DevOps sans exclure tous les postes DevOps.",
+      "Une pénalité est appliquée seulement quand le titre concerne DevOps/CI-CD ET que la description exige une compétence CI/CD.",
+      "Une simple mention de CI/CD, ou une compétence optionnelle, ne suffit pas.",
+      "Les postes Linux/Infrastructure DevOps conservent une pénalité réduite.",
+      "Les postes d’administration système classiques ne sont pas pénalisés pour une simple mention de CI/CD."
+    ],
+    "devops_cicd": {
+      "actif": true,
+      "penalite_points": 10,
+      "penalite_infrastructure_points": 5,
+      "mots_titre": [
+        "DevOps",
+        "CI/CD",
+        "CI-CD"
+      ],
+      "mots_titre_infra": [
+        "Linux",
+        "Systemadministrator",
+        "Systemadministration",
+        "Infrastruktur",
+        "Infrastructure",
+        "Sysadmin"
+      ],
+      "mots_cicd": [
+        "CI/CD",
+        "CI CD",
+        "CI-CD",
+        "CI / CD",
+        "CI- / CD",
+        "Pipelines",
+        "Pipeline",
+        "Jenkins",
+        "GitLab CI",
+        "GitHub Actions",
+        "OpenShift"
+      ],
+      "marqueurs_obligatoires": [
+        "Fachkenntnisse",
+        "Kenntnisse",
+        "Erfahrung",
+        "Erfahrungen",
+        "Expertise",
+        "fundiert",
+        "umfangreich",
+        "mehrjährig",
+        "vorausgesetzt",
+        "erforderlich",
+        "notwendig",
+        "beherrschen",
+        "required",
+        "experience",
+        "proficiency",
+        "proficient"
+      ],
+      "marqueurs_optionnels": [
+        "wünschenswert",
+        "von Vorteil",
+        "idealerweise",
+        "optional",
+        "nice to have",
+        "bonus",
+        "Pluspunkt",
+        "wäre schön",
+        "desirable"
+      ]
+    }
   }
 }

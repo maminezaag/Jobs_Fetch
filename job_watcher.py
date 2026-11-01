@@ -105,6 +105,9 @@ class JobResult:
     longitude: float | None = None
     description: str = ""
     score: int = 0
+    score_brut: int = 0
+    penalite_metier: int = 0
+    motifs_adequation: list[str] = field(default_factory=list)
     matched_positive: list[str] = field(default_factory=list)
     matched_elimination: list[str] = field(default_factory=list)
     deja_postule: bool = False
@@ -154,6 +157,7 @@ def load_config(path: Path) -> dict[str, Any]:
     cfg["criteres"]["b2_marqueurs"] = elim.get("b2_marqueurs", [])
     cfg["criteres"]["points_positifs"] = criteres_data.get("points_positifs", {}).get("groupes", [])
     cfg["criteres"]["francais"] = criteres_data.get("francais", {})
+    cfg["criteres"]["adequation_metier"] = criteres_data.get("adequation_metier", {})
 
     return cfg
 
@@ -455,6 +459,57 @@ def classify_source(job: JobResult, cfg: dict[str, Any]) -> None:
 # Évaluation (élimination stricte/souple + règle B2, points positifs)
 # --------------------------------------------------------------------------
 
+def _expression_presente(expression: str, texte: str) -> bool:
+    """Recherche Unicode avec limites de mots (Git != digitale, SAN != interessant).
+
+    Les séparateurs comme espace, tiret et slash restent autorisés : GitLab,
+    CI/CD, Windows-Server, SAN-Storage et les expressions composées fonctionnent.
+    """
+    expression = str(expression).strip()
+    if not expression:
+        return False
+    return re.search(r"(?<!\w)" + re.escape(expression) + r"(?!\w)", texte, re.IGNORECASE) is not None
+
+
+def _penalite_devops_cicd(job: JobResult, crit: dict[str, Any]) -> tuple[int, str]:
+    """Baisse la priorité des postes DevOps centrés sur une compétence CI/CD exigée.
+
+    Une simple mention de CI/CD (ou "wünschenswert") ne déclenche rien.
+    Les postes d'administration système mentionnant CI/CD restent inchangés.
+    """
+    regle = (crit.get("adequation_metier", {}) or {}).get("devops_cicd", {}) or {}
+    if not regle.get("actif", False):
+        return 0, ""
+
+    titres = regle.get("mots_titre", ["DevOps", "CI/CD"])
+    if not any(_expression_presente(m, job.title) for m in titres):
+        return 0, ""
+
+    # Séparer les lignes de compétences d'un texte HTML éventuel ; ne pas
+    # relier une exigence située sur une ligne à un mot CI/CD d'une autre.
+    description = re.sub(r"</(?:p|li|div|h[1-6]|ul|ol)>|<br\s*/?>", "\n", job.description, flags=re.IGNORECASE)
+    description = re.sub(r"<[^>]+>", " ", description)
+    clauses = re.split(r"[\n\r.!?;]+", description)
+    exigence_detectee = False
+    for clause in clauses:
+        if not any(_expression_presente(m, clause) for m in regle.get("mots_cicd", [])):
+            continue
+        if any(_expression_presente(m, clause) for m in regle.get("marqueurs_optionnels", [])):
+            continue
+        if any(_expression_presente(m, clause) for m in regle.get("marqueurs_obligatoires", [])):
+            exigence_detectee = True
+            break
+
+    if not exigence_detectee:
+        return 0, ""
+
+    titre_infra = any(_expression_presente(m, job.title) for m in regle.get("mots_titre_infra", []))
+    cle = "penalite_infrastructure_points" if titre_infra else "penalite_points"
+    penalite = max(0, int(regle.get(cle, 5 if titre_infra else 10)))
+    return penalite, ("DevOps infrastructure avec exigence CI/CD" if titre_infra
+                      else "DevOps avec compétence CI/CD exigée")
+
+
 def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
     """Applique les critères d'élimination (avec règle B2, voir criteres.json)
     puis calcule le score de points positifs.
@@ -467,16 +522,16 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
     RÈGLE POINTS : chaque groupe de points_positifs est accordé UNE SEULE FOIS
     même si plusieurs synonymes du groupe apparaissent (voir criteres.json)."""
     crit = cfg["criteres"]
-    haystack = f"{job.title}\n{job.description}".lower()
+    haystack = f"{job.title}\n{job.description}"
 
     # --- français (criteres.json > francais)
     francais = crit.get("francais", {}) or {}
-    mots_fr = [m for m in francais.get("mots_detection", []) if m.lower() in haystack]
+    mots_fr = [m for m in francais.get("mots_detection", []) if _expression_presente(m, haystack)]
     job.francais = bool(mots_fr)
 
-    matched_stricte = [kw for kw in crit.get("elimination_stricte", []) if kw.lower() in haystack]
-    matched_souple = [kw for kw in crit.get("elimination_souple", []) if kw.lower() in haystack]
-    b2_present = any(m.lower() in haystack for m in crit.get("b2_marqueurs", []))
+    matched_stricte = [kw for kw in crit.get("elimination_stricte", []) if _expression_presente(kw, haystack)]
+    matched_souple = [kw for kw in crit.get("elimination_souple", []) if _expression_presente(kw, haystack)]
+    b2_present = any(_expression_presente(m, haystack) for m in crit.get("b2_marqueurs", []))
 
     if job.francais:
         # Sur une offre française, 'Niveau C1' / 'mindestens C1' seuls visent souvent le FRANÇAIS :
@@ -494,12 +549,17 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
         nom = groupe.get("nom", "?")
         poids = int(groupe.get("poids", 0))
         mots = groupe.get("mots", []) or []
-        synonymes_trouves = [m for m in mots if m.lower() in haystack]
+        synonymes_trouves = [m for m in mots if _expression_presente(m, haystack)]
         if synonymes_trouves:
             score += poids
             job.matched_positive.append(f"{nom} ({'/'.join(synonymes_trouves)})")
 
-    job.score = score
+    job.score_brut = score
+    penalite, motif = _penalite_devops_cicd(job, crit)
+    job.penalite_metier = penalite
+    if motif and penalite:
+        job.motifs_adequation.append(motif)
+    job.score = max(0, score - penalite)
     if job.francais:
         job.matched_positive.insert(0, f"Français ({'/'.join(mots_fr[:3])})")
 
@@ -590,7 +650,10 @@ def _lignes_offre(j: JobResult) -> list[str]:
     return [
         f"● {j.title} — {j.employer}{avertissement}",
         f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}",
-        f"  Score : {j.score} points | Compétences : {', '.join(j.matched_positive) or '-'}",
+        f"  Score : {j.score} points" +
+        (f" (score brut {j.score_brut}, adéquation métier -{j.penalite_metier})"
+         if j.penalite_metier else "") +
+        f" | Compétences : {', '.join(j.matched_positive) or '-'}",
         f"  Publié le : {j.published}",
         f"  Lien : {j.url}",
         "",
@@ -738,6 +801,8 @@ def main() -> None:
     for j in eliminees:
         logger.info("  ✘ %s — %s (élim.: %s)", j.title, j.employer, ", ".join(j.matched_elimination))
     for j in sorted(sous_le_seuil, key=lambda x: x.score, reverse=True):
+        if j.motifs_adequation:
+            logger.info("  ↳ Adéquation métier : %s (-%d points)", ", ".join(j.motifs_adequation), j.penalite_metier)
         logger.info("  ○ %s — %s (%d pts, sous le seuil de %d) [%s] %s", j.title, j.employer, j.score, seuil, j.source, j.url)
 
     if qualifies and not args.dry_run:
