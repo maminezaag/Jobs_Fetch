@@ -504,6 +504,29 @@ def branche_offre(titre):
     return "IT / AUTRE"
 
 
+def poste_it_elargi_a_examiner(titre, description, cfg):
+    """Rattrape des titres IT atypiques sans valider les titres seuls.
+
+    L'exclusion du type Ausbildung, la zone et l'analyse du domaine sont
+    appliquées par noter(). Les compétences sont vérifiées dans la description,
+    sans compter les mots de l'intitulé.
+    """
+    regles = cfg.get('intitules_it_elargis', {})
+    if not regles.get('actif', False):
+        return False, ''
+    t = normaliser(titre).casefold()
+    if not any(re.search(motif, t, re.I) for motif in regles.get('titres_regex', [])):
+        return False, ''
+    noms = set(regles.get('indices_techniques', []))
+    preuves = [(g['nom'], points_competence(g, description))
+               for g in cfg.get('competences', []) if g['nom'] in noms]
+    preuves = [(n, points) for n, points in preuves if points > 0]
+    total = sum(points for _, points in preuves)
+    if total < regles.get('minimum_competences_description', 3):
+        return False, ''
+    return True, ', '.join(n for n, _ in preuves[:4])
+
+
 def points_competence(groupe, texte):
     """Une compétence est comptée UNE FOIS, même avec plusieurs synonymes.
 
@@ -666,7 +689,19 @@ def noter(o, cfg):
         primaire = False
         secondaire = True
         priorite = 'PROMOTION_A_EXAMINER'
+    # Rattrapage prudent des offres IT expérimentées à intitulé inhabituel.
+    # Aucun contournement des exclusions, de la zone ou du hors-profil.
+    it_elargi, preuves_it = poste_it_elargi_a_examiner(o.titre, o.texte, cfg)
+    if (it_elargi and valide and adequation['action'] != 'HORS_PROFIL'
+            and not primaire and not promotion_a_examiner):
+        secondaire = True
+        priorite = 'A_EXAMINER'
+    else:
+        it_elargi = False
     motifs = []
+    if it_elargi:
+        motifs.append('intitulé IT compatible ; compétences vérifiées dans les missions : ' + preuves_it +
+                      ' ; contrôle humain des exigences obligatoires')
     if promotion_a_examiner:
         motifs.append('poste doctoral rémunéré : ' + preuve_paie +
                       ' ; vérifier les prérequis universitaires, le cursus, les compétences obligatoires et la date limite')

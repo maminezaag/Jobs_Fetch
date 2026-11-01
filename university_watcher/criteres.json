@@ -664,5 +664,43 @@
     "timeout_secondes": 35,
     "reessais_erreurs_transitoires": 1,
     "pause_reessai_secondes": 2
+  },
+  "intitules_it_elargis": {
+    "_aide": "Alerte secondaire pour postes IT expérimentés dont le titre est atypique. Ne concerne pas Ausbildung. Le titre seul ne suffit jamais : une compétence technique doit apparaitre dans la description détaillée.",
+    "actif": true,
+    "minimum_competences_description": 3,
+    "titres_regex": [
+      "\\bit[ -]?fachkraft\\b",
+      "\\bfachinformatiker(?:in|:in|\\*in)?\\b",
+      "\\b(?:systemintegrations|it[ -]?integrations|integrations)(?:ingenieur|engineer)(?:in|:in|\\*in)?\\b",
+      "\\b(?:it[ -]?|system[ -]?|network[ -]?|netzwerk[ -]?|infrastruktur[ -]?)(?:engineer|techniker|spezialist|administrator|betreuer)(?:in|:in|\\*in)?\\b",
+      "\\b(?:it[ -]?service|it[ -]?betreuung|it[ -]?betrieb|it[ -]?support|it[ -]?infrastruktur|it[ -]?operations|it[ -]?koordination)\\b",
+      "\\b(?:technisch\\w*\\s+mitarbeiter\\w*|technical\\s+(?:specialist|officer|employee|staff))\\b",
+      "\\b(?:system[ -]?integration|systemintegration|it[ -]?integration|netzwerkadministration|systemadministration)\\b",
+      "\\b(?:cloud|devops|platform|site reliability|sre|endpoint|workplace|service desk|helpdesk|rechenzentrum|datacenter|data center|identity|microsoft 365|m365)\\b"
+    ],
+    "indices_techniques": [
+      "Linux / Red Hat / Ubuntu / SUSE",
+      "IT-Systemadministration",
+      "VMware / Proxmox",
+      "IT Support",
+      "Active Directory / GPO",
+      "Windows Server",
+      "Netzwerke / Firewall",
+      "Firewalling",
+      "Cloud / Azure",
+      "DevOps",
+      "Monitoring",
+      "Bash / Shell",
+      "Ansible",
+      "Terraform",
+      "Docker",
+      "Kubernetes",
+      "Veeam / Backup",
+      "NetApp / Storage",
+      "Checkmk / Nagios",
+      "Zimbra",
+      "Kaspersky Security Center"
+    ]
   }
 }
