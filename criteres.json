@@ -818,5 +818,301 @@
       "IT Anwendungsbetreuer",
       "Application Administrator"
     ]
+  },
+  "compatibilite_profil": {
+    "_aide": [
+      "Un SEUL e-mail avec deux sections : prioritaire + à examiner. Les postes manifestement hors profil sont gardés dans 'vus', sans notification.",
+      "Le score n'est pas modifié. Une compétence spécialisée simplement optionnelle ne suffit pas à exclure.",
+      "Titres hors profil : uniquement des rôles explicitement spécialisés hors administration IT.",
+      "Les postes DevOps généraux restent à examiner si la spécialisation avancée obligatoire n'est pas établie."
+    ],
+    "actif": true,
+    "titres_a_examiner": {
+      "Ceph / cloud-native avancé": [
+        "Ceph",
+        "Cloud Native",
+        "Cloud-Native",
+        "Cloud Storage Engineer",
+        "Kubernetes Platform Engineer",
+        "OpenShift Engineer",
+        "SRE",
+        "Site Reliability Engineer"
+      ],
+      "DevOps / CI-CD spécialisé": [
+        "DevOps Engineer",
+        "DevOps Software Engineer",
+        "DevOps Consultant",
+        "DevOps Berater",
+        "CI/CD Engineer",
+        "Build Engineer",
+        "Platform DevOps",
+        "IT DevOps"
+      ],
+      "réseau expert": [
+        "Senior Network Engineer",
+        "(Senior) Network Engineer",
+        "Senior Netzwerk Engineer",
+        "Senior Netzwerkingenieur",
+        "Network Security Engineer",
+        "Netzwerk- und Security-Ingenieur"
+      ],
+      "bases de données spécialisées": [
+        "Datenbankadministrator",
+        "Database Administrator",
+        "MongoDB Administrator",
+        "MongoDB & Linux",
+        "DBA MongoDB"
+      ],
+      "développement logiciel": [
+        "Software Engineer",
+        "Software Developer",
+        "Python Developer",
+        "Backend Developer",
+        "Frontend Developer",
+        "Java Developer",
+        "Full Stack Developer",
+        "Fullstack Developer"
+      ],
+      "poste cloud / workplace spécialisé": [
+        "Workplace Services",
+        "Endpoint Engineer",
+        "Intune Specialist",
+        "Cloud Security Engineer",
+        "Cloud Security Consultant"
+      ],
+      "recherche / données spécialisées": [
+        "Data Scientist",
+        "Data Engineer",
+        "Machine Learning Engineer"
+      ]
+    },
+    "expertises_avancees": {
+      "Ceph": [
+        "Ceph",
+        "RADOS"
+      ],
+      "Kubernetes/OpenShift avancé": [
+        "Kubernetes",
+        "OpenShift"
+      ],
+      "CI/CD": [
+        "CI/CD",
+        "CI-CD",
+        "Jenkins",
+        "GitLab CI"
+      ],
+      "Terraform/IaC avancé": [
+        "Terraform",
+        "Infrastructure as Code"
+      ],
+      "réseau expert": [
+        "BGP",
+        "MPLS",
+        "CCNP"
+      ],
+      "MongoDB": [
+        "MongoDB"
+      ]
+    },
+    "mots_exigence_ferme": [
+      "fundierte Kenntnisse",
+      "fundierte Erfahrung",
+      "fundiertes Wissen",
+      "umfangreiche Erfahrung",
+      "mehrjährige Erfahrung",
+      "mehrjährige Kenntnisse",
+      "sehr gute Kenntnisse",
+      "tiefgehende Kenntnisse",
+      "Expertenkenntnisse",
+      "zwingend",
+      "erforderlich",
+      "vorausgesetzt",
+      "must have",
+      "required",
+      "proven experience",
+      "strong expertise"
+    ],
+    "mots_optionnels": [
+      "wünschenswert",
+      "von Vorteil",
+      "idealerweise",
+      "optional",
+      "nice to have",
+      "wäre schön",
+      "desirable",
+      "pluspunkt"
+    ],
+    "titres_prioritaires": [
+      "Systemadministrator",
+      "Systemadministration",
+      "Linux Administrator",
+      "Windows Administrator",
+      "IT-Administrator",
+      "IT Administrator",
+      "IT-Systembetreuer",
+      "IT Systembetreuer",
+      "IT Operations",
+      "IT-Betrieb",
+      "IT Operations Manager",
+      "Head of IT Operations",
+      "IT-Systemmanager",
+      "IT Systemmanager",
+      "Serverinfrastruktur",
+      "IT Serverinfrastruktur",
+      "Datacenter Engineer",
+      "Data Center Engineer",
+      "Virtualisierung",
+      "Virtualization",
+      "VMware Administrator",
+      "VMware Specialist",
+      "VMware Engineer",
+      "vSphere Administrator",
+      "Citrix Administrator",
+      "Citrix-Infrastruktur",
+      "Citrix Infrastruktur",
+      "Citrix Engineer",
+      "Storage & Backup",
+      "Storage and Backup",
+      "Storage und Backup",
+      "Storage Administrator",
+      "Backup Administrator",
+      "Veeam Administrator",
+      "NetApp Administrator",
+      "Netzwerkadministrator",
+      "Network Administrator",
+      "Infrastructure Administrator",
+      "Infrastrukturadministrator",
+      "IT-Administration",
+      "IT Administration",
+      "Linux Engineer",
+      "Windows Server Administrator",
+      "IT Netzwerk Ingenieur Linux",
+      "IT Netzwerkingenieur Linux",
+      "IT- Systemmanager"
+    ],
+    "support_titres": [
+      "IT-Support",
+      "IT Support",
+      "1st Level",
+      "2nd Level",
+      "3rd Level",
+      "Onsite Support",
+      "vor-Ort-Support",
+      "Helpdesk",
+      "Service Desk",
+      "Systemintegration",
+      "Fachinformatiker"
+    ],
+    "support_niveau_avance": [
+      "2nd Level",
+      "3rd Level",
+      "Second Level",
+      "Third Level"
+    ],
+    "support_preuves_infrastructure": [
+      "Windows Server",
+      "Active Directory",
+      "VMware",
+      "Linux Server",
+      "Exchange Server",
+      "Netzwerkadministration",
+      "IT-Infrastruktur",
+      "Serveradministration"
+    ],
+    "titres_conditionnels": [
+      "System Engineer",
+      "Systemingenieur",
+      "Infrastructure Engineer",
+      "Network Infrastructure Engineer",
+      "IT Specialist",
+      "IT-System Engineer",
+      "IT System Engineer",
+      "IT Service Engineer",
+      "IT-Anwendungsbetreuer",
+      "Cloud Administrator",
+      "M365 Administrator",
+      "Microsoft 365 Administrator",
+      "Workplace Engineer"
+    ],
+    "minimum_preuves_infra": 2,
+    "preuves_infrastructure": [
+      [
+        "Linux",
+        "Red Hat",
+        "RHEL",
+        "Debian"
+      ],
+      [
+        "Windows Server",
+        "Active Directory",
+        "GPO",
+        "Citrix"
+      ],
+      [
+        "VMware",
+        "vSphere",
+        "ESXi",
+        "Hyper-V",
+        "Proxmox",
+        "Nutanix"
+      ],
+      [
+        "Veeam",
+        "Backup",
+        "Datensicherung",
+        "SAN",
+        "NAS",
+        "NetApp"
+      ],
+      [
+        "IT-Betrieb",
+        "Monitoring",
+        "Serverbetrieb",
+        "Systemadministration",
+        "Serveradministration"
+      ],
+      [
+        "Netzwerkadministration",
+        "Firewall",
+        "Netzwerk-Infrastruktur"
+      ]
+    ],
+    "titres_hors_profil": [
+      "Senior Cloud Native Storage Engineer",
+      "DevOps Software Engineer",
+      "Python Developer",
+      "Backend Developer",
+      "Frontend Developer",
+      "Full Stack Developer",
+      "Fullstack Developer"
+    ],
+    "hors_si_exigences": {
+      "DevOps CI/CD et orchestration expert": {
+        "titres": [
+          "DevOps Engineer",
+          "DevOps Consultant",
+          "DevOps Berater",
+          "Platform DevOps",
+          "IT DevOps"
+        ],
+        "expertises": [
+          "CI/CD",
+          "Kubernetes/OpenShift avancé",
+          "Terraform/IaC avancé"
+        ],
+        "minimum": 2
+      },
+      "réseau senior expert": {
+        "titres": [
+          "Senior Network Engineer",
+          "Senior Netzwerk Engineer",
+          "Senior Netzwerkingenieur"
+        ],
+        "expertises": [
+          "réseau expert"
+        ],
+        "minimum": 1
+      }
+    }
   }
 }

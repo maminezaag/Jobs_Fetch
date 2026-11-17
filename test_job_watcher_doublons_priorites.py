@@ -125,7 +125,8 @@ class Priorites(unittest.TestCase):
         a = annonce('P6','Python Developer', 'Linux Python PowerShell')
         b = annonce('P7','Head of IT Operations', 'Linux')
         s = w.build_email_body([a,b])
-        self.assertLess(s.index('Head of IT Operations'), s.index('Python Developer'))
+        self.assertIn('Head of IT Operations', s)
+        self.assertNotIn('Python Developer', s)  # métier hors profil : plus de notification
 
 
 class Dedoublonnage(unittest.TestCase):

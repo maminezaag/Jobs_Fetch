@@ -114,6 +114,8 @@ class JobResult:
     bonus_metier: int = 0
     metier_cible: bool = False
     priorite_metier: str = "À examiner"
+    categorie_profil: str = "prioritaire"  # "prioritaire", "a_examiner" ou "hors_profil"
+    motifs_profil: list[str] = field(default_factory=list)
     statut_teletravail: str = "aucun"
     localisations: list[dict[str, Any]] = field(default_factory=list)
     motifs_adequation: list[str] = field(default_factory=list)
@@ -168,6 +170,7 @@ def load_config(path: Path) -> dict[str, Any]:
     cfg["criteres"]["francais"] = criteres_data.get("francais", {})
     cfg["criteres"]["adequation_metier"] = criteres_data.get("adequation_metier", {})
     cfg["criteres"]["priorites_metier"] = criteres_data.get("priorites_metier", {})
+    cfg["criteres"]["compatibilite_profil"] = criteres_data.get("compatibilite_profil", {})
 
     return cfg
 
@@ -757,6 +760,95 @@ def _priorite_metier(job: JobResult, crit: dict[str, Any]) -> str:
     return "À examiner"
 
 
+
+def _exigences_avancees_obligatoires(description: str, regles: dict[str, Any]) -> list[str]:
+    """Détecte une compétence avancée *obligatoire*, dans la même exigence.
+
+    Une simple mention dans la description ou une compétence « souhaitable »
+    n'est pas une condition éliminatoire. On réserve le classement secondaire
+    aux exigences fermes de spécialités éloignées du parcours système classique.
+    """
+    if not description:
+        return []
+    texte = re.sub(r"</(?:li|p|div|h[1-6]|ul|ol)>|<br\s*/?>", "\n", description, flags=re.I)
+    texte = re.sub(r"<[^>]+>", " ", texte)
+    clauses = re.split(r"[\n\r;.!?]+", texte)
+    trouvees = []
+    for clause in clauses:
+        if any(_expression_presente(x, clause) for x in regles.get("mots_optionnels", [])):
+            continue
+        if not any(_expression_presente(x, clause) for x in regles.get("mots_exigence_ferme", [])):
+            continue
+        for nom, termes in regles.get("expertises_avancees", {}).items():
+            if any(_expression_presente(x, clause) for x in termes) and nom not in trouvees:
+                trouvees.append(nom)
+    return trouvees
+
+
+def _compatibilite_profil(job: JobResult, crit: dict[str, Any]) -> tuple[str, list[str]]:
+    """Catégorise sans éliminer ni modifier le score historique.
+
+    Décision fondée sur le TYPE de poste et sur les exigences réelles, pas sur
+    l'accumulation de mots Linux/Python/Git qui gonfle les scores DevOps.
+    Les postes pertinents sont regroupés dans un seul e-mail à deux sections.
+    Seuls les postes manifestement hors compétences sont archivés sans notification.
+    """
+    reg = crit.get("compatibilite_profil", {}) or {}
+    if not reg.get("actif", False):
+        return "prioritaire", ["classement profil désactivé"]
+    titre = job.title
+    motifs = []
+    # Exclusions très ciblées : une spécialisation explicitement hors du profil,
+    # jamais un employeur entier ni un mot isolé (Linux, Kubernetes, Cloud, etc.).
+    for expression in reg.get("titres_hors_profil", []):
+        if _expression_presente(expression, titre):
+            return "hors_profil", [f"poste spécialisé hors compétences actuelles : {expression}"]
+
+    exigences = _exigences_avancees_obligatoires(job.description, reg)
+    groupes_obligatoires = set(exigences)
+    for famille, spec in (reg.get("hors_si_exigences", {}) or {}).items():
+        titres = spec.get("titres", [])
+        if not any(_expression_presente(x, titre) for x in titres):
+            continue
+        requis = set(spec.get("expertises", []))
+        nb = int(spec.get("minimum", 1))
+        if len(groupes_obligatoires & requis) >= nb:
+            return "hors_profil", [f"spécialisation obligatoire hors profil ({famille}) : "
+                                    + ", ".join(sorted(groupes_obligatoires & requis))]
+
+    # Le poste, pas l'employeur, détermine l'appartenance au cœur de métier.
+    # Des titres trop spécialisés sont à examiner même avec un score élevé.
+    for famille, expressions in reg.get("titres_a_examiner", {}).items():
+        if any(_expression_presente(x, titre) for x in expressions):
+            return "a_examiner", [f"spécialisation {famille} hors cœur du profil"]
+
+    if exigences:
+        return "a_examiner", ["exigence(s) avancée(s) : " + ", ".join(exigences)]
+
+    if any(_expression_presente(x, titre) for x in reg.get("titres_prioritaires", [])):
+        return "prioritaire", ["métier d'administration / exploitation IT ciblé"]
+
+    # Support 2nd / 3rd level avec preuve système : intéressant, mais
+    # hotline/rollout/1st level uniquement = e-mail secondaire.
+    if any(_expression_presente(x, titre) for x in reg.get("support_titres", [])):
+        if any(_expression_presente(x, titre) for x in reg.get("support_niveau_avance", [])):
+            return "prioritaire", ["support technique 2nd/3rd level"]
+        if any(_expression_presente(x, job.description) for x in
+               reg.get("support_preuves_infrastructure", [])):
+            return "prioritaire", ["support avec administration infrastructure"]
+        return "a_examiner", ["support essentiellement utilisateur/terrain"]
+
+    # Un System Engineer / IT Specialist / IT Administration sans mention IT
+    # explicite doit faire la preuve d'une vraie infrastructure.
+    if any(_expression_presente(x, titre) for x in reg.get("titres_conditionnels", [])):
+        preuves = sum(any(_expression_presente(terme, job.description) for terme in
+                          groupe) for groupe in reg.get("preuves_infrastructure", []))
+        if preuves >= int(reg.get("minimum_preuves_infra", 2)):
+            return "prioritaire", ["missions et technologies d'infrastructure confirmées"]
+        return "a_examiner", ["intitulé générique, missions infrastructure à confirmer"]
+
+    return "a_examiner", ["poste IT connexe, adéquation à vérifier"]
+
 def _metier_francais_pertinent(job: JobResult, crit: dict[str, Any]) -> bool:
     """Le français ne doit PAS transformer un poste SAP fonctionnel en poste IT.
 
@@ -988,6 +1080,23 @@ def evaluate(job: JobResult, cfg: dict[str, Any]) -> None:
         if mots_titre and not any(_mot_dans_titre(m, job.title) for m in mots_titre):
             job.matched_elimination.append("titre hors IT (recherche 'français')")
 
+    # Le classement profil ne touche pas au score, ni aux règles de langue
+    # ou de distance. Le filtre hors profil s'applique seulement après scoring.
+    job.categorie_profil, job.motifs_profil = _compatibilite_profil(job, crit)
+    # Conserver la priorité historique pour les familles IT ordinaires;
+    # une spécialité avancée qui était étiquetée « Très adapté » ne doit
+    # plus apparaître ainsi dans l'e-mail secondaire.
+    if job.categorie_profil != "prioritaire" and job.priorite_metier == "Très adapté":
+        # La catégorie profil a priorité sur un score/titre générique flatteur.
+        # Garder l'ancienne étiquette « Adapté » pour les autres métiers IT.
+        job.priorite_metier = "À examiner"
+    elif job.categorie_profil == "prioritaire" and (
+        any(_expression_presente(x, job.title) for x in
+            ("IT-Systemmanager", "IT Systemmanager", "IT Serverinfrastruktur", "IT-Administration"))
+        or re.search(r"\bIT\s*[- ]\s*Systemmanager\b", job.title, re.I)
+    ):
+        job.priorite_metier = "Très adapté"
+
 
 def _mot_dans_titre(mot: str, titre: str) -> bool:
     """Le mot doit commencer un mot du titre ('Admin' trouve 'Administrator') ; les mots de 3 lettres
@@ -1070,6 +1179,8 @@ def _lignes_offre(j: JobResult) -> list[str]:
         f"● {j.title} — {j.employer}{avertissement}",
         f"  Lieu : {j.plz} {j.ort} ({j.region}) | Source : {j.source}",
         f"  Priorité métier : {j.priorite_metier}",
+        f"  Compatibilité profil : {('PRIORITAIRE' if j.categorie_profil == 'prioritaire' else 'À EXAMINER' if j.categorie_profil == 'a_examiner' else 'HORS PROFIL')}"
+        + (f" — {', '.join(j.motifs_profil)}" if j.motifs_profil else ""),
         f"  Score : {j.score} points (technique {j.score_brut}, "
         f"bonus métier +{j.bonus_metier}, pénalité -{j.penalite_metier})" +
         f" | Compétences : {', '.join(j.matched_positive) or '-'}",
@@ -1080,19 +1191,32 @@ def _lignes_offre(j: JobResult) -> list[str]:
 
 
 def build_email_body(jobs: list[JobResult]) -> str:
+    """Un seul e-mail, deux sections, français identifié dans chacune.
+
+    Les offres hors profil sont volontairement absentes du corps ; elles sont
+    conservées dans l'historique « vus » pour audit ultérieur.
+    """
     rang = {"Très adapté": 0, "Adapté": 1, "À examiner": 2}
-    critere = lambda j: (rang.get(j.priorite_metier, 2), -j.score, j.title)
-    fr = sorted([j for j in jobs if j.francais], key=critere)
-    autres = sorted([j for j in jobs if not j.francais], key=critere)
-    lines = [f"{len(jobs)} nouvelle(s) offre(s) correspondant à tes critères :", ""]
-    if fr:
-        lines += [f"🇫🇷 OFFRES AVEC FRANÇAIS ({len(fr)}) — toute l'Allemagne", "=" * 50, ""]
-        for j in fr:
-            lines += _lignes_offre(j)
+    ordre = lambda j: (rang.get(j.priorite_metier, 2), -j.score, j.title)
+    prioritaires = sorted((j for j in jobs if j.categorie_profil == "prioritaire"), key=ordre)
+    a_examiner = sorted((j for j in jobs if j.categorie_profil == "a_examiner"), key=ordre)
+    nb = len(prioritaires) + len(a_examiner)
+    lines = [f"{nb} nouvelle(s) offre(s) correspondant à tes critères :",
+             f"{len(prioritaires)} prioritaire(s), {len(a_examiner)} à examiner.", ""]
+    for titre, groupe in (("OFFRES PRIORITAIRES", prioritaires),
+                          ("OFFRES À EXAMINER", a_examiner)):
+        if not groupe:
+            continue
+        lines += [f"{titre} ({len(groupe)})", "=" * 50, ""]
+        francaises = [j for j in groupe if j.francais]
+        autres = [j for j in groupe if not j.francais]
+        if francaises:
+            lines += [f"🇫🇷 OFFRES AVEC FRANÇAIS ({len(francaises)})", ""]
+            for j in francaises:
+                lines += _lignes_offre(j)
         if autres:
-            lines += [f"AUTRES OFFRES ({len(autres)})", "=" * 50, ""]
-    for j in autres:
-        lines += _lignes_offre(j)
+            for j in autres:
+                lines += _lignes_offre(j)
     return "\n".join(lines)
 
 
@@ -1114,7 +1238,10 @@ def send_email(cfg: dict[str, Any], jobs: list[JobResult]) -> bool:
 
     recipients = [addr.strip() for addr in to_raw.split(",") if addr.strip()]
     nb_fr = sum(1 for j in jobs if j.francais)
-    subject = f"[Job Watcher] {len(jobs)} nouvelle(s) offre(s) IT à Oldenburg/Bremen"
+    nb_prioritaires = sum(j.categorie_profil == "prioritaire" for j in jobs)
+    nb_examiner = sum(j.categorie_profil == "a_examiner" for j in jobs)
+    subject = (f"[Job Watcher] {len(jobs)} offre(s) IT — "
+               f"{nb_prioritaires} prioritaire(s), {nb_examiner} à examiner")
     if nb_fr:
         subject += f" (dont {nb_fr} avec français 🇫🇷)"
     body = build_email_body(jobs)
@@ -1235,11 +1362,22 @@ def main() -> None:
     if doublons_historiques:
         logger.info("Doublons d'annonces déjà notifiées (autre référence BA) : %d", len(doublons_historiques))
     qualifies = [j for j in qualifies if j not in doublons_historiques]
+    # Garder la collecte large et l'historique complet. Les postes *clairement*
+    # hors profil ne sont pas envoyés, même lorsque leur score est élevé.
+    hors_profil = [j for j in qualifies if j.categorie_profil == "hors_profil"]
+    qualifies = [j for j in qualifies if j.categorie_profil != "hors_profil"]
+    if hors_profil:
+        logger.info("Hors profil non notifiés : %d (toujours dans l'historique vus).",
+                    len(hors_profil))
+        for j in hors_profil:
+            logger.info("  ⊘ %s — %s : %s", j.title, j.employer, "; ".join(j.motifs_profil))
     eliminees = [j for j in results if j.eliminated]
     references_qualifiees = {j.refnr for j in qualifies}
     references_doublons = {j.refnr for j in doublons_run + doublons_historiques}
+    references_hors_profil = {j.refnr for j in hors_profil}
     sous_le_seuil = [j for j in results if j.refnr not in references_qualifiees
-                     and j.refnr not in references_doublons and not j.eliminated]
+                     and j.refnr not in references_doublons
+                     and j.refnr not in references_hors_profil and not j.eliminated]
 
     if qualifies:
         entreprises_recentes = load_recent_companies(cfg, session)
@@ -1260,28 +1398,29 @@ def main() -> None:
             logger.info("  ↳ Adéquation métier : %s (-%d points)", ", ".join(j.motifs_adequation), j.penalite_metier)
         logger.info("  ○ %s — %s (%d pts, sous le seuil de %d) [%s] %s", j.title, j.employer, j.score, seuil, j.source, j.url)
 
-    if qualifies and not args.dry_run:
-        if send_email(cfg, qualifies):
-            # Ce registre contient seulement les offres réellement envoyées.
-            # Il complète 'vus' sans changer son format ni rejouer l'historique.
-            nouvelles = [_empreinte_notification(j) for j in qualifies]
-            state.setdefault("notifications", []).extend(nouvelles)
-            # Purge prudente des très anciens enregistrements (sans toucher vus).
-            today = datetime.now(timezone.utc).date()
-            state["notifications"] = [n for n in state["notifications"]
-                if n.get("date") and _date_proche(n.get("date"), today.isoformat(), 60)]
+    if qualifies:
+        prioritaires = [j for j in qualifies if j.categorie_profil == "prioritaire"]
+        secondaires = [j for j in qualifies if j.categorie_profil == "a_examiner"]
+        logger.info("Répartition de l'unique e-mail : %d prioritaire(s), %d à examiner ; %d hors profil non notifiées.",
+                    len(prioritaires), len(secondaires), len(hors_profil))
+        if args.dry_run:
+            print("\n--- APERÇU DU MAIL UNIQUE (dry-run, aucun e-mail envoyé) ---\n")
+            print(build_email_body(qualifies))
         else:
-            # Sans confirmation SMTP, ces offres doivent rester disponibles
-            # pour une nouvelle notification lors de la prochaine exécution.
-            for j in qualifies:
-                state["vus"].pop(j.refnr, None)
-            logger.warning(
-                "SMTP en échec : %d annonce(s) qualifiée(s) NON marquée(s) vue(s) ; nouvel essai au prochain run.",
-                len(qualifies),
-            )
-    elif qualifies and args.dry_run:
-        print("\n--- APERÇU (dry-run, aucun e-mail envoyé) ---\n")
-        print(build_email_body(qualifies))
+            # L'envoi est atomique : 1 mail / 1 succès ou échec. En cas d'échec
+            # SMTP, toutes ses offres pourront être retentées au prochain run.
+            if send_email(cfg, qualifies):
+                state.setdefault("notifications", []).extend(
+                    _empreinte_notification(j) for j in qualifies
+                )
+            else:
+                for j in qualifies:
+                    state["vus"].pop(j.refnr, None)
+                logger.warning("SMTP en échec : %d offre(s) à retenter au prochain run.", len(qualifies))
+            if state.get("notifications"):
+                today = datetime.now(timezone.utc).date()
+                state["notifications"] = [n for n in state["notifications"]
+                    if n.get("date") and _date_proche(n.get("date"), today.isoformat(), 60)]
 
     if args.dry_run:
         logger.info("Mode dry-run : seen_jobs.json laissé intact. %s",
